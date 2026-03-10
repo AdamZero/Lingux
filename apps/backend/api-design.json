@@ -1,0 +1,577 @@
+{
+  "openapi": "3.0.0",
+  "info": {
+    "title": "Lingux API",
+    "description": "API for Lingux, a multi-language management platform. [FROZEN V1 CONTRACT] - Incorporates unified Action API and complete resource navigation.",
+    "version": "1.3.0"
+  },
+  "servers": [
+    {
+      "url": "/api/v1"
+    }
+  ],
+  "tags": [
+    { "name": "Projects", "description": "Manage projects" },
+    { "name": "Locales", "description": "Manage global locales" },
+    { "name": "Namespaces", "description": "Manage namespaces within a project" },
+    { "name": "Keys & Translations", "description": "Core endpoints for managing keys and their translations" },
+    { "name": "Tasks", "description": "Manage asynchronous tasks like batch translation" },
+    { "name": "Assets", "description": "Manage static assets for translation" },
+    { "name": "Audit Logs", "description": "View system activity logs" },
+    { "name": "Users", "description": "User profile and management" }
+  ],
+  "paths": {
+    "/projects": {
+      "get": {
+        "summary": "List all projects",
+        "tags": ["Projects"],
+        "responses": {
+          "200": {
+            "description": "A list of projects.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": { "$ref": "#/components/schemas/Project" }
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "summary": "Create a new project",
+        "tags": ["Projects"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "name": { "type": "string" },
+                  "description": { "type": "string" },
+                  "baseLocale": { "type": "string", "default": "zh-CN" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Project created successfully.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/Project" } }
+            }
+          },
+          "400": { "$ref": "#/components/responses/BadRequest" }
+        }
+      }
+    },
+    "/projects/{projectId}": {
+      "get": {
+        "summary": "Get a single project by ID",
+        "tags": ["Projects"],
+        "parameters": [{ "name": "projectId", "in": "path", "required": true, "schema": { "type": "string" } }],
+        "responses": {
+          "200": {
+            "description": "A single project.",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Project" } } }
+          },
+          "404": { "$ref": "#/components/responses/NotFound" }
+        }
+      },
+      "patch": {
+        "summary": "Update a project",
+        "tags": ["Projects"],
+        "parameters": [{ "name": "projectId", "in": "path", "required": true, "schema": { "type": "string" } }],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "name": { "type": "string" },
+                  "description": { "type": "string" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Project updated", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Project" } } } }
+        }
+      },
+      "delete": {
+        "summary": "Delete a project",
+        "tags": ["Projects"],
+        "parameters": [{ "name": "projectId", "in": "path", "required": true, "schema": { "type": "string" } }],
+        "responses": {
+          "204": { "description": "Project deleted" }
+        }
+      }
+    },
+    "/locales": {
+      "get": {
+        "summary": "List all global locales",
+        "tags": ["Locales"],
+        "responses": {
+          "200": {
+            "description": "A list of global locales.",
+            "content": {
+              "application/json": {
+                "schema": { "type": "array", "items": { "$ref": "#/components/schemas/Locale" } }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "summary": "Create a new global locale",
+        "tags": ["Locales"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "code": { "type": "string", "example": "en-US" },
+                  "name": { "type": "string", "example": "English" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": { "description": "Locale created", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Locale" } } } }
+        }
+      }
+    },
+    "/projects/{projectId}/namespaces": {
+      "get": {
+        "summary": "List all namespaces for a project",
+        "tags": ["Namespaces"],
+        "parameters": [{ "name": "projectId", "in": "path", "required": true, "schema": { "type": "string" } }],
+        "responses": {
+          "200": {
+            "description": "A list of namespaces for the project.",
+            "content": {
+              "application/json": {
+                "schema": { "type": "array", "items": { "$ref": "#/components/schemas/Namespace" } }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "summary": "Create a new namespace",
+        "tags": ["Namespaces"],
+        "parameters": [{ "name": "projectId", "in": "path", "required": true, "schema": { "type": "string" } }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "name": { "type": "string", "example": "common" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": { "description": "Namespace created", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Namespace" } } } }
+        }
+      }
+    },
+    "/projects/{projectId}/namespaces/{namespaceId}": {
+      "patch": {
+        "summary": "Update namespace",
+        "tags": ["Namespaces"],
+        "parameters": [
+          { "name": "projectId", "in": "path", "required": true, "schema": { "type": "string" } },
+          { "name": "namespaceId", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "requestBody": {
+          "content": { "application/json": { "schema": { "type": "object", "properties": { "name": { "type": "string" } } } } }
+        },
+        "responses": {
+          "200": { "description": "Updated", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Namespace" } } } }
+        }
+      },
+      "delete": {
+        "summary": "Delete namespace",
+        "tags": ["Namespaces"],
+        "parameters": [
+          { "name": "projectId", "in": "path", "required": true, "schema": { "type": "string" } },
+          { "name": "namespaceId", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "responses": {
+          "204": { "description": "Deleted" }
+        }
+      }
+    },
+    "/projects/{projectId}/namespaces/{namespaceId}/publish": {
+      "post": {
+        "summary": "Publish namespace translations",
+        "tags": ["Namespaces"],
+        "description": "Triggers the publication of all approved translations in this namespace to the CDN/distribution layer.",
+        "parameters": [
+          { "name": "projectId", "in": "path", "required": true, "schema": { "type": "string" } },
+          { "name": "namespaceId", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "responses": {
+          "202": { "description": "Publish task started", "content": { "application/json": { "schema": { "type": "object", "properties": { "taskId": { "type": "string", "format": "uuid" } } } } } }
+        }
+      }
+    },
+    "/projects/{projectId}/namespaces/{namespaceId}/keys": {
+      "get": {
+        "summary": "List keys in a namespace with translations",
+        "tags": ["Keys & Translations"],
+        "parameters": [
+          { "name": "projectId", "in": "path", "required": true, "schema": { "type": "string" } },
+          { "name": "namespaceId", "in": "path", "required": true, "schema": { "type": "string" } },
+          { "name": "page", "in": "query", "schema": { "type": "integer", "default": 1 } },
+          { "name": "limit", "in": "query", "schema": { "type": "integer", "default": 20 } },
+          { "name": "search", "in": "query", "description": "Search by key name", "schema": { "type": "string" } }
+        ],
+        "responses": {
+          "200": {
+            "description": "A paginated list of keys with their translations.",
+            "content": {
+              "application/json": {
+                "schema": { "type": "array", "items": { "$ref": "#/components/schemas/Key" } }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "summary": "Create a new key",
+        "tags": ["Keys & Translations"],
+        "description": "Creates a new key and optionally initializes its translations.",
+        "parameters": [
+          { "name": "projectId", "in": "path", "required": true, "schema": { "type": "string" } },
+          { "name": "namespaceId", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "name": { "type": "string", "example": "page.home.title" },
+                  "description": { "type": "string", "example": "The main title on the homepage" },
+                  "type": { "$ref": "#/components/schemas/KeyType" },
+                  "translations": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "localeCode": { "type": "string", "example": "en-US" },
+                        "content": { "type": "string", "example": "Hello World" }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": { "description": "Key created", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Key" } } } },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "409": { "$ref": "#/components/responses/Conflict" }
+        }
+      }
+    },
+    "/projects/{projectId}/namespaces/{namespaceId}/keys/{keyId}": {
+      "get": {
+        "summary": "Get a single key by ID",
+        "tags": ["Keys & Translations"],
+        "parameters": [
+          { "name": "projectId", "in": "path", "required": true, "schema": { "type": "string" } },
+          { "name": "namespaceId", "in": "path", "required": true, "schema": { "type": "string" } },
+          { "name": "keyId", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "responses": {
+          "200": { "description": "A single key with its translations.", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Key" } } } },
+          "404": { "$ref": "#/components/responses/NotFound" }
+        }
+      },
+      "delete": {
+        "summary": "Delete key",
+        "tags": ["Keys & Translations"],
+        "parameters": [
+          { "name": "projectId", "in": "path", "required": true, "schema": { "type": "string" } },
+          { "name": "namespaceId", "in": "path", "required": true, "schema": { "type": "string" } },
+          { "name": "keyId", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "responses": {
+          "204": { "description": "Deleted" }
+        }
+      }
+    },
+    "/projects/{projectId}/namespaces/{namespaceId}/keys/{keyId}/translations/{localeCode}": {
+      "patch": {
+        "summary": "Upsert a translation",
+        "tags": ["Keys & Translations"],
+        "description": "Updates or creates a translation for a specific key and locale. Server must validate that the localeCode is enabled for the project.",
+        "parameters": [
+          { "name": "projectId", "in": "path", "required": true, "schema": { "type": "string" } },
+          { "name": "namespaceId", "in": "path", "required": true, "schema": { "type": "string" } },
+          { "name": "keyId", "in": "path", "required": true, "schema": { "type": "string" } },
+          { "name": "localeCode", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": { "application/json": { "schema": { "type": "object", "properties": { "content": { "type": "string" } } } } }
+        },
+        "responses": {
+          "200": { "description": "Translation updated.", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Translation" } } } },
+          "400": { "$ref": "#/components/responses/BadRequest" }
+        }
+      }
+    },
+    "/projects/{projectId}/namespaces/{namespaceId}/keys/{keyId}/translations/{localeCode}/approve": {
+      "post": {
+        "summary": "Approve a translation",
+        "tags": ["Keys & Translations"],
+        "description": "Unified Action API: Approves a translation using localeCode instead of database ID.",
+        "parameters": [
+          { "name": "projectId", "in": "path", "required": true, "schema": { "type": "string" } },
+          { "name": "namespaceId", "in": "path", "required": true, "schema": { "type": "string" } },
+          { "name": "keyId", "in": "path", "required": true, "schema": { "type": "string" } },
+          { "name": "localeCode", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "responses": {
+          "200": { "description": "Approved", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Translation" } } } },
+          "403": { "$ref": "#/components/responses/Forbidden" },
+          "404": { "$ref": "#/components/responses/NotFound" }
+        }
+      }
+    },
+    "/projects/{projectId}/namespaces/{namespaceId}/keys/{keyId}/translations/{localeCode}/reject": {
+      "post": {
+        "summary": "Reject a translation",
+        "tags": ["Keys & Translations"],
+        "description": "Unified Action API: Rejects a translation using localeCode.",
+        "parameters": [
+          { "name": "projectId", "in": "path", "required": true, "schema": { "type": "string" } },
+          { "name": "namespaceId", "in": "path", "required": true, "schema": { "type": "string" } },
+          { "name": "keyId", "in": "path", "required": true, "schema": { "type": "string" } },
+          { "name": "localeCode", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "requestBody": {
+          "content": { "application/json": { "schema": { "type": "object", "properties": { "reason": { "type": "string" } } } } }
+        },
+        "responses": {
+          "200": { "description": "Rejected", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Translation" } } } }
+        }
+      }
+    },
+    "/projects/{projectId}/namespaces/{namespaceId}/keys/{keyId}/translations/{localeCode}/publish": {
+      "post": {
+        "summary": "Publish a single translation",
+        "tags": ["Keys & Translations"],
+        "description": "Unified Action API: Publishes a specific translation immediately.",
+        "parameters": [
+          { "name": "projectId", "in": "path", "required": true, "schema": { "type": "string" } },
+          { "name": "namespaceId", "in": "path", "required": true, "schema": { "type": "string" } },
+          { "name": "keyId", "in": "path", "required": true, "schema": { "type": "string" } },
+          { "name": "localeCode", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "responses": {
+          "200": { "description": "Published", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Translation" } } } }
+        }
+      }
+    },
+    "/projects/{projectId}/translations/batch/llm-translate": {
+      "post": {
+        "summary": "Batch translate with LLM (Async)",
+        "tags": ["Tasks"],
+        "parameters": [{ "name": "projectId", "in": "path", "required": true, "schema": { "type": "string" } }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "sourceLocale": { "type": "string" },
+                  "targetLocales": { "type": "array", "items": { "type": "string" } },
+                  "keyIds": { "type": "array", "items": { "type": "string" } }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": { "description": "Accepted", "content": { "application/json": { "schema": { "type": "object", "properties": { "taskId": { "type": "string", "format": "uuid" } } } } } }
+        }
+      }
+    },
+    "/tasks/{taskId}": {
+      "get": {
+        "summary": "Get task status",
+        "tags": ["Tasks"],
+        "parameters": [{ "name": "taskId", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }],
+        "responses": {
+          "200": { "description": "Status", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Task" } } } }
+        }
+      }
+    },
+    "/projects/{projectId}/assets": {
+      "get": {
+        "summary": "List project assets",
+        "tags": ["Assets"],
+        "parameters": [{ "name": "projectId", "in": "path", "required": true, "schema": { "type": "string" } }],
+        "responses": {
+          "200": { "description": "Assets", "content": { "application/json": { "schema": { "type": "array", "items": { "$ref": "#/components/schemas/Asset" } } } } }
+        }
+      },
+      "post": {
+        "summary": "Upload asset",
+        "tags": ["Assets"],
+        "parameters": [{ "name": "projectId", "in": "path", "required": true, "schema": { "type": "string" } }],
+        "requestBody": {
+          "content": { "multipart/form-data": { "schema": { "type": "object", "properties": { "file": { "type": "string", "format": "binary" }, "name": { "type": "string" } } } } }
+        },
+        "responses": {
+          "201": { "description": "Uploaded", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Asset" } } } }
+        }
+      }
+    },
+    "/projects/{projectId}/audit-logs": {
+      "get": {
+        "summary": "Get project audit logs",
+        "tags": ["Audit Logs"],
+        "parameters": [
+          { "name": "projectId", "in": "path", "required": true, "schema": { "type": "string" } },
+          { "name": "page", "in": "query", "schema": { "type": "integer" } }
+        ],
+        "responses": {
+          "200": { "description": "Logs", "content": { "application/json": { "schema": { "type": "array", "items": { "$ref": "#/components/schemas/AuditLog" } } } } }
+        }
+      }
+    },
+    "/users/me": {
+      "get": {
+        "summary": "Get current user info",
+        "tags": ["Users"],
+        "responses": {
+          "200": { "description": "User info", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/User" } } } }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "Project": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string", "format": "uuid" },
+          "name": { "type": "string" },
+          "description": { "type": "string" },
+          "baseLocale": { "type": "string" },
+          "createdAt": { "type": "string", "format": "date-time" },
+          "updatedAt": { "type": "string", "format": "date-time" }
+        }
+      },
+      "Locale": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string", "format": "uuid" },
+          "code": { "type": "string" },
+          "name": { "type": "string" }
+        }
+      },
+      "Namespace": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string", "format": "uuid" },
+          "name": { "type": "string" },
+          "projectId": { "type": "string", "format": "uuid" }
+        }
+      },
+      "Key": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string", "format": "uuid" },
+          "name": { "type": "string" },
+          "description": { "type": "string" },
+          "type": { "$ref": "#/components/schemas/KeyType" },
+          "translations": { "type": "array", "items": { "$ref": "#/components/schemas/Translation" } }
+        }
+      },
+      "KeyType": { "type": "string", "enum": ["TEXT", "RICH_TEXT", "ASSET"] },
+      "Translation": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string", "format": "uuid" },
+          "content": { "type": "string" },
+          "status": { "$ref": "#/components/schemas/TranslationStatus" },
+          "localeCode": { "type": "string" }
+        }
+      },
+      "TranslationStatus": { "type": "string", "enum": ["PENDING", "TRANSLATING", "REVIEWING", "APPROVED", "PUBLISHED"] },
+      "Task": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string", "format": "uuid" },
+          "status": { "$ref": "#/components/schemas/TaskStatus" },
+          "progress": { "type": "integer" },
+          "result": { "type": "object" },
+          "error": { "type": "string" }
+        }
+      },
+      "TaskStatus": { "type": "string", "enum": ["PENDING", "PROCESSING", "COMPLETED", "FAILED"] },
+      "Asset": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string", "format": "uuid" },
+          "name": { "type": "string" },
+          "url": { "type": "string" },
+          "type": { "type": "string" }
+        }
+      },
+      "AuditLog": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string", "format": "uuid" },
+          "action": { "type": "string" },
+          "targetType": { "type": "string" },
+          "targetId": { "type": "string" },
+          "createdAt": { "type": "string", "format": "date-time" }
+        }
+      },
+      "User": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string", "format": "uuid" },
+          "username": { "type": "string" },
+          "email": { "type": "string" },
+          "role": { "type": "string", "enum": ["ADMIN", "EDITOR", "REVIEWER"] }
+        }
+      },
+      "ApiError": {
+        "type": "object",
+        "properties": {
+          "statusCode": { "type": "integer" },
+          "message": { "type": "string" },
+          "error": { "type": "string" }
+        }
+      }
+    },
+    "responses": {
+      "BadRequest": { "description": "Bad Request", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } } } },
+      "NotFound": { "description": "Not Found", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } } } },
+      "Forbidden": { "description": "Forbidden", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } } } },
+      "Conflict": { "description": "Conflict", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } } } }
+    }
+  }
+}

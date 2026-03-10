@@ -1,0 +1,138 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model Project {
+  id          String   @id @default(uuid())
+  name        String
+  description String?
+  baseLocale  String   @default("zh-CN")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  namespaces  Namespace[]
+  locales     Locale[]    @relation("ProjectLocales")
+  users       User[]      @relation("ProjectUsers")
+}
+
+model Locale {
+  id        String   @id @default(uuid())
+  code      String   @unique // e.g., "en-US"
+  name      String   // e.g., "English"
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  projects     Project[]     @relation("ProjectLocales")
+  translations Translation[]
+}
+
+model Namespace {
+  id        String   @id @default(uuid())
+  name      String   // e.g., "common"
+  projectId String
+  project   Project  @relation(fields: [projectId], references: [id])
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  keys Key[]
+
+  @@unique([projectId, name])
+}
+
+enum KeyType {
+  TEXT
+  RICH_TEXT
+  ASSET
+}
+
+model Key {
+  id          String   @id @default(uuid())
+  name        String   // e.g., "login.submit"
+  description String?
+  type        KeyType  @default(TEXT)
+  namespaceId String
+  namespace   Namespace @relation(fields: [namespaceId], references: [id])
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  translations Translation[]
+
+  @@unique([namespaceId, name])
+}
+
+enum TranslationStatus {
+  PENDING      // 待翻译
+  TRANSLATING  // 翻译中
+  REVIEWING    // 审核中
+  APPROVED     // 已审核
+  PUBLISHED    // 已发布
+}
+
+model Translation {
+  id             String            @id @default(uuid())
+  content        String            @db.Text
+  status         TranslationStatus @default(PENDING)
+  isLlmTranslated Boolean           @default(false)
+  
+  keyId     String
+  key       Key      @relation(fields: [keyId], references: [id])
+  localeId  String
+  locale    Locale   @relation(fields: [localeId], references: [id])
+  
+  reviewerId String?
+  reviewer   User?    @relation("Reviewer", fields: [reviewerId], references: [id])
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([keyId, localeId])
+}
+
+enum UserRole {
+  ADMIN
+  EDITOR
+  REVIEWER
+}
+
+model User {
+  id         String   @id @default(uuid())
+  username   String   @unique
+  email      String?  @unique
+  role       UserRole @default(EDITOR)
+  externalId String?  @unique // For Feishu/DingTalk
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  projects     Project[]     @relation("ProjectUsers")
+  reviews      Translation[] @relation("Reviewer")
+  auditLogs    AuditLog[]
+}
+
+model AuditLog {
+  id         String   @id @default(uuid())
+  action     String   // e.g., "CREATE", "UPDATE", "PUBLISH"
+  targetType String   // e.g., "Translation", "Key"
+  targetId   String
+  payload    Json?
+  userId     String
+  user       User     @relation(fields: [userId], references: [id])
+  createdAt  DateTime @default(now())
+}
+
+model Asset {
+  id          String   @id @default(uuid())
+  name        String
+  url         String
+  type        String   // e.g., "image", "video"
+  description String?
+  projectId   String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
