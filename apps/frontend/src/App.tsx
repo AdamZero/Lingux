@@ -1,35 +1,41 @@
-import { useState } from 'react'
-import reactLogo from './assets/react.svg'
-import viteLogo from '/vite.svg'
-import './App.css'
+import React from 'react';
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { ConfigProvider, App as AntdApp } from 'antd';
+import MainLayout from '@/layout/MainLayout';
+import ProjectPage from '@/pages/ProjectPage';
 
-function App() {
-  const [count, setCount] = useState(0)
+// Create a query client
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      retry: 1,
+      refetchOnWindowFocus: false,
+    },
+  },
+});
 
+const App: React.FC = () => {
   return (
-    <>
-      <div>
-        <a href="https://vite.dev" target="_blank">
-          <img src={viteLogo} className="logo" alt="Vite logo" />
-        </a>
-        <a href="https://react.dev" target="_blank">
-          <img src={reactLogo} className="logo react" alt="React logo" />
-        </a>
-      </div>
-      <h1>Vite + React</h1>
-      <div className="card">
-        <button onClick={() => setCount((count) => count + 1)}>
-          count is {count}
-        </button>
-        <p>
-          Edit <code>src/App.tsx</code> and save to test HMR
-        </p>
-      </div>
-      <p className="read-the-docs">
-        Click on the Vite and React logos to learn more
-      </p>
-    </>
-  )
-}
+    <QueryClientProvider client={queryClient}>
+      <ConfigProvider>
+        <AntdApp>
+          <BrowserRouter>
+            <Routes>
+              <Route path="/" element={<MainLayout />}>
+                <Route index element={<Navigate to="/projects" replace />} />
+                <Route path="projects" element={<ProjectPage />} />
+                <Route path="locales" element={<div>Locales Management Page</div>} />
+                <Route path="keys" element={<div>Keys Management Page</div>} />
+                <Route path="settings" element={<div>Settings Page</div>} />
+                <Route path="*" element={<div>404 Not Found</div>} />
+              </Route>
+            </Routes>
+          </BrowserRouter>
+        </AntdApp>
+      </ConfigProvider>
+    </QueryClientProvider>
+  );
+};
 
-export default App
+export default App;
