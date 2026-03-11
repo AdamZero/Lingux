@@ -21,6 +21,10 @@ export class LocaleService {
   }
 
   async findAll() {
-    return this.prisma.locale.findMany();
+    return this.prisma.locale.findMany({
+      orderBy: {
+        updatedAt: 'desc',
+      },
+    });
   }
 }

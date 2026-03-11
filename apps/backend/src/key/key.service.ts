@@ -36,8 +36,14 @@ export class KeyService {
         namespaceId: namespaceId,
         namespace: { projectId },
       },
+      orderBy: {
+        updatedAt: 'desc',
+      },
       include: {
         translations: {
+          orderBy: {
+            updatedAt: 'desc',
+          },
           include: {
             locale: true,
           },

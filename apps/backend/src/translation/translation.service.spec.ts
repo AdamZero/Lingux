@@ -153,6 +153,9 @@ describe('TranslationService', () => {
             namespace: { projectId },
           },
         },
+        orderBy: {
+          updatedAt: 'desc',
+        },
         include: {
           locale: true,
         },

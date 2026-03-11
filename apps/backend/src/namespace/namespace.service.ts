@@ -27,6 +27,9 @@ export class NamespaceService {
   async findAll(projectId: string) {
     return this.prisma.namespace.findMany({
       where: { projectId },
+      orderBy: {
+        updatedAt: 'desc',
+      },
     });
   }
 

@@ -19,8 +19,15 @@ export class ProjectService {
 
   async findAll() {
     return this.prisma.project.findMany({
+      orderBy: {
+        updatedAt: 'desc',
+      },
       include: {
-        locales: true,
+        locales: {
+          orderBy: {
+            updatedAt: 'desc',
+          },
+        },
       },
     });
   }
@@ -29,7 +36,11 @@ export class ProjectService {
     const project = await this.prisma.project.findUnique({
       where: { id },
       include: {
-        locales: true,
+        locales: {
+          orderBy: {
+            updatedAt: 'desc',
+          },
+        },
       },
     });
     if (!project) {
@@ -44,7 +55,11 @@ export class ProjectService {
         where: { id },
         data: updateProjectDto,
         include: {
-          locales: true,
+          locales: {
+            orderBy: {
+              updatedAt: 'desc',
+            },
+          },
         },
       });
     } catch (error) {
@@ -62,7 +77,11 @@ export class ProjectService {
           },
         },
         include: {
-          locales: true,
+          locales: {
+            orderBy: {
+              updatedAt: 'desc',
+            },
+          },
         },
       });
     } catch (error) {
@@ -80,7 +99,11 @@ export class ProjectService {
           },
         },
         include: {
-          locales: true,
+          locales: {
+            orderBy: {
+              updatedAt: 'desc',
+            },
+          },
         },
       });
     } catch (error) {

@@ -20,15 +20,15 @@ const ProjectPage: React.FC = () => {
   const { message } = AntdApp.useApp();
   const queryClient = useQueryClient();
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [editingProject, setEditingProject] = useState<Project | null>(null);
   const [form] = Form.useForm();
 
   // Fetch projects
-  const { data: projects, isLoading } = useQuery<Project[]>({
+  const { data: projects = [], isLoading } = useQuery<Project[]>({
     queryKey: ['projects'],
     queryFn: async () => {
       try {
-        const response = await apiClient.get('/project');
-        return response.data;
+        return await apiClient.get('/projects');
       } catch (error) {
         console.error('Failed to fetch projects', error);
         return [];
@@ -39,20 +39,72 @@ const ProjectPage: React.FC = () => {
   // Create project mutation
   const createMutation = useMutation({
     mutationFn: (values: { name: string; description?: string }) => 
-      apiClient.post('/project', values),
+      apiClient.post('/projects', values),
     onSuccess: () => {
       message.success('Project created successfully');
       setIsModalOpen(false);
       form.resetFields();
       queryClient.invalidateQueries({ queryKey: ['projects'] });
     },
-    onError: (error: any) => {
-      message.error(error.response?.data?.message || 'Failed to create project');
+    onError: (error: unknown) => {
+      const err = error as { response?: { data?: { message?: string } } };
+      message.error(err.response?.data?.message || 'Failed to create project');
     },
   });
 
-  const handleCreate = (values: { name: string; description?: string }) => {
+  const updateMutation = useMutation({
+    mutationFn: (values: { name: string; description?: string }) => {
+      if (!editingProject) {
+        throw new Error('No project selected for update');
+      }
+      return apiClient.patch(`/projects/${editingProject.id}`, values);
+    },
+    onSuccess: () => {
+      message.success('Project updated successfully');
+      setIsModalOpen(false);
+      setEditingProject(null);
+      form.resetFields();
+      queryClient.invalidateQueries({ queryKey: ['projects'] });
+    },
+    onError: (error: unknown) => {
+      const err = error as { response?: { data?: { message?: string } } };
+      message.error(err.response?.data?.message || 'Failed to update project');
+    },
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: (projectId: string) => apiClient.delete(`/projects/${projectId}`),
+    onSuccess: () => {
+      message.success('Project deleted successfully');
+      queryClient.invalidateQueries({ queryKey: ['projects'] });
+    },
+    onError: (error: unknown) => {
+      const err = error as { response?: { data?: { message?: string } } };
+      message.error(err.response?.data?.message || 'Failed to delete project');
+    },
+  });
+
+  const handleSubmit = (values: { name: string; description?: string }) => {
+    if (editingProject) {
+      updateMutation.mutate(values);
+      return;
+    }
     createMutation.mutate(values);
+  };
+
+  const openCreateModal = () => {
+    setEditingProject(null);
+    form.resetFields();
+    setIsModalOpen(true);
+  };
+
+  const openEditModal = (project: Project) => {
+    setEditingProject(project);
+    form.setFieldsValue({
+      name: project.name,
+      description: project.description,
+    });
+    setIsModalOpen(true);
   };
 
   const columns = [
@@ -78,10 +130,28 @@ const ProjectPage: React.FC = () => {
     {
       title: 'Actions',
       key: 'action',
-      render: () => (
+      render: (_: unknown, record: Project) => (
         <Space size="middle">
-          <Button type="text" icon={<EditOutlined />} />
-          <Button type="text" danger icon={<DeleteOutlined />} />
+          <Button
+            type="text"
+            icon={<EditOutlined />}
+            onClick={() => openEditModal(record)}
+          />
+          <Button
+            type="text"
+            danger
+            icon={<DeleteOutlined />}
+            loading={deleteMutation.isPending}
+            onClick={() => {
+              Modal.confirm({
+                title: 'Delete Project',
+                content: `Are you sure you want to delete "${record.name}"?`,
+                okText: 'Delete',
+                okButtonProps: { danger: true },
+                onOk: () => deleteMutation.mutate(record.id),
+              });
+            }}
+          />
         </Space>
       ),
     },
@@ -94,7 +164,7 @@ const ProjectPage: React.FC = () => {
         <Button 
           type="primary" 
           icon={<PlusOutlined />} 
-          onClick={() => setIsModalOpen(true)}
+          onClick={openCreateModal}
         >
           Create Project
         </Button>
@@ -110,16 +180,22 @@ const ProjectPage: React.FC = () => {
       </Card>
 
       <Modal
-        title="Create New Project"
+        title={editingProject ? 'Edit Project' : 'Create New Project'}
         open={isModalOpen}
         onOk={() => form.submit()}
-        onCancel={() => setIsModalOpen(false)}
-        confirmLoading={createMutation.isPending}
+        onCancel={() => {
+          setIsModalOpen(false);
+          setEditingProject(null);
+          form.resetFields();
+        }}
+        confirmLoading={
+          editingProject ? updateMutation.isPending : createMutation.isPending
+        }
       >
         <Form
           form={form}
           layout="vertical"
-          onFinish={handleCreate}
+          onFinish={handleSubmit}
         >
           <Form.Item
             name="name"

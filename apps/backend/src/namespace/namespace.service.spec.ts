@@ -74,6 +74,9 @@ describe('NamespaceService', () => {
       expect(result).toEqual(expectedResult);
       expect(prisma.namespace.findMany).toHaveBeenCalledWith({
         where: { projectId },
+        orderBy: {
+          updatedAt: 'desc',
+        },
       });
     });
   });

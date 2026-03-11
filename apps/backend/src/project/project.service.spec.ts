@@ -65,7 +65,18 @@ describe('ProjectService', () => {
 
       const result = await service.findAll();
       expect(result).toEqual(expectedResult);
-      expect(prisma.project.findMany).toHaveBeenCalled();
+      expect(prisma.project.findMany).toHaveBeenCalledWith({
+        orderBy: {
+          updatedAt: 'desc',
+        },
+        include: {
+          locales: {
+            orderBy: {
+              updatedAt: 'desc',
+            },
+          },
+        },
+      });
     });
   });
 
@@ -79,7 +90,13 @@ describe('ProjectService', () => {
       expect(result).toEqual(expectedResult);
       expect(prisma.project.findUnique).toHaveBeenCalledWith({
         where: { id },
-        include: { locales: true },
+        include: {
+          locales: {
+            orderBy: {
+              updatedAt: 'desc',
+            },
+          },
+        },
       });
     });
 
@@ -103,7 +120,13 @@ describe('ProjectService', () => {
       expect(prisma.project.update).toHaveBeenCalledWith({
         where: { id },
         data: updateDto,
-        include: { locales: true },
+        include: {
+          locales: {
+            orderBy: {
+              updatedAt: 'desc',
+            },
+          },
+        },
       });
     });
 

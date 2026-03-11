@@ -105,6 +105,9 @@ export class TranslationService {
           namespace: { projectId },
         },
       },
+      orderBy: {
+        updatedAt: 'desc',
+      },
       include: {
         locale: true,
       },

@@ -16,7 +16,6 @@ import {
   App as AntdApp,
   Tag,
   Drawer,
-  Card,
   Tooltip
 } from 'antd';
 import { 
@@ -25,13 +24,11 @@ import {
   DeleteOutlined, 
   EditOutlined,
   GlobalOutlined,
-  CheckCircleOutlined,
-  SyncOutlined
 } from '@ant-design/icons';
 import apiClient from '@/api/client';
 
 const { Sider, Content } = Layout;
-const { Title, Text, Paragraph } = Typography;
+const { Title, Text } = Typography;
 const { Option } = Select;
 
 interface Namespace {
@@ -89,8 +86,7 @@ const KeysPage: React.FC = () => {
   const { data: project } = useQuery<Project>({
     queryKey: ['project', projectId],
     queryFn: async () => {
-      const response = await apiClient.get(`/projects/${projectId}`);
-      return response.data;
+      return await apiClient.get(`/projects/${projectId}`);
     },
     enabled: !!projectId,
   });
@@ -99,8 +95,7 @@ const KeysPage: React.FC = () => {
   const { data: namespaces = [], isLoading: isNamespacesLoading } = useQuery<Namespace[]>({
     queryKey: ['namespaces', projectId],
     queryFn: async () => {
-      const response = await apiClient.get(`/projects/${projectId}/namespaces`);
-      return response.data;
+      return await apiClient.get(`/projects/${projectId}/namespaces`);
     },
     enabled: !!projectId,
   });
@@ -116,8 +111,9 @@ const KeysPage: React.FC = () => {
   const { data: keys = [], isLoading: isKeysLoading } = useQuery<Key[]>({
     queryKey: ['keys', projectId, selectedNamespaceId],
     queryFn: async () => {
-      const response = await apiClient.get(`/projects/${projectId}/namespaces/${selectedNamespaceId}/keys`);
-      return response.data;
+      return await apiClient.get(
+        `/projects/${projectId}/namespaces/${selectedNamespaceId}/keys`,
+      );
     },
     enabled: !!projectId && !!selectedNamespaceId,
   });
@@ -194,7 +190,7 @@ const KeysPage: React.FC = () => {
     {
       title: 'Translations Preview',
       key: 'translations',
-      render: (_: any, record: Key) => (
+      render: (_: unknown, record: Key) => (
         <Space wrap>
           {project?.locales.map(locale => {
             const translation = record.translations.find(t => t.locale.code === locale.code);
@@ -221,7 +217,7 @@ const KeysPage: React.FC = () => {
       title: 'Actions',
       key: 'action',
       width: 150,
-      render: (_: any, record: Key) => (
+      render: (_: unknown, record: Key) => (
         <Space>
           <Button 
             type="primary" 

@@ -41,8 +41,7 @@ const LocalesPage: React.FC = () => {
   const { data: project, isLoading: isProjectLoading } = useQuery<Project>({
     queryKey: ['project', projectId],
     queryFn: async () => {
-      const response = await apiClient.get(`/projects/${projectId}`);
-      return response.data;
+      return await apiClient.get(`/projects/${projectId}`);
     },
     enabled: !!projectId,
   });
@@ -51,8 +50,7 @@ const LocalesPage: React.FC = () => {
   const { data: allLocales = [], isLoading: isAllLocalesLoading } = useQuery<Locale[]>({
     queryKey: ['locales'],
     queryFn: async () => {
-      const response = await apiClient.get('/locales');
-      return response.data;
+      return await apiClient.get('/locales');
     },
   });
 
@@ -71,8 +69,9 @@ const LocalesPage: React.FC = () => {
       setSelectedLocaleId(null);
       queryClient.invalidateQueries({ queryKey: ['project', projectId] });
     },
-    onError: (error: any) => {
-      message.error(error.response?.data?.message || 'Failed to add locale');
+    onError: (error: unknown) => {
+      const err = error as { response?: { data?: { message?: string } } };
+      message.error(err.response?.data?.message || 'Failed to add locale');
     },
   });
 
@@ -84,8 +83,9 @@ const LocalesPage: React.FC = () => {
       message.success('Locale removed from project');
       queryClient.invalidateQueries({ queryKey: ['project', projectId] });
     },
-    onError: (error: any) => {
-      message.error(error.response?.data?.message || 'Failed to remove locale');
+    onError: (error: unknown) => {
+      const err = error as { response?: { data?: { message?: string } } };
+      message.error(err.response?.data?.message || 'Failed to remove locale');
     },
   });
 
@@ -104,7 +104,7 @@ const LocalesPage: React.FC = () => {
     {
       title: 'Actions',
       key: 'action',
-      render: (_: any, record: Locale) => (
+      render: (_: unknown, record: Locale) => (
         <Button 
           type="text" 
           danger 

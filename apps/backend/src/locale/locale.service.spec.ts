@@ -69,7 +69,11 @@ describe('LocaleService', () => {
 
       const result = await service.findAll();
       expect(result).toEqual(expectedResult);
-      expect(prisma.locale.findMany).toHaveBeenCalled();
+      expect(prisma.locale.findMany).toHaveBeenCalledWith({
+        orderBy: {
+          updatedAt: 'desc',
+        },
+      });
     });
   });
 });
