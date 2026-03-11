@@ -43,19 +43,28 @@ describe('LocaleService', () => {
 
       const result = await service.create(createDto);
       expect(result).toEqual(expectedResult);
-      expect(prisma.locale.findUnique).toHaveBeenCalledWith({ where: { code: createDto.code } });
+      expect(prisma.locale.findUnique).toHaveBeenCalledWith({
+        where: { code: createDto.code },
+      });
       expect(prisma.locale.create).toHaveBeenCalledWith({ data: createDto });
     });
 
     it('should throw ConflictException if locale already exists', async () => {
-      prisma.locale.findUnique.mockResolvedValue({ id: 'locale-1', ...createDto });
-      await expect(service.create(createDto)).rejects.toThrow(ConflictException);
+      prisma.locale.findUnique.mockResolvedValue({
+        id: 'locale-1',
+        ...createDto,
+      });
+      await expect(service.create(createDto)).rejects.toThrow(
+        ConflictException,
+      );
     });
   });
 
   describe('findAll', () => {
     it('should return an array of locales', async () => {
-      const expectedResult = [{ id: 'locale-1', code: 'en-US', name: 'English' }];
+      const expectedResult = [
+        { id: 'locale-1', code: 'en-US', name: 'English' },
+      ];
       prisma.locale.findMany.mockResolvedValue(expectedResult);
 
       const result = await service.findAll();

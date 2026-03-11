@@ -11,7 +11,9 @@ export class LocaleService {
       where: { code: createLocaleDto.code },
     });
     if (existing) {
-      throw new ConflictException(`Locale with code ${createLocaleDto.code} already exists`);
+      throw new ConflictException(
+        `Locale with code ${createLocaleDto.code} already exists`,
+      );
     }
     return this.prisma.locale.create({
       data: createLocaleDto,

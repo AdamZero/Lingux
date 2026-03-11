@@ -10,7 +10,6 @@ const mockLocaleService = {
 
 describe('LocaleController', () => {
   let controller: LocaleController;
-  let service: typeof mockLocaleService;
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
@@ -24,7 +23,6 @@ describe('LocaleController', () => {
     }).compile();
 
     controller = module.get<LocaleController>(LocaleController);
-    service = module.get(LocaleService);
     jest.clearAllMocks();
   });
 
@@ -46,7 +44,9 @@ describe('LocaleController', () => {
 
   describe('findAll', () => {
     it('should return an array of locales', async () => {
-      const expectedResult = [{ id: 'locale-1', code: 'en-US', name: 'English' }];
+      const expectedResult = [
+        { id: 'locale-1', code: 'en-US', name: 'English' },
+      ];
       mockLocaleService.findAll.mockResolvedValue(expectedResult);
 
       const result = await controller.findAll();

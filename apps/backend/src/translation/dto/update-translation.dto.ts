@@ -1,5 +1,8 @@
 import { PartialType } from '@nestjs/mapped-types';
-import { CreateTranslationDto, TranslationStatus } from './create-translation.dto';
+import {
+  CreateTranslationDto,
+  TranslationStatus,
+} from './create-translation.dto';
 import { IsString, IsOptional, IsEnum, IsBoolean } from 'class-validator';
 
 export class UpdateTranslationDto extends PartialType(CreateTranslationDto) {

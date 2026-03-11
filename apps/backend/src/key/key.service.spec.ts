@@ -46,24 +46,35 @@ describe('KeyService', () => {
 
     it('should create a key', async () => {
       const expectedResult = { id: 'key-1', ...createDto, namespaceId };
-      prisma.namespace.findFirst.mockResolvedValue({ id: namespaceId, projectId });
+      prisma.namespace.findFirst.mockResolvedValue({
+        id: namespaceId,
+        projectId,
+      });
       prisma.key.create.mockResolvedValue(expectedResult);
 
       const result = await service.create(projectId, namespaceId, createDto);
       expect(result).toEqual(expectedResult);
-      expect(prisma.namespace.findFirst).toHaveBeenCalledWith({ where: { id: namespaceId, projectId } });
-      expect(prisma.key.create).toHaveBeenCalledWith({ data: { ...createDto, namespaceId } });
+      expect(prisma.namespace.findFirst).toHaveBeenCalledWith({
+        where: { id: namespaceId, projectId },
+      });
+      expect(prisma.key.create).toHaveBeenCalledWith({
+        data: { ...createDto, namespaceId },
+      });
     });
 
     it('should throw NotFoundException if namespace does not exist', async () => {
       prisma.namespace.findFirst.mockResolvedValue(null);
-      await expect(service.create(projectId, namespaceId, createDto)).rejects.toThrow(NotFoundException);
+      await expect(
+        service.create(projectId, namespaceId, createDto),
+      ).rejects.toThrow(NotFoundException);
     });
   });
 
   describe('findAll', () => {
     it('should return all keys for a namespace', async () => {
-      const expectedResult = [{ id: 'key-1', name: 'login.submit', namespaceId }];
+      const expectedResult = [
+        { id: 'key-1', name: 'login.submit', namespaceId },
+      ];
       prisma.key.findMany.mockResolvedValue(expectedResult);
 
       const result = await service.findAll(projectId, namespaceId);
@@ -71,10 +82,14 @@ describe('KeyService', () => {
       expect(prisma.key.findMany).toHaveBeenCalledWith({
         where: {
           namespaceId: namespaceId,
-          namespace: { projectId }
+          namespace: { projectId },
         },
         include: {
-          translations: true,
+          translations: {
+            include: {
+              locale: true,
+            },
+          },
         },
       });
     });
@@ -93,17 +108,23 @@ describe('KeyService', () => {
         where: {
           id,
           namespaceId,
-          namespace: { projectId }
+          namespace: { projectId },
         },
         include: {
-          translations: true,
+          translations: {
+            include: {
+              locale: true,
+            },
+          },
         },
       });
     });
 
     it('should throw NotFoundException if key not found', async () => {
       prisma.key.findFirst.mockResolvedValue(null);
-      await expect(service.findOne(projectId, namespaceId, id)).rejects.toThrow(NotFoundException);
+      await expect(service.findOne(projectId, namespaceId, id)).rejects.toThrow(
+        NotFoundException,
+      );
     });
   });
 
@@ -115,14 +136,24 @@ describe('KeyService', () => {
       const expectedResult = { id, ...updateDto, namespaceId };
       prisma.key.update.mockResolvedValue(expectedResult);
 
-      const result = await service.update(projectId, namespaceId, id, updateDto);
+      const result = await service.update(
+        projectId,
+        namespaceId,
+        id,
+        updateDto,
+      );
       expect(result).toEqual(expectedResult);
-      expect(prisma.key.update).toHaveBeenCalledWith({ where: { id }, data: updateDto });
+      expect(prisma.key.update).toHaveBeenCalledWith({
+        where: { id },
+        data: updateDto,
+      });
     });
 
     it('should throw NotFoundException if key to update is not found', async () => {
       prisma.key.update.mockRejectedValue(new Error());
-      await expect(service.update(projectId, namespaceId, id, updateDto)).rejects.toThrow(NotFoundException);
+      await expect(
+        service.update(projectId, namespaceId, id, updateDto),
+      ).rejects.toThrow(NotFoundException);
     });
   });
 
@@ -139,7 +170,9 @@ describe('KeyService', () => {
 
     it('should throw NotFoundException if key to delete is not found', async () => {
       prisma.key.delete.mockRejectedValue(new Error());
-      await expect(service.remove(projectId, namespaceId, id)).rejects.toThrow(NotFoundException);
+      await expect(service.remove(projectId, namespaceId, id)).rejects.toThrow(
+        NotFoundException,
+      );
     });
   });
 });

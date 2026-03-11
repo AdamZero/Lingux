@@ -43,9 +43,48 @@ export class ProjectService {
       return await this.prisma.project.update({
         where: { id },
         data: updateProjectDto,
+        include: {
+          locales: true,
+        },
       });
     } catch (error) {
       throw new NotFoundException(`Project with ID ${id} not found`);
+    }
+  }
+
+  async addLocale(projectId: string, localeId: string) {
+    try {
+      return await this.prisma.project.update({
+        where: { id: projectId },
+        data: {
+          locales: {
+            connect: { id: localeId },
+          },
+        },
+        include: {
+          locales: true,
+        },
+      });
+    } catch (error) {
+      throw new NotFoundException(`Project with ID ${projectId} not found`);
+    }
+  }
+
+  async removeLocale(projectId: string, localeId: string) {
+    try {
+      return await this.prisma.project.update({
+        where: { id: projectId },
+        data: {
+          locales: {
+            disconnect: { id: localeId },
+          },
+        },
+        include: {
+          locales: true,
+        },
+      });
+    } catch (error) {
+      throw new NotFoundException(`Project with ID ${projectId} not found`);
     }
   }
 

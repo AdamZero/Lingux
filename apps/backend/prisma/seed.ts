@@ -1,0 +1,46 @@
+import { PrismaClient } from '@prisma/client';
+
+const prisma = new PrismaClient();
+
+const defaultLocales = [
+  { code: 'zh-CN', name: '简体中文 (Simplified Chinese)' },
+  { code: 'en-US', name: 'English (United States)' },
+  { code: 'ja-JP', name: '日本語 (Japanese)' },
+  { code: 'ko-KR', name: '한국어 (Korean)' },
+  { code: 'zh-TW', name: '繁體中文 (Traditional Chinese)' },
+  { code: 'fr-FR', name: 'Français (French)' },
+  { code: 'de-DE', name: 'Deutsch (German)' },
+  { code: 'es-ES', name: 'Español (Spanish)' },
+  { code: 'ru-RU', name: 'Русский (Russian)' },
+  { code: 'pt-BR', name: 'Português (Portuguese - Brazil)' },
+];
+
+async function main() {
+  console.log('Start seeding default locales...');
+
+  for (const locale of defaultLocales) {
+    const existing = await prisma.locale.findUnique({
+      where: { code: locale.code },
+    });
+
+    if (!existing) {
+      await prisma.locale.create({
+        data: locale,
+      });
+      console.log(`Created locale: ${locale.name} (${locale.code})`);
+    } else {
+      console.log(`Locale already exists: ${locale.name} (${locale.code})`);
+    }
+  }
+
+  console.log('Seeding finished.');
+}
+
+main()
+  .catch((e) => {
+    console.error(e);
+    process.exit(1);
+  })
+  .finally(async () => {
+    await prisma.$disconnect();
+  });

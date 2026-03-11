@@ -9,7 +9,14 @@ import { TranslationModule } from './translation/translation.module';
 import { LocaleModule } from './locale/locale.module';
 
 @Module({
-  imports: [PrismaModule, ProjectModule, NamespaceModule, KeyModule, TranslationModule, LocaleModule],
+  imports: [
+    PrismaModule,
+    ProjectModule,
+    NamespaceModule,
+    KeyModule,
+    TranslationModule,
+    LocaleModule,
+  ],
   controllers: [AppController],
   providers: [AppService],
 })

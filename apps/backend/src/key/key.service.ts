@@ -7,13 +7,19 @@ import { PrismaService } from '../prisma.service';
 export class KeyService {
   constructor(private readonly prisma: PrismaService) {}
 
-  async create(projectId: string, namespaceId: string, createKeyDto: CreateKeyDto) {
+  async create(
+    projectId: string,
+    namespaceId: string,
+    createKeyDto: CreateKeyDto,
+  ) {
     // Verify project and namespace relationship
     const namespace = await this.prisma.namespace.findFirst({
       where: { id: namespaceId, projectId },
     });
     if (!namespace) {
-      throw new NotFoundException(`Namespace with ID ${namespaceId} not found in project ${projectId}`);
+      throw new NotFoundException(
+        `Namespace with ID ${namespaceId} not found in project ${projectId}`,
+      );
     }
 
     return this.prisma.key.create({
@@ -26,25 +32,33 @@ export class KeyService {
 
   async findAll(projectId: string, namespaceId: string) {
     return this.prisma.key.findMany({
-      where: { 
+      where: {
         namespaceId: namespaceId,
-        namespace: { projectId } 
+        namespace: { projectId },
       },
       include: {
-        translations: true,
+        translations: {
+          include: {
+            locale: true,
+          },
+        },
       },
     });
   }
 
   async findOne(projectId: string, namespaceId: string, id: string) {
     const key = await this.prisma.key.findFirst({
-      where: { 
-        id, 
+      where: {
+        id,
         namespaceId,
-        namespace: { projectId } 
+        namespace: { projectId },
       },
       include: {
-        translations: true,
+        translations: {
+          include: {
+            locale: true,
+          },
+        },
       },
     });
     if (!key) {
@@ -53,7 +67,12 @@ export class KeyService {
     return key;
   }
 
-  async update(projectId: string, namespaceId: string, id: string, updateKeyDto: UpdateKeyDto) {
+  async update(
+    projectId: string,
+    namespaceId: string,
+    id: string,
+    updateKeyDto: UpdateKeyDto,
+  ) {
     try {
       return await this.prisma.key.update({
         where: { id },

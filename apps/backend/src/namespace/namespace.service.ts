@@ -35,17 +35,23 @@ export class NamespaceService {
       where: { id, projectId },
     });
     if (!namespace) {
-      throw new NotFoundException(`Namespace with ID ${id} not found in project ${projectId}`);
+      throw new NotFoundException(
+        `Namespace with ID ${id} not found in project ${projectId}`,
+      );
     }
     return namespace;
   }
 
-  async update(projectId: string, id: string, updateNamespaceDto: UpdateNamespaceDto) {
+  async update(
+    projectId: string,
+    id: string,
+    updateNamespaceDto: UpdateNamespaceDto,
+  ) {
     try {
       return await this.prisma.namespace.update({
-        where: { 
+        where: {
           id,
-          projectId // Prisma's update where only supports unique fields usually, but we can combine if needed or use updateMany then find.
+          projectId, // Prisma's update where only supports unique fields usually, but we can combine if needed or use updateMany then find.
           // Actually, 'id' is globally unique. We just need to verify projectId for safety.
         },
         data: updateNamespaceDto,

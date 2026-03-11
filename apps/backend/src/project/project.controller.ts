@@ -1,4 +1,14 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete, HttpCode, HttpStatus } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Body,
+  Patch,
+  Param,
+  Delete,
+  HttpCode,
+  HttpStatus,
+} from '@nestjs/common';
 import { ProjectService } from './project.service';
 import { CreateProjectDto } from './dto/create-project.dto';
 import { UpdateProjectDto } from './dto/update-project.dto';
@@ -23,8 +33,27 @@ export class ProjectController {
   }
 
   @Patch(':projectId')
-  update(@Param('projectId') id: string, @Body() updateProjectDto: UpdateProjectDto) {
+  update(
+    @Param('projectId') id: string,
+    @Body() updateProjectDto: UpdateProjectDto,
+  ) {
     return this.projectService.update(id, updateProjectDto);
+  }
+
+  @Post(':projectId/locales')
+  addLocale(
+    @Param('projectId') projectId: string,
+    @Body('localeId') localeId: string,
+  ) {
+    return this.projectService.addLocale(projectId, localeId);
+  }
+
+  @Delete(':projectId/locales/:localeId')
+  removeLocale(
+    @Param('projectId') projectId: string,
+    @Param('localeId') localeId: string,
+  ) {
+    return this.projectService.removeLocale(projectId, localeId);
   }
 
   @Delete(':projectId')

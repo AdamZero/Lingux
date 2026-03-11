@@ -39,12 +39,22 @@ describe('ProjectService', () => {
   describe('create', () => {
     it('should create a project', async () => {
       const createDto = { name: 'Test Project', description: 'A test project' };
-      const expectedResult = { id: '1', ...createDto, baseLocale: 'zh-CN', createdAt: new Date(), updatedAt: new Date(), locales: [], users: [] };
+      const expectedResult = {
+        id: '1',
+        ...createDto,
+        baseLocale: 'zh-CN',
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        locales: [],
+        users: [],
+      };
       prisma.project.create.mockResolvedValue(expectedResult);
 
       const result = await service.create(createDto);
       expect(result).toEqual(expectedResult);
-      expect(prisma.project.create).toHaveBeenCalledWith({ data: { ...createDto, baseLocale: 'zh-CN' } });
+      expect(prisma.project.create).toHaveBeenCalledWith({
+        data: { ...createDto, baseLocale: 'zh-CN' },
+      });
     });
   });
 
@@ -67,7 +77,10 @@ describe('ProjectService', () => {
 
       const result = await service.findOne(id);
       expect(result).toEqual(expectedResult);
-      expect(prisma.project.findUnique).toHaveBeenCalledWith({ where: { id }, include: { locales: true } });
+      expect(prisma.project.findUnique).toHaveBeenCalledWith({
+        where: { id },
+        include: { locales: true },
+      });
     });
 
     it('should throw NotFoundException if project not found', async () => {
@@ -87,7 +100,11 @@ describe('ProjectService', () => {
 
       const result = await service.update(id, updateDto);
       expect(result).toEqual(expectedResult);
-      expect(prisma.project.update).toHaveBeenCalledWith({ where: { id }, data: updateDto });
+      expect(prisma.project.update).toHaveBeenCalledWith({
+        where: { id },
+        data: updateDto,
+        include: { locales: true },
+      });
     });
 
     it('should throw NotFoundException if project to update is not found', async () => {
@@ -95,7 +112,9 @@ describe('ProjectService', () => {
       const updateDto = { name: 'Updated Project' };
       prisma.project.update.mockRejectedValue(new Error());
 
-      await expect(service.update(id, updateDto)).rejects.toThrow(NotFoundException);
+      await expect(service.update(id, updateDto)).rejects.toThrow(
+        NotFoundException,
+      );
     });
   });
 

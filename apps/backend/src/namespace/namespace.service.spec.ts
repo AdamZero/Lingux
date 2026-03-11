@@ -48,13 +48,19 @@ describe('NamespaceService', () => {
 
       const result = await service.create(projectId, createDto);
       expect(result).toEqual(expectedResult);
-      expect(prisma.project.findUnique).toHaveBeenCalledWith({ where: { id: projectId } });
-      expect(prisma.namespace.create).toHaveBeenCalledWith({ data: { ...createDto, projectId } });
+      expect(prisma.project.findUnique).toHaveBeenCalledWith({
+        where: { id: projectId },
+      });
+      expect(prisma.namespace.create).toHaveBeenCalledWith({
+        data: { ...createDto, projectId },
+      });
     });
 
     it('should throw NotFoundException if project does not exist', async () => {
       prisma.project.findUnique.mockResolvedValue(null);
-      await expect(service.create(projectId, createDto)).rejects.toThrow(NotFoundException);
+      await expect(service.create(projectId, createDto)).rejects.toThrow(
+        NotFoundException,
+      );
     });
   });
 
@@ -66,7 +72,9 @@ describe('NamespaceService', () => {
 
       const result = await service.findAll(projectId);
       expect(result).toEqual(expectedResult);
-      expect(prisma.namespace.findMany).toHaveBeenCalledWith({ where: { projectId } });
+      expect(prisma.namespace.findMany).toHaveBeenCalledWith({
+        where: { projectId },
+      });
     });
   });
 
@@ -80,12 +88,16 @@ describe('NamespaceService', () => {
 
       const result = await service.findOne(projectId, id);
       expect(result).toEqual(expectedResult);
-      expect(prisma.namespace.findFirst).toHaveBeenCalledWith({ where: { id, projectId } });
+      expect(prisma.namespace.findFirst).toHaveBeenCalledWith({
+        where: { id, projectId },
+      });
     });
 
     it('should throw NotFoundException if namespace not found', async () => {
       prisma.namespace.findFirst.mockResolvedValue(null);
-      await expect(service.findOne(projectId, id)).rejects.toThrow(NotFoundException);
+      await expect(service.findOne(projectId, id)).rejects.toThrow(
+        NotFoundException,
+      );
     });
   });
 

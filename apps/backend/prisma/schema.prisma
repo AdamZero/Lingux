@@ -80,6 +80,7 @@ model Translation {
   content        String
   status         TranslationStatus @default(PENDING)
   isLlmTranslated Boolean           @default(false)
+  reviewComment  String?
   
   keyId     String
   key       Key      @relation(fields: [keyId], references: [id])
@@ -121,8 +122,8 @@ model AuditLog {
   targetType String   // e.g., "Translation", "Key"
   targetId   String
   payload    Json?
-  userId     String
-  user       User     @relation(fields: [userId], references: [id])
+  userId     String?
+  user       User?    @relation(fields: [userId], references: [id])
   createdAt  DateTime @default(now())
 }
 

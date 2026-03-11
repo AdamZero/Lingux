@@ -3,7 +3,6 @@ import { NamespaceController } from './namespace.controller';
 import { NamespaceService } from './namespace.service';
 import { CreateNamespaceDto } from './dto/create-namespace.dto';
 import { UpdateNamespaceDto } from './dto/update-namespace.dto';
-import { NotFoundException } from '@nestjs/common';
 
 const mockNamespaceService = {
   create: jest.fn(),
@@ -15,7 +14,6 @@ const mockNamespaceService = {
 
 describe('NamespaceController', () => {
   let controller: NamespaceController;
-  let service: typeof mockNamespaceService;
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
@@ -29,7 +27,6 @@ describe('NamespaceController', () => {
     }).compile();
 
     controller = module.get<NamespaceController>(NamespaceController);
-    service = module.get(NamespaceService);
     jest.clearAllMocks();
   });
 
@@ -47,7 +44,10 @@ describe('NamespaceController', () => {
 
       const result = await controller.create(projectId, createDto);
       expect(result).toEqual(expectedResult);
-      expect(mockNamespaceService.create).toHaveBeenCalledWith(projectId, createDto);
+      expect(mockNamespaceService.create).toHaveBeenCalledWith(
+        projectId,
+        createDto,
+      );
     });
   });
 
@@ -70,7 +70,10 @@ describe('NamespaceController', () => {
 
       const result = await controller.findOne(projectId, namespaceId);
       expect(result).toEqual(expectedResult);
-      expect(mockNamespaceService.findOne).toHaveBeenCalledWith(projectId, namespaceId);
+      expect(mockNamespaceService.findOne).toHaveBeenCalledWith(
+        projectId,
+        namespaceId,
+      );
     });
   });
 
@@ -83,7 +86,11 @@ describe('NamespaceController', () => {
 
       const result = await controller.update(projectId, namespaceId, updateDto);
       expect(result).toEqual(expectedResult);
-      expect(mockNamespaceService.update).toHaveBeenCalledWith(projectId, namespaceId, updateDto);
+      expect(mockNamespaceService.update).toHaveBeenCalledWith(
+        projectId,
+        namespaceId,
+        updateDto,
+      );
     });
   });
 
@@ -93,7 +100,10 @@ describe('NamespaceController', () => {
       mockNamespaceService.remove.mockResolvedValue({ success: true });
 
       await controller.remove(projectId, namespaceId);
-      expect(mockNamespaceService.remove).toHaveBeenCalledWith(projectId, namespaceId);
+      expect(mockNamespaceService.remove).toHaveBeenCalledWith(
+        projectId,
+        namespaceId,
+      );
     });
   });
 });

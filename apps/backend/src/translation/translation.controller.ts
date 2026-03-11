@@ -1,9 +1,21 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete, HttpCode, HttpStatus } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Body,
+  Patch,
+  Param,
+  Delete,
+  HttpCode,
+  HttpStatus,
+} from '@nestjs/common';
 import { TranslationService } from './translation.service';
 import { CreateTranslationDto } from './dto/create-translation.dto';
 import { UpdateTranslationDto } from './dto/update-translation.dto';
 
-@Controller('projects/:projectId/namespaces/:namespaceId/keys/:keyId/translations')
+@Controller(
+  'projects/:projectId/namespaces/:namespaceId/keys/:keyId/translations',
+)
 export class TranslationController {
   constructor(private readonly translationService: TranslationService) {}
 
@@ -14,7 +26,12 @@ export class TranslationController {
     @Param('keyId') keyId: string,
     @Body() createTranslationDto: CreateTranslationDto,
   ) {
-    return this.translationService.create(projectId, namespaceId, keyId, createTranslationDto);
+    return this.translationService.create(
+      projectId,
+      namespaceId,
+      keyId,
+      createTranslationDto,
+    );
   }
 
   @Get()
@@ -33,7 +50,12 @@ export class TranslationController {
     @Param('keyId') keyId: string,
     @Param('localeCode') localeCode: string,
   ) {
-    return this.translationService.findOne(projectId, namespaceId, keyId, localeCode);
+    return this.translationService.findOne(
+      projectId,
+      namespaceId,
+      keyId,
+      localeCode,
+    );
   }
 
   @Patch(':localeCode')
@@ -44,7 +66,13 @@ export class TranslationController {
     @Param('localeCode') localeCode: string,
     @Body() updateTranslationDto: UpdateTranslationDto,
   ) {
-    return this.translationService.update(projectId, namespaceId, keyId, localeCode, updateTranslationDto);
+    return this.translationService.update(
+      projectId,
+      namespaceId,
+      keyId,
+      localeCode,
+      updateTranslationDto,
+    );
   }
 
   @Post(':localeCode/approve')
@@ -54,7 +82,12 @@ export class TranslationController {
     @Param('keyId') keyId: string,
     @Param('localeCode') localeCode: string,
   ) {
-    return this.translationService.approve(projectId, namespaceId, keyId, localeCode);
+    return this.translationService.approve(
+      projectId,
+      namespaceId,
+      keyId,
+      localeCode,
+    );
   }
 
   @Post(':localeCode/reject')
@@ -63,8 +96,30 @@ export class TranslationController {
     @Param('namespaceId') namespaceId: string,
     @Param('keyId') keyId: string,
     @Param('localeCode') localeCode: string,
+    @Body('reason') reason: string,
   ) {
-    return this.translationService.reject(projectId, namespaceId, keyId, localeCode);
+    return this.translationService.reject(
+      projectId,
+      namespaceId,
+      keyId,
+      localeCode,
+      reason,
+    );
+  }
+
+  @Post(':localeCode/submit-review')
+  submitReview(
+    @Param('projectId') projectId: string,
+    @Param('namespaceId') namespaceId: string,
+    @Param('keyId') keyId: string,
+    @Param('localeCode') localeCode: string,
+  ) {
+    return this.translationService.submitReview(
+      projectId,
+      namespaceId,
+      keyId,
+      localeCode,
+    );
   }
 
   @Post(':localeCode/publish')
@@ -74,7 +129,12 @@ export class TranslationController {
     @Param('keyId') keyId: string,
     @Param('localeCode') localeCode: string,
   ) {
-    return this.translationService.publish(projectId, namespaceId, keyId, localeCode);
+    return this.translationService.publish(
+      projectId,
+      namespaceId,
+      keyId,
+      localeCode,
+    );
   }
 
   @Delete(':localeCode')
@@ -85,6 +145,11 @@ export class TranslationController {
     @Param('keyId') keyId: string,
     @Param('localeCode') localeCode: string,
   ) {
-    return this.translationService.remove(projectId, namespaceId, keyId, localeCode);
+    return this.translationService.remove(
+      projectId,
+      namespaceId,
+      keyId,
+      localeCode,
+    );
   }
 }

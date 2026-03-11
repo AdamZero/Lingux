@@ -31,6 +31,14 @@
 $ npm install
 ```
 
+## Database Seeding
+
+To populate the database with initial data (e.g., default system locales like zh-CN, en-US), run the following command:
+
+```bash
+npx prisma db seed
+```
+
 ## Compile and run the project
 
 ```bash

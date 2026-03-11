@@ -1,4 +1,14 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete, HttpCode, HttpStatus } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Body,
+  Patch,
+  Param,
+  Delete,
+  HttpCode,
+  HttpStatus,
+} from '@nestjs/common';
 import { NamespaceService } from './namespace.service';
 import { CreateNamespaceDto } from './dto/create-namespace.dto';
 import { UpdateNamespaceDto } from './dto/update-namespace.dto';
@@ -8,7 +18,10 @@ export class NamespaceController {
   constructor(private readonly namespaceService: NamespaceService) {}
 
   @Post()
-  create(@Param('projectId') projectId: string, @Body() createNamespaceDto: CreateNamespaceDto) {
+  create(
+    @Param('projectId') projectId: string,
+    @Body() createNamespaceDto: CreateNamespaceDto,
+  ) {
     return this.namespaceService.create(projectId, createNamespaceDto);
   }
 
@@ -18,7 +31,10 @@ export class NamespaceController {
   }
 
   @Get(':namespaceId')
-  findOne(@Param('projectId') projectId: string, @Param('namespaceId') id: string) {
+  findOne(
+    @Param('projectId') projectId: string,
+    @Param('namespaceId') id: string,
+  ) {
     return this.namespaceService.findOne(projectId, id);
   }
 
@@ -33,7 +49,10 @@ export class NamespaceController {
 
   @Delete(':namespaceId')
   @HttpCode(HttpStatus.NO_CONTENT)
-  remove(@Param('projectId') projectId: string, @Param('namespaceId') id: string) {
+  remove(
+    @Param('projectId') projectId: string,
+    @Param('namespaceId') id: string,
+  ) {
     return this.namespaceService.remove(projectId, id);
   }
 }

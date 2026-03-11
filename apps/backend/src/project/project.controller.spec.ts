@@ -37,7 +37,10 @@ describe('ProjectController', () => {
 
   describe('create', () => {
     it('should create a project', async () => {
-      const createDto: CreateProjectDto = { name: 'Test Project', description: 'Test Description' };
+      const createDto: CreateProjectDto = {
+        name: 'Test Project',
+        description: 'Test Description',
+      };
       const expectedResult = { id: '1', ...createDto };
       service.create.mockResolvedValue(expectedResult);
 

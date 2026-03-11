@@ -1,15 +1,18 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { TranslationController } from './translation.controller';
 import { TranslationService } from './translation.service';
-import { CreateTranslationDto, TranslationStatus } from './dto/create-translation.dto';
+import {
+  CreateTranslationDto,
+  TranslationStatus,
+} from './dto/create-translation.dto';
 import { UpdateTranslationDto } from './dto/update-translation.dto';
-import { HttpStatus } from '@nestjs/common';
 
 const mockTranslationService = {
   create: jest.fn(),
   findAll: jest.fn(),
   findOne: jest.fn(),
   update: jest.fn(),
+  submitReview: jest.fn(),
   approve: jest.fn(),
   reject: jest.fn(),
   publish: jest.fn(),
@@ -18,7 +21,6 @@ const mockTranslationService = {
 
 describe('TranslationController', () => {
   let controller: TranslationController;
-  let service: typeof mockTranslationService;
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
@@ -32,7 +34,6 @@ describe('TranslationController', () => {
     }).compile();
 
     controller = module.get<TranslationController>(TranslationController);
-    service = module.get(TranslationService);
     jest.clearAllMocks();
   });
 
@@ -51,9 +52,19 @@ describe('TranslationController', () => {
       const expectedResult = { id: 'trans-1', ...createDto, keyId };
       mockTranslationService.create.mockResolvedValue(expectedResult);
 
-      const result = await controller.create(projectId, namespaceId, keyId, createDto);
+      const result = await controller.create(
+        projectId,
+        namespaceId,
+        keyId,
+        createDto,
+      );
       expect(result).toEqual(expectedResult);
-      expect(mockTranslationService.create).toHaveBeenCalledWith(projectId, namespaceId, keyId, createDto);
+      expect(mockTranslationService.create).toHaveBeenCalledWith(
+        projectId,
+        namespaceId,
+        keyId,
+        createDto,
+      );
     });
   });
 
@@ -64,18 +75,37 @@ describe('TranslationController', () => {
 
       const result = await controller.findAll(projectId, namespaceId, keyId);
       expect(result).toEqual(expectedResult);
-      expect(mockTranslationService.findAll).toHaveBeenCalledWith(projectId, namespaceId, keyId);
+      expect(mockTranslationService.findAll).toHaveBeenCalledWith(
+        projectId,
+        namespaceId,
+        keyId,
+      );
     });
   });
 
   describe('findOne', () => {
     it('should return a single translation', async () => {
-      const expectedResult = { id: 'trans-1', content: 'Hello', keyId, localeCode };
+      const expectedResult = {
+        id: 'trans-1',
+        content: 'Hello',
+        keyId,
+        localeCode,
+      };
       mockTranslationService.findOne.mockResolvedValue(expectedResult);
 
-      const result = await controller.findOne(projectId, namespaceId, keyId, localeCode);
+      const result = await controller.findOne(
+        projectId,
+        namespaceId,
+        keyId,
+        localeCode,
+      );
       expect(result).toEqual(expectedResult);
-      expect(mockTranslationService.findOne).toHaveBeenCalledWith(projectId, namespaceId, keyId, localeCode);
+      expect(mockTranslationService.findOne).toHaveBeenCalledWith(
+        projectId,
+        namespaceId,
+        keyId,
+        localeCode,
+      );
     });
   });
 
@@ -85,42 +115,120 @@ describe('TranslationController', () => {
       const expectedResult = { id: 'trans-1', ...updateDto, keyId, localeCode };
       mockTranslationService.update.mockResolvedValue(expectedResult);
 
-      const result = await controller.update(projectId, namespaceId, keyId, localeCode, updateDto);
+      const result = await controller.update(
+        projectId,
+        namespaceId,
+        keyId,
+        localeCode,
+        updateDto,
+      );
       expect(result).toEqual(expectedResult);
-      expect(mockTranslationService.update).toHaveBeenCalledWith(projectId, namespaceId, keyId, localeCode, updateDto);
+      expect(mockTranslationService.update).toHaveBeenCalledWith(
+        projectId,
+        namespaceId,
+        keyId,
+        localeCode,
+        updateDto,
+      );
     });
   });
 
   describe('approve', () => {
     it('should approve a translation', async () => {
-      const expectedResult = { id: 'trans-1', status: TranslationStatus.APPROVED };
+      const expectedResult = {
+        id: 'trans-1',
+        status: TranslationStatus.APPROVED,
+      };
       mockTranslationService.approve.mockResolvedValue(expectedResult);
 
-      const result = await controller.approve(projectId, namespaceId, keyId, localeCode);
+      const result = await controller.approve(
+        projectId,
+        namespaceId,
+        keyId,
+        localeCode,
+      );
       expect(result).toEqual(expectedResult);
-      expect(mockTranslationService.approve).toHaveBeenCalledWith(projectId, namespaceId, keyId, localeCode);
+      expect(mockTranslationService.approve).toHaveBeenCalledWith(
+        projectId,
+        namespaceId,
+        keyId,
+        localeCode,
+      );
     });
   });
 
   describe('reject', () => {
     it('should reject a translation', async () => {
-      const expectedResult = { id: 'trans-1', status: TranslationStatus.PENDING };
+      const reason = 'Needs changes';
+      const expectedResult = {
+        id: 'trans-1',
+        status: TranslationStatus.PENDING,
+      };
       mockTranslationService.reject.mockResolvedValue(expectedResult);
 
-      const result = await controller.reject(projectId, namespaceId, keyId, localeCode);
+      const result = await controller.reject(
+        projectId,
+        namespaceId,
+        keyId,
+        localeCode,
+        reason,
+      );
       expect(result).toEqual(expectedResult);
-      expect(mockTranslationService.reject).toHaveBeenCalledWith(projectId, namespaceId, keyId, localeCode);
+      expect(mockTranslationService.reject).toHaveBeenCalledWith(
+        projectId,
+        namespaceId,
+        keyId,
+        localeCode,
+        reason,
+      );
+    });
+  });
+
+  describe('submitReview', () => {
+    it('should submit a translation for review', async () => {
+      const expectedResult = {
+        id: 'trans-1',
+        status: TranslationStatus.REVIEWING,
+      };
+      mockTranslationService.submitReview.mockResolvedValue(expectedResult);
+
+      const result = await controller.submitReview(
+        projectId,
+        namespaceId,
+        keyId,
+        localeCode,
+      );
+      expect(result).toEqual(expectedResult);
+      expect(mockTranslationService.submitReview).toHaveBeenCalledWith(
+        projectId,
+        namespaceId,
+        keyId,
+        localeCode,
+      );
     });
   });
 
   describe('publish', () => {
     it('should publish a translation', async () => {
-      const expectedResult = { id: 'trans-1', status: TranslationStatus.PUBLISHED };
+      const expectedResult = {
+        id: 'trans-1',
+        status: TranslationStatus.PUBLISHED,
+      };
       mockTranslationService.publish.mockResolvedValue(expectedResult);
 
-      const result = await controller.publish(projectId, namespaceId, keyId, localeCode);
+      const result = await controller.publish(
+        projectId,
+        namespaceId,
+        keyId,
+        localeCode,
+      );
       expect(result).toEqual(expectedResult);
-      expect(mockTranslationService.publish).toHaveBeenCalledWith(projectId, namespaceId, keyId, localeCode);
+      expect(mockTranslationService.publish).toHaveBeenCalledWith(
+        projectId,
+        namespaceId,
+        keyId,
+        localeCode,
+      );
     });
   });
 
@@ -129,7 +237,12 @@ describe('TranslationController', () => {
       mockTranslationService.remove.mockResolvedValue({ success: true });
 
       await controller.remove(projectId, namespaceId, keyId, localeCode);
-      expect(mockTranslationService.remove).toHaveBeenCalledWith(projectId, namespaceId, keyId, localeCode);
+      expect(mockTranslationService.remove).toHaveBeenCalledWith(
+        projectId,
+        namespaceId,
+        keyId,
+        localeCode,
+      );
     });
   });
 });
