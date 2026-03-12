@@ -7,6 +7,8 @@ import { UpdateKeyDto } from './dto/update-key.dto';
 const mockKeyService = {
   create: jest.fn(),
   findAll: jest.fn(),
+  lookupByName: jest.fn(),
+  copyTranslations: jest.fn(),
   findOne: jest.fn(),
   update: jest.fn(),
   remove: jest.fn(),
@@ -68,6 +70,55 @@ describe('KeyController', () => {
       expect(mockKeyService.findAll).toHaveBeenCalledWith(
         projectId,
         namespaceId,
+      );
+    });
+  });
+
+  describe('lookupByName', () => {
+    it('should lookup keys by name', async () => {
+      const name = 'login.submit';
+      const excludeKeyId = 'key-exclude';
+      const expectedResult: unknown[] = [];
+      mockKeyService.lookupByName.mockResolvedValue(expectedResult);
+
+      const result = await controller.lookupByName(
+        projectId,
+        name,
+        excludeKeyId,
+      );
+      expect(result).toEqual(expectedResult);
+      expect(mockKeyService.lookupByName).toHaveBeenCalledWith(
+        projectId,
+        name,
+        excludeKeyId,
+      );
+    });
+  });
+
+  describe('copyTranslations', () => {
+    it('should copy translations from another key', async () => {
+      const keyId = 'key-1';
+      const sourceKeyId = 'key-src';
+      const expectedResult = { copied: 2, skipped: 0, mode: 'fillMissing' };
+      mockKeyService.copyTranslations.mockResolvedValue(expectedResult);
+
+      const result = await controller.copyTranslations(
+        projectId,
+        namespaceId,
+        keyId,
+        {
+          sourceKeyId,
+          mode: 'fillMissing',
+        },
+      );
+
+      expect(result).toEqual(expectedResult);
+      expect(mockKeyService.copyTranslations).toHaveBeenCalledWith(
+        projectId,
+        namespaceId,
+        keyId,
+        sourceKeyId,
+        'fillMissing',
       );
     });
   });

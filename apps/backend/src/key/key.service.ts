@@ -1,4 +1,10 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
+import { TranslationStatus } from '@prisma/client';
 import { CreateKeyDto } from './dto/create-key.dto';
 import { UpdateKeyDto } from './dto/update-key.dto';
 import { PrismaService } from '../prisma.service';
@@ -20,6 +26,35 @@ export class KeyService {
       throw new NotFoundException(
         `Namespace with ID ${namespaceId} not found in project ${projectId}`,
       );
+    }
+
+    const existingKey = await this.prisma.key.findFirst({
+      where: {
+        namespaceId,
+        name: createKeyDto.name,
+      },
+      include: {
+        namespace: {
+          select: {
+            id: true,
+            name: true,
+          },
+        },
+        translations: {
+          orderBy: {
+            updatedAt: 'desc',
+          },
+          include: {
+            locale: true,
+          },
+        },
+      },
+    });
+    if (existingKey) {
+      throw new ConflictException({
+        message: `Key ${createKeyDto.name} already exists`,
+        existingKey,
+      });
     }
 
     return this.prisma.key.create({
@@ -52,6 +87,121 @@ export class KeyService {
     });
   }
 
+  async lookupByName(projectId: string, name: string, excludeKeyId?: string) {
+    const normalized = name?.trim();
+    if (!normalized) {
+      throw new BadRequestException('Query param "name" is required');
+    }
+
+    return this.prisma.key.findMany({
+      where: {
+        name: normalized,
+        namespace: { projectId },
+        ...(excludeKeyId ? { NOT: { id: excludeKeyId } } : {}),
+      },
+      orderBy: {
+        updatedAt: 'desc',
+      },
+      include: {
+        namespace: {
+          select: {
+            id: true,
+            name: true,
+          },
+        },
+        _count: {
+          select: {
+            translations: true,
+          },
+        },
+      },
+    });
+  }
+
+  async copyTranslations(
+    projectId: string,
+    namespaceId: string,
+    targetKeyId: string,
+    sourceKeyId: string,
+    mode: 'fillMissing' | 'overwrite' = 'fillMissing',
+  ) {
+    if (!sourceKeyId?.trim()) {
+      throw new BadRequestException('"sourceKeyId" is required');
+    }
+    if (mode !== 'fillMissing' && mode !== 'overwrite') {
+      throw new BadRequestException('"mode" must be fillMissing or overwrite');
+    }
+
+    const targetKey = await this.prisma.key.findFirst({
+      where: {
+        id: targetKeyId,
+        namespaceId,
+        namespace: { projectId },
+      },
+    });
+    if (!targetKey) {
+      throw new NotFoundException(`Key with ID ${targetKeyId} not found`);
+    }
+
+    const sourceKey = await this.prisma.key.findFirst({
+      where: {
+        id: sourceKeyId,
+        namespace: { projectId },
+      },
+    });
+    if (!sourceKey) {
+      throw new NotFoundException(`Key with ID ${sourceKeyId} not found`);
+    }
+
+    const sourceTranslations = await this.prisma.translation.findMany({
+      where: {
+        keyId: sourceKeyId,
+        key: {
+          namespace: { projectId },
+        },
+      },
+      select: {
+        localeId: true,
+        content: true,
+      },
+    });
+
+    if (sourceTranslations.length === 0) {
+      return { copied: 0, skipped: 0, mode };
+    }
+
+    const result = await this.prisma.$transaction(async (tx) => {
+      if (mode === 'overwrite') {
+        await tx.translation.deleteMany({
+          where: {
+            keyId: targetKeyId,
+            localeId: { in: sourceTranslations.map((t) => t.localeId) },
+          },
+        });
+      }
+
+      const created = await tx.translation.createMany({
+        data: sourceTranslations.map((t) => ({
+          keyId: targetKeyId,
+          localeId: t.localeId,
+          content: t.content,
+          status: TranslationStatus.PENDING,
+          isLlmTranslated: false,
+          reviewComment: null,
+        })),
+        skipDuplicates: mode === 'fillMissing',
+      });
+
+      return created.count;
+    });
+
+    return {
+      copied: result,
+      skipped: mode === 'fillMissing' ? sourceTranslations.length - result : 0,
+      mode,
+    };
+  }
+
   async findOne(projectId: string, namespaceId: string, id: string) {
     const key = await this.prisma.key.findFirst({
       where: {
@@ -61,6 +211,9 @@ export class KeyService {
       },
       include: {
         translations: {
+          orderBy: {
+            updatedAt: 'desc',
+          },
           include: {
             locale: true,
           },

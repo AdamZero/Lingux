@@ -1,4 +1,8 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { CreateNamespaceDto } from './dto/create-namespace.dto';
 import { UpdateNamespaceDto } from './dto/update-namespace.dto';
 import { PrismaService } from '../prisma.service';
@@ -8,17 +12,61 @@ export class NamespaceService {
   constructor(private readonly prisma: PrismaService) {}
 
   async create(projectId: string, createNamespaceDto: CreateNamespaceDto) {
-    // Check if project exists
     const project = await this.prisma.project.findUnique({
       where: { id: projectId },
+      select: {
+        id: true,
+        baseLocale: true,
+        projectLocales: {
+          where: {
+            enabled: true,
+          },
+          select: {
+            locale: {
+              select: {
+                code: true,
+              },
+            },
+          },
+        },
+      },
     });
     if (!project) {
       throw new NotFoundException(`Project with ID ${projectId} not found`);
     }
 
+    const baseLocale = project.baseLocale || 'zh-CN';
+    const hasBaseLocale = project.projectLocales.some(
+      (pl) => pl.locale.code === baseLocale,
+    );
+
+    if (!hasBaseLocale) {
+      const locale = await this.prisma.locale.findUnique({
+        where: { code: baseLocale },
+        select: { id: true },
+      });
+      if (!locale) {
+        throw new BadRequestException(
+          `Default locale ${baseLocale} not found. Please seed locales first.`,
+        );
+      }
+
+      await this.prisma.projectLocale.upsert({
+        where: { projectId_localeId: { projectId, localeId: locale.id } },
+        create: {
+          projectId,
+          localeId: locale.id,
+          enabled: true,
+          disabledAt: null,
+        },
+        update: { enabled: true, disabledAt: null },
+      });
+    }
+
     return this.prisma.namespace.create({
       data: {
         name: createNamespaceDto.name,
+        description: createNamespaceDto.description,
         projectId: projectId,
       },
     });
@@ -50,28 +98,34 @@ export class NamespaceService {
     id: string,
     updateNamespaceDto: UpdateNamespaceDto,
   ) {
-    try {
-      return await this.prisma.namespace.update({
-        where: {
-          id,
-          projectId, // Prisma's update where only supports unique fields usually, but we can combine if needed or use updateMany then find.
-          // Actually, 'id' is globally unique. We just need to verify projectId for safety.
-        },
-        data: updateNamespaceDto,
-      });
-    } catch (error) {
-      throw new NotFoundException(`Namespace with ID ${id} not found`);
+    const existing = await this.prisma.namespace.findFirst({
+      where: { id, projectId },
+      select: { id: true },
+    });
+    if (!existing) {
+      throw new NotFoundException(
+        `Namespace with ID ${id} not found in project ${projectId}`,
+      );
     }
+    return this.prisma.namespace.update({
+      where: { id },
+      data: updateNamespaceDto,
+    });
   }
 
   async remove(projectId: string, id: string) {
-    try {
-      await this.prisma.namespace.delete({
-        where: { id },
-      });
-      return { success: true };
-    } catch (error) {
-      throw new NotFoundException(`Namespace with ID ${id} not found`);
+    const existing = await this.prisma.namespace.findFirst({
+      where: { id, projectId },
+      select: { id: true },
+    });
+    if (!existing) {
+      throw new NotFoundException(
+        `Namespace with ID ${id} not found in project ${projectId}`,
+      );
     }
+    await this.prisma.namespace.delete({
+      where: { id },
+    });
+    return { success: true };
   }
 }

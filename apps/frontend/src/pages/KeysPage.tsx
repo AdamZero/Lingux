@@ -55,8 +55,22 @@ interface Key {
   translations: Translation[];
 }
 
+interface LookupKeyCandidate {
+  id: string;
+  name: string;
+  updatedAt: string;
+  namespace: {
+    id: string;
+    name: string;
+  };
+  _count: {
+    translations: number;
+  };
+}
+
 interface Project {
   id: string;
+  baseLocale: string;
   locales: {
     id: string;
     code: string;
@@ -81,6 +95,22 @@ const KeysPage: React.FC = () => {
   const [namespaceForm] = Form.useForm();
   const [keyForm] = Form.useForm();
   const [translationForm] = Form.useForm();
+
+  const isRecord = (value: unknown): value is Record<string, unknown> =>
+    typeof value === 'object' && value !== null;
+
+  const extractApiError = (error: unknown) => {
+    if (!isRecord(error)) {
+      return { status: undefined as number | undefined, data: undefined as unknown };
+    }
+    const response = error.response;
+    if (!isRecord(response)) {
+      return { status: undefined as number | undefined, data: undefined as unknown };
+    }
+    const status = typeof response.status === 'number' ? response.status : undefined;
+    const data = response.data;
+    return { status, data };
+  };
 
   // Fetch Project (for locales)
   const { data: project } = useQuery<Project>({
@@ -120,7 +150,7 @@ const KeysPage: React.FC = () => {
 
   // Mutations
   const createNamespaceMutation = useMutation({
-    mutationFn: (values: { name: string; description?: string }) => 
+    mutationFn: (values: { name: string; description?: string }) =>
       apiClient.post(`/projects/${projectId}/namespaces`, values),
     onSuccess: () => {
       message.success('Namespace created');
@@ -128,18 +158,140 @@ const KeysPage: React.FC = () => {
       namespaceForm.resetFields();
       queryClient.invalidateQueries({ queryKey: ['namespaces', projectId] });
     },
+    onError: () => {
+      return;
+    },
   });
 
   const createKeyMutation = useMutation({
-    mutationFn: (values: { name: string; description?: string; type: string }) => 
-      apiClient.post(`/projects/${projectId}/namespaces/${selectedNamespaceId}/keys`, values),
-    onSuccess: () => {
+    mutationFn: (values: {
+      name: string;
+      description?: string;
+      type: string;
+      baseContent?: string;
+    }) =>
+      apiClient.post(`/projects/${projectId}/namespaces/${selectedNamespaceId}/keys`, {
+        name: values.name,
+        description: values.description,
+        type: values.type,
+      }),
+    onSuccess: async (created: unknown, variables: {
+      name: string;
+      description?: string;
+      type: string;
+      baseContent?: string;
+    }) => {
       message.success('Key created');
       setIsKeyModalOpen(false);
       keyForm.resetFields();
       queryClient.invalidateQueries({ queryKey: ['keys', projectId, selectedNamespaceId] });
+
+      const createdKeyId =
+        isRecord(created) && typeof created.id === 'string' ? created.id : undefined;
+      const createdKeyName =
+        isRecord(created) && typeof created.name === 'string' ? created.name : undefined;
+
+      if (!createdKeyId || !createdKeyName) {
+        return;
+      }
+
+      const baseContent = variables.baseContent?.trim();
+      const defaultLocaleCode = project?.baseLocale || project?.locales?.[0]?.code;
+      if (baseContent && defaultLocaleCode) {
+        try {
+          await apiClient.patch(
+            `/projects/${projectId}/namespaces/${selectedNamespaceId}/keys/${createdKeyId}/translations/${defaultLocaleCode}`,
+            { content: baseContent },
+          );
+          queryClient.invalidateQueries({
+            queryKey: ['keys', projectId, selectedNamespaceId],
+          });
+        } catch {
+          return;
+        }
+      }
+
+      try {
+        const candidates = await lookupSameNameKeys(createdKeyName, createdKeyId);
+        if (candidates.length === 0) {
+          return;
+        }
+
+        const source = candidates[0];
+        Modal.confirm({
+          title: '发现同名词条',
+          content: `在「${source.namespace.name}」中找到同名词条（${source._count.translations} 条翻译），是否一键复用？`,
+          okText: '一键复用翻译',
+          cancelText: '跳过',
+          onOk: async () => {
+            await copyTranslationsFromKey(createdKeyId, source.id);
+            message.success('已复用翻译');
+            queryClient.invalidateQueries({
+              queryKey: ['keys', projectId, selectedNamespaceId],
+            });
+            const fullKey = await fetchKeyById(createdKeyId);
+            openEditDrawer(fullKey);
+          },
+        });
+      } catch {
+        return;
+      }
+    },
+    onError: (error: unknown) => {
+      const { status, data } = extractApiError(error);
+      if (status === 409) {
+        const existingKey =
+          isRecord(data) && isRecord(data.message) && isRecord(data.message.existingKey)
+            ? (data.message.existingKey as Key)
+            : isRecord(data) && isRecord(data.existingKey)
+              ? (data.existingKey as Key)
+              : null;
+
+        if (existingKey) {
+          setIsKeyModalOpen(false);
+          keyForm.resetFields();
+
+          Modal.confirm({
+            title: 'Key 已存在',
+            content: `已存在同名词条：${existingKey.name}`,
+            okText: '打开并编辑翻译',
+            cancelText: '取消',
+            onOk: () => {
+              openEditDrawer(existingKey);
+            },
+          });
+          return;
+        }
+      }
+
+      return;
     },
   });
+
+  const fetchKeyById = async (keyId: string) => {
+    return (await apiClient.get(
+      `/projects/${projectId}/namespaces/${selectedNamespaceId}/keys/${keyId}`,
+    )) as Key;
+  };
+
+  const lookupSameNameKeys = async (name: string, excludeKeyId?: string) => {
+    return (await apiClient.get(
+      `/projects/${projectId}/namespaces/${selectedNamespaceId}/keys/lookup`,
+      {
+        params: { name, excludeKeyId },
+      },
+    )) as LookupKeyCandidate[];
+  };
+
+  const copyTranslationsFromKey = async (
+    targetKeyId: string,
+    sourceKeyId: string,
+  ) => {
+    return await apiClient.post(
+      `/projects/${projectId}/namespaces/${selectedNamespaceId}/keys/${targetKeyId}/copy-translations`,
+      { sourceKeyId, mode: 'fillMissing' },
+    );
+  };
 
   // Save Translations
   const saveTranslationsMutation = useMutation({
@@ -341,7 +493,13 @@ const KeysPage: React.FC = () => {
         onCancel={() => setIsNamespaceModalOpen(false)}
         confirmLoading={createNamespaceMutation.isPending}
       >
-        <Form form={namespaceForm} layout="vertical" onFinish={(values) => createNamespaceMutation.mutate(values)}>
+        <Form
+          form={namespaceForm}
+          layout="vertical"
+          onFinish={(values: { name: string; description?: string }) =>
+            createNamespaceMutation.mutate(values)
+          }
+        >
           <Form.Item name="name" label="Name" rules={[{ required: true }]}>
             <Input placeholder="e.g. common, auth, home" />
           </Form.Item>
@@ -359,7 +517,12 @@ const KeysPage: React.FC = () => {
         onCancel={() => setIsKeyModalOpen(false)}
         confirmLoading={createKeyMutation.isPending}
       >
-        <Form form={keyForm} layout="vertical" onFinish={(values) => createKeyMutation.mutate(values)} initialValues={{ type: 'TEXT' }}>
+        <Form
+          form={keyForm}
+          layout="vertical"
+          onFinish={(values) => createKeyMutation.mutate(values)}
+          initialValues={{ type: 'TEXT' }}
+        >
           <Form.Item name="name" label="Key Name" rules={[{ required: true }]}>
             <Input placeholder="e.g. button.submit" />
           </Form.Item>
@@ -372,6 +535,12 @@ const KeysPage: React.FC = () => {
               <Option value="RICH_TEXT">Rich Text</Option>
               <Option value="ASSET">Asset</Option>
             </Select>
+          </Form.Item>
+          <Form.Item
+            name="baseContent"
+            label={`Default (${project?.baseLocale || 'base locale'})`}
+          >
+            <Input.TextArea rows={3} placeholder="Optional: input default locale text" />
           </Form.Item>
         </Form>
       </Modal>

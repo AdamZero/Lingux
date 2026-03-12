@@ -4,7 +4,6 @@ import {
   MenuFoldOutlined,
   MenuUnfoldOutlined,
   ProjectOutlined,
-  GlobalOutlined,
   KeyOutlined,
   SettingOutlined,
   ArrowLeftOutlined,
@@ -41,11 +40,6 @@ const MainLayout: React.FC = () => {
           key: `/project/${projectId}/keys`,
           icon: <KeyOutlined />,
           label: 'Keys',
-        },
-        {
-          key: `/project/${projectId}/locales`,
-          icon: <GlobalOutlined />,
-          label: 'Locales',
         },
         {
           key: `/project/${projectId}/settings`,

@@ -1,7 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { KeyService } from './key.service';
 import { PrismaService } from '../prisma.service';
-import { NotFoundException } from '@nestjs/common';
+import { ConflictException, NotFoundException } from '@nestjs/common';
 import { KeyType } from './dto/create-key.dto';
 
 const mockPrismaService = {
@@ -12,9 +12,15 @@ const mockPrismaService = {
     update: jest.fn(),
     delete: jest.fn(),
   },
+  translation: {
+    findMany: jest.fn(),
+    deleteMany: jest.fn(),
+    createMany: jest.fn(),
+  },
   namespace: {
     findFirst: jest.fn(),
   },
+  $transaction: jest.fn(),
 };
 
 describe('KeyService', () => {
@@ -32,6 +38,12 @@ describe('KeyService', () => {
     service = module.get<KeyService>(KeyService);
     prisma = module.get(PrismaService);
     jest.clearAllMocks();
+    prisma.$transaction.mockImplementation(async (fn: unknown) => {
+      if (typeof fn !== 'function') {
+        throw new Error('Invalid transaction callback');
+      }
+      return (fn as (tx: typeof mockPrismaService) => unknown)(prisma);
+    });
   });
 
   it('should be defined', () => {
@@ -50,6 +62,7 @@ describe('KeyService', () => {
         id: namespaceId,
         projectId,
       });
+      prisma.key.findFirst.mockResolvedValue(null);
       prisma.key.create.mockResolvedValue(expectedResult);
 
       const result = await service.create(projectId, namespaceId, createDto);
@@ -57,9 +70,30 @@ describe('KeyService', () => {
       expect(prisma.namespace.findFirst).toHaveBeenCalledWith({
         where: { id: namespaceId, projectId },
       });
+      expect(prisma.key.findFirst).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { namespaceId, name: createDto.name },
+        }),
+      );
       expect(prisma.key.create).toHaveBeenCalledWith({
         data: { ...createDto, namespaceId },
       });
+    });
+
+    it('should throw ConflictException if key already exists', async () => {
+      prisma.namespace.findFirst.mockResolvedValue({
+        id: namespaceId,
+        projectId,
+      });
+      prisma.key.findFirst.mockResolvedValue({
+        id: 'key-1',
+        name: createDto.name,
+        namespaceId,
+      });
+
+      await expect(
+        service.create(projectId, namespaceId, createDto),
+      ).rejects.toThrow(ConflictException);
     });
 
     it('should throw NotFoundException if namespace does not exist', async () => {
@@ -118,6 +152,9 @@ describe('KeyService', () => {
         },
         include: {
           translations: {
+            orderBy: {
+              updatedAt: 'desc',
+            },
             include: {
               locale: true,
             },
@@ -130,6 +167,82 @@ describe('KeyService', () => {
       prisma.key.findFirst.mockResolvedValue(null);
       await expect(service.findOne(projectId, namespaceId, id)).rejects.toThrow(
         NotFoundException,
+      );
+    });
+  });
+
+  describe('lookupByName', () => {
+    it('should lookup keys by name', async () => {
+      const name = 'login.submit';
+      const excludeKeyId = 'key-exclude';
+      const expectedResult = [{ id: 'key-2', name }];
+      prisma.key.findMany.mockResolvedValue(expectedResult);
+
+      const result = await service.lookupByName(projectId, name, excludeKeyId);
+      expect(result).toEqual(expectedResult);
+      expect(prisma.key.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({
+            name,
+            namespace: { projectId },
+            NOT: { id: excludeKeyId },
+          }),
+        }),
+      );
+    });
+  });
+
+  describe('copyTranslations', () => {
+    it('should copy translations in fillMissing mode', async () => {
+      prisma.key.findFirst
+        .mockResolvedValueOnce({ id: 'target-1', namespaceId })
+        .mockResolvedValueOnce({ id: 'source-1' });
+      prisma.translation.findMany.mockResolvedValue([
+        { localeId: 'loc-1', content: 'Hello' },
+        { localeId: 'loc-2', content: '你好' },
+      ]);
+      prisma.translation.createMany.mockResolvedValue({ count: 2 });
+
+      const result = await service.copyTranslations(
+        projectId,
+        namespaceId,
+        'target-1',
+        'source-1',
+        'fillMissing',
+      );
+
+      expect(result).toEqual({ copied: 2, skipped: 0, mode: 'fillMissing' });
+      expect(prisma.translation.deleteMany).not.toHaveBeenCalled();
+      expect(prisma.translation.createMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          skipDuplicates: true,
+        }),
+      );
+    });
+
+    it('should copy translations in overwrite mode', async () => {
+      prisma.key.findFirst
+        .mockResolvedValueOnce({ id: 'target-1', namespaceId })
+        .mockResolvedValueOnce({ id: 'source-1' });
+      prisma.translation.findMany.mockResolvedValue([
+        { localeId: 'loc-1', content: 'Hello' },
+      ]);
+      prisma.translation.createMany.mockResolvedValue({ count: 1 });
+
+      const result = await service.copyTranslations(
+        projectId,
+        namespaceId,
+        'target-1',
+        'source-1',
+        'overwrite',
+      );
+
+      expect(result).toEqual({ copied: 1, skipped: 0, mode: 'overwrite' });
+      expect(prisma.translation.deleteMany).toHaveBeenCalled();
+      expect(prisma.translation.createMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          skipDuplicates: false,
+        }),
       );
     });
   });

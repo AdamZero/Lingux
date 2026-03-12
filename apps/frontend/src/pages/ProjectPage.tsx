@@ -1,6 +1,17 @@
 import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Table, Button, Space, Typography, Card, Modal, Form, Input, App as AntdApp } from 'antd';
+import {
+  Table,
+  Button,
+  Space,
+  Typography,
+  Card,
+  Modal,
+  Form,
+  Input,
+  App as AntdApp,
+  Select,
+} from 'antd';
 import { PlusOutlined, EditOutlined, DeleteOutlined } from '@ant-design/icons';
 import apiClient from '@/api/client';
 
@@ -11,9 +22,17 @@ interface Project {
   name: string;
   description?: string;
   createdAt: string;
+  baseLocale: string;
+  locales: Locale[];
 }
 
 import { useNavigate } from 'react-router-dom';
+
+interface Locale {
+  id: string;
+  code: string;
+  name: string;
+}
 
 const ProjectPage: React.FC = () => {
   const navigate = useNavigate();
@@ -22,6 +41,13 @@ const ProjectPage: React.FC = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingProject, setEditingProject] = useState<Project | null>(null);
   const [form] = Form.useForm();
+
+  const { data: allLocales = [], isLoading: isLocalesLoading } = useQuery<Locale[]>({
+    queryKey: ['locales'],
+    queryFn: async () => {
+      return await apiClient.get('/locales');
+    },
+  });
 
   // Fetch projects
   const { data: projects = [], isLoading } = useQuery<Project[]>({
@@ -38,8 +64,12 @@ const ProjectPage: React.FC = () => {
 
   // Create project mutation
   const createMutation = useMutation({
-    mutationFn: (values: { name: string; description?: string }) => 
-      apiClient.post('/projects', values),
+    mutationFn: (values: {
+      name: string;
+      description?: string;
+      baseLocale: string;
+      localeIds?: string[];
+    }) => apiClient.post('/projects', values),
     onSuccess: () => {
       message.success('Project created successfully');
       setIsModalOpen(false);
@@ -53,7 +83,11 @@ const ProjectPage: React.FC = () => {
   });
 
   const updateMutation = useMutation({
-    mutationFn: (values: { name: string; description?: string }) => {
+    mutationFn: (values: {
+      name: string;
+      description?: string;
+      localeIds?: string[];
+    }) => {
       if (!editingProject) {
         throw new Error('No project selected for update');
       }
@@ -84,17 +118,47 @@ const ProjectPage: React.FC = () => {
     },
   });
 
-  const handleSubmit = (values: { name: string; description?: string }) => {
+  const handleSubmit = (values: {
+    name: string;
+    description?: string;
+    baseLocale?: string;
+    localeIds?: string[];
+  }) => {
+    const baseLocale = values.baseLocale?.trim() || 'zh-CN';
+    const baseLocaleId = allLocales.find((l) => l.code === baseLocale)?.id;
+    const localeIds = Array.from(
+      new Set([...(values.localeIds ?? []), ...(baseLocaleId ? [baseLocaleId] : [])]),
+    );
+
     if (editingProject) {
-      updateMutation.mutate(values);
+      updateMutation.mutate({
+        name: values.name,
+        description: values.description,
+        localeIds,
+      });
       return;
     }
-    createMutation.mutate(values);
+    createMutation.mutate({
+      name: values.name,
+      description: values.description,
+      baseLocale,
+      localeIds,
+    });
   };
 
   const openCreateModal = () => {
     setEditingProject(null);
     form.resetFields();
+    const defaultBaseLocale =
+      allLocales.some((l) => l.code === 'zh-CN')
+        ? 'zh-CN'
+        : allLocales[0]?.code ?? 'zh-CN';
+    const defaultBaseLocaleId = allLocales.find((l) => l.code === defaultBaseLocale)?.id;
+
+    form.setFieldsValue({
+      baseLocale: defaultBaseLocale,
+      localeIds: defaultBaseLocaleId ? [defaultBaseLocaleId] : [],
+    });
     setIsModalOpen(true);
   };
 
@@ -103,6 +167,8 @@ const ProjectPage: React.FC = () => {
     form.setFieldsValue({
       name: project.name,
       description: project.description,
+      baseLocale: project.baseLocale,
+      localeIds: project.locales.map((l) => l.id),
     });
     setIsModalOpen(true);
   };
@@ -209,6 +275,34 @@ const ProjectPage: React.FC = () => {
             label="Description"
           >
             <Input.TextArea rows={3} placeholder="Project description..." />
+          </Form.Item>
+          <Form.Item
+            name="baseLocale"
+            label="Base Locale"
+            rules={[{ required: true, message: 'Please select base locale!' }]}
+          >
+            <Select
+              showSearch
+              optionFilterProp="label"
+              loading={isLocalesLoading}
+              disabled={!!editingProject}
+              options={allLocales.map((l) => ({ value: l.code, label: `${l.name} (${l.code})` }))}
+              placeholder="Select base locale"
+            />
+          </Form.Item>
+          <Form.Item
+            name="localeIds"
+            label="Supported Locales"
+            rules={[{ required: true, message: 'Please select at least one locale!' }]}
+          >
+            <Select
+              mode="multiple"
+              showSearch
+              optionFilterProp="label"
+              loading={isLocalesLoading}
+              options={allLocales.map((l) => ({ value: l.id, label: `${l.name} (${l.code})` }))}
+              placeholder="Select supported locales"
+            />
           </Form.Item>
         </Form>
       </Modal>

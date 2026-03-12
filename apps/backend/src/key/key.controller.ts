@@ -8,6 +8,7 @@ import {
   Delete,
   HttpCode,
   HttpStatus,
+  Query,
 } from '@nestjs/common';
 import { KeyService } from './key.service';
 import { CreateKeyDto } from './dto/create-key.dto';
@@ -32,6 +33,32 @@ export class KeyController {
     @Param('namespaceId') namespaceId: string,
   ) {
     return this.keyService.findAll(projectId, namespaceId);
+  }
+
+  @Get('lookup')
+  lookupByName(
+    @Param('projectId') projectId: string,
+    @Query('name') name: string,
+    @Query('excludeKeyId') excludeKeyId?: string,
+  ) {
+    return this.keyService.lookupByName(projectId, name, excludeKeyId);
+  }
+
+  @Post(':keyId/copy-translations')
+  copyTranslations(
+    @Param('projectId') projectId: string,
+    @Param('namespaceId') namespaceId: string,
+    @Param('keyId') keyId: string,
+    @Body()
+    body: { sourceKeyId: string; mode?: 'fillMissing' | 'overwrite' },
+  ) {
+    return this.keyService.copyTranslations(
+      projectId,
+      namespaceId,
+      keyId,
+      body.sourceKeyId,
+      body.mode,
+    );
   }
 
   @Get(':keyId')

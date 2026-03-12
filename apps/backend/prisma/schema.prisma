@@ -18,7 +18,7 @@ model Project {
   updatedAt   DateTime @updatedAt
 
   namespaces  Namespace[]
-  locales     Locale[]    @relation("ProjectLocales")
+  projectLocales ProjectLocale[]
   users       User[]      @relation("ProjectUsers")
 }
 
@@ -29,17 +29,33 @@ model Locale {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  projects     Project[]     @relation("ProjectLocales")
+  projectLocales ProjectLocale[]
   translations Translation[]
 }
 
+model ProjectLocale {
+  projectId  String
+  localeId   String
+  enabled    Boolean  @default(true)
+  disabledAt DateTime?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  locale  Locale  @relation(fields: [localeId], references: [id], onDelete: Restrict)
+
+  @@id([projectId, localeId])
+  @@index([localeId])
+}
+
 model Namespace {
-  id        String   @id @default(uuid())
-  name      String   // e.g., "common"
-  projectId String
-  project   Project  @relation(fields: [projectId], references: [id])
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id          String   @id @default(uuid())
+  name        String   // e.g., "common"
+  description String?
+  projectId   String
+  project     Project  @relation(fields: [projectId], references: [id])
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 
   keys Key[]
 

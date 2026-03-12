@@ -40,22 +40,6 @@ export class ProjectController {
     return this.projectService.update(id, updateProjectDto);
   }
 
-  @Post(':projectId/locales')
-  addLocale(
-    @Param('projectId') projectId: string,
-    @Body('localeId') localeId: string,
-  ) {
-    return this.projectService.addLocale(projectId, localeId);
-  }
-
-  @Delete(':projectId/locales/:localeId')
-  removeLocale(
-    @Param('projectId') projectId: string,
-    @Param('localeId') localeId: string,
-  ) {
-    return this.projectService.removeLocale(projectId, localeId);
-  }
-
   @Delete(':projectId')
   @HttpCode(HttpStatus.NO_CONTENT)
   remove(@Param('projectId') id: string) {

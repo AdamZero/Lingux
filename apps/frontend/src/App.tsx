@@ -5,7 +5,6 @@ import { ConfigProvider, App as AntdApp, theme as antdTheme } from 'antd';
 import MainLayout from '@/layout/MainLayout';
 import ProjectPage from '@/pages/ProjectPage';
 import KeysPage from '@/pages/KeysPage';
-import LocalesPage from '@/pages/LocalesPage';
 import { useAppStore } from '@/store/useAppStore';
 
 // Create a query client
@@ -39,7 +38,6 @@ const App: React.FC = () => {
                 <Route path="project/:projectId">
                   <Route index element={<Navigate to="keys" replace />} />
                   <Route path="keys" element={<KeysPage />} />
-                  <Route path="locales" element={<LocalesPage />} />
                   <Route path="settings" element={<div>Settings Page</div>} />
                 </Route>
 

@@ -1,4 +1,4 @@
-import { IsString, IsOptional, IsNotEmpty } from 'class-validator';
+import { IsString, IsOptional, IsNotEmpty, IsArray } from 'class-validator';
 
 export class CreateProjectDto {
   @IsString()
@@ -12,4 +12,9 @@ export class CreateProjectDto {
   @IsString()
   @IsOptional()
   baseLocale?: string = 'zh-CN';
+
+  @IsArray()
+  @IsString({ each: true })
+  @IsOptional()
+  localeIds?: string[];
 }

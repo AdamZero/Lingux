@@ -11,7 +11,14 @@ const mockPrismaService = {
     update: jest.fn(),
     delete: jest.fn(),
   },
+  projectLocale: {
+    upsert: jest.fn(),
+  },
   project: {
+    findUnique: jest.fn(),
+    update: jest.fn(),
+  },
+  locale: {
     findUnique: jest.fn(),
   },
 };
@@ -39,18 +46,24 @@ describe('NamespaceService', () => {
 
   describe('create', () => {
     const projectId = 'proj-1';
-    const createDto = { name: 'common' };
+    const createDto = { name: 'common', description: 'Common strings' };
 
     it('should create a namespace', async () => {
       const expectedResult = { id: 'ns-1', ...createDto, projectId };
-      prisma.project.findUnique.mockResolvedValue({ id: projectId });
+      prisma.project.findUnique.mockResolvedValue({
+        id: projectId,
+        baseLocale: 'zh-CN',
+        projectLocales: [{ locale: { code: 'zh-CN' } }],
+      });
       prisma.namespace.create.mockResolvedValue(expectedResult);
 
       const result = await service.create(projectId, createDto);
       expect(result).toEqual(expectedResult);
-      expect(prisma.project.findUnique).toHaveBeenCalledWith({
-        where: { id: projectId },
-      });
+      expect(prisma.project.findUnique).toHaveBeenCalledWith(
+        expect.objectContaining({ where: { id: projectId } }),
+      );
+      expect(prisma.project.update).not.toHaveBeenCalled();
+      expect(prisma.projectLocale.upsert).not.toHaveBeenCalled();
       expect(prisma.namespace.create).toHaveBeenCalledWith({
         data: { ...createDto, projectId },
       });
