@@ -45,6 +45,19 @@ async function main() {
     }
   }
 
+  const existingSystemUser = await prisma.user.findUnique({
+    where: { username: 'system' },
+    select: { id: true },
+  });
+  if (!existingSystemUser) {
+    await prisma.user.create({
+      data: { username: 'system', role: 'ADMIN' },
+    });
+    console.log('Created system user');
+  } else {
+    console.log('System user already exists');
+  }
+
   console.log('Seeding finished.');
 }
 

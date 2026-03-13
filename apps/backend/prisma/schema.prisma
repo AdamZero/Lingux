@@ -118,6 +118,18 @@ enum UserRole {
   REVIEWER
 }
 
+enum AuditScopeType {
+  GLOBAL
+  PROJECT
+}
+
+enum AuditActorType {
+  USER
+  SYSTEM
+  INTEGRATION
+  LLM
+}
+
 model User {
   id         String   @id @default(uuid())
   username   String   @unique
@@ -133,14 +145,24 @@ model User {
 }
 
 model AuditLog {
-  id         String   @id @default(uuid())
-  action     String   // e.g., "CREATE", "UPDATE", "PUBLISH"
-  targetType String   // e.g., "Translation", "Key"
-  targetId   String
-  payload    Json?
-  userId     String?
-  user       User?    @relation(fields: [userId], references: [id])
-  createdAt  DateTime @default(now())
+  id            String         @id @default(uuid())
+  action        String
+  targetType    String
+  targetId      String
+  scopeType     AuditScopeType @default(GLOBAL)
+  projectId     String?
+  actorType     AuditActorType @default(SYSTEM)
+  actorId       String?
+  userId        String?
+  user          User?          @relation(fields: [userId], references: [id])
+  correlationId String?
+  version       Int            @default(1)
+  payload       Json?
+  createdAt     DateTime       @default(now())
+
+  @@index([projectId, createdAt])
+  @@index([targetType, targetId, createdAt])
+  @@index([userId, createdAt])
 }
 
 model Asset {

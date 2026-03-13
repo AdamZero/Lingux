@@ -8,6 +8,7 @@ import {
   Delete,
   HttpCode,
   HttpStatus,
+  Query,
 } from '@nestjs/common';
 import { ProjectService } from './project.service';
 import { CreateProjectDto } from './dto/create-project.dto';
@@ -30,6 +31,25 @@ export class ProjectController {
   @Get(':projectId')
   findOne(@Param('projectId') id: string) {
     return this.projectService.findOne(id);
+  }
+
+  @Get(':projectId/audit-logs')
+  findAuditLogs(
+    @Param('projectId') projectId: string,
+    @Query()
+    query: {
+      limit?: string;
+      before?: string;
+      beforeId?: string;
+      targetType?: string;
+      targetId?: string;
+      actionPrefix?: string;
+      actorType?: string;
+      actorId?: string;
+      userId?: string;
+    },
+  ) {
+    return this.projectService.findAuditLogs(projectId, query);
   }
 
   @Patch(':projectId')

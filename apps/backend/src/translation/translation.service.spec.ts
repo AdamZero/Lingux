@@ -20,6 +20,10 @@ const mockPrismaService = {
   auditLog: {
     create: jest.fn(),
   },
+  user: {
+    findUnique: jest.fn(),
+    create: jest.fn(),
+  },
   locale: {
     findUnique: jest.fn(),
   },
@@ -56,6 +60,7 @@ describe('TranslationService', () => {
   const localeId = 'locale-en-US';
 
   beforeEach(() => {
+    prisma.user.findUnique.mockResolvedValue({ id: 'user-system' });
     prisma.locale.findUnique.mockResolvedValue({
       id: localeId,
       code: localeCode,
@@ -109,14 +114,23 @@ describe('TranslationService', () => {
           action: 'TRANSLATION_CREATE',
           targetType: 'Translation',
           targetId: expectedResult.id,
+          scopeType: 'PROJECT',
+          projectId,
+          actorType: 'SYSTEM',
+          actorId: 'user-system',
+          userId: 'user-system',
+          version: 1,
           payload: {
-            projectId,
-            namespaceId,
-            keyId,
-            localeCode,
-            status: TranslationStatus.PENDING,
+            context: {
+              projectId,
+              namespaceId,
+              keyId,
+              localeCode,
+            },
+            detail: {
+              status: TranslationStatus.PENDING,
+            },
           },
-          userId: null,
         },
       });
     });

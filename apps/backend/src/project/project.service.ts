@@ -294,4 +294,89 @@ export class ProjectService {
       throw new NotFoundException(`Project with ID ${id} not found`);
     }
   }
+
+  async findAuditLogs(
+    projectId: string,
+    query: {
+      limit?: number | string;
+      before?: string;
+      beforeId?: string;
+      targetType?: string;
+      targetId?: string;
+      actionPrefix?: string;
+      actorType?: string;
+      actorId?: string;
+      userId?: string;
+    },
+  ) {
+    const limit =
+      typeof query.limit === 'number'
+        ? query.limit
+        : typeof query.limit === 'string'
+          ? Number(query.limit)
+          : 50;
+
+    if (!Number.isFinite(limit) || limit <= 0 || limit > 100) {
+      throw new BadRequestException('limit must be a number between 1 and 100');
+    }
+
+    const where: Record<string, unknown> = {
+      projectId,
+    };
+
+    if (query.targetType) {
+      where.targetType = query.targetType;
+    }
+    if (query.targetId) {
+      where.targetId = query.targetId;
+    }
+    if (query.actionPrefix) {
+      where.action = { startsWith: query.actionPrefix };
+    }
+    if (query.actorType) {
+      where.actorType = query.actorType;
+    }
+    if (query.actorId) {
+      where.actorId = query.actorId;
+    }
+    if (query.userId) {
+      where.userId = query.userId;
+    }
+
+    const beforeDate =
+      query.before && query.before.trim() ? new Date(query.before) : null;
+    if (beforeDate && Number.isNaN(beforeDate.getTime())) {
+      throw new BadRequestException('before must be a valid ISO date string');
+    }
+
+    if (beforeDate) {
+      if (query.beforeId && query.beforeId.trim()) {
+        where.OR = [
+          { createdAt: { lt: beforeDate } },
+          { createdAt: beforeDate, id: { lt: query.beforeId } },
+        ];
+      } else {
+        where.createdAt = { lt: beforeDate };
+      }
+    }
+
+    const items = await this.prisma.auditLog.findMany({
+      where,
+      orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+      take: limit,
+      include: {
+        user: {
+          select: { id: true, username: true, role: true },
+        },
+      },
+    });
+
+    const last = items.at(-1);
+    return {
+      items,
+      nextCursor: last
+        ? { before: last.createdAt.toISOString(), beforeId: last.id }
+        : null,
+    };
+  }
 }

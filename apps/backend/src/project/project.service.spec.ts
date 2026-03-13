@@ -11,6 +11,9 @@ const mockPrismaService = {
     update: jest.fn(),
     delete: jest.fn(),
   },
+  auditLog: {
+    findMany: jest.fn(),
+  },
   projectLocale: {
     upsert: jest.fn(),
     findMany: jest.fn(),
@@ -148,6 +151,44 @@ describe('ProjectService', () => {
             include: { locale: true },
           },
         },
+      });
+    });
+  });
+
+  describe('findAuditLogs', () => {
+    it('should query audit logs by project with cursor', async () => {
+      const projectId = 'proj-1';
+      const before = '2026-03-12T00:00:00.000Z';
+      const beforeId = 'audit-100';
+
+      prisma.auditLog.findMany.mockResolvedValue([
+        { id: 'audit-1', createdAt: new Date('2026-03-11T00:00:00.000Z') },
+      ]);
+
+      const result = await service.findAuditLogs(projectId, {
+        limit: 10,
+        before,
+        beforeId,
+        actionPrefix: 'translation.',
+      });
+
+      expect(prisma.auditLog.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({
+            projectId,
+            action: { startsWith: 'translation.' },
+            OR: [
+              { createdAt: { lt: new Date(before) } },
+              { createdAt: new Date(before), id: { lt: beforeId } },
+            ],
+          }),
+          orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+          take: 10,
+        }),
+      );
+      expect(result.nextCursor).toEqual({
+        before: '2026-03-11T00:00:00.000Z',
+        beforeId: 'audit-1',
       });
     });
   });

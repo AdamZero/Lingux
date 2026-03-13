@@ -8,6 +8,7 @@ const mockProjectService = {
   create: jest.fn(),
   findAll: jest.fn(),
   findOne: jest.fn(),
+  findAuditLogs: jest.fn(),
   update: jest.fn(),
   remove: jest.fn(),
 };
@@ -70,6 +71,19 @@ describe('ProjectController', () => {
       const result = await controller.findOne(id);
       expect(result).toEqual(expectedResult);
       expect(service.findOne).toHaveBeenCalledWith(id);
+    });
+  });
+
+  describe('findAuditLogs', () => {
+    it('should return audit logs for a project', async () => {
+      const projectId = 'proj-1';
+      const query = { limit: '10', actionPrefix: 'translation.' };
+      const expectedResult = { items: [], nextCursor: null };
+      service.findAuditLogs.mockResolvedValue(expectedResult);
+
+      const result = await controller.findAuditLogs(projectId, query);
+      expect(result).toEqual(expectedResult);
+      expect(service.findAuditLogs).toHaveBeenCalledWith(projectId, query);
     });
   });
 

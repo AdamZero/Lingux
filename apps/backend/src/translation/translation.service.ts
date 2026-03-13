@@ -15,6 +15,8 @@ import { PrismaService } from '../prisma.service';
 export class TranslationService {
   constructor(private readonly prisma: PrismaService) {}
 
+  private systemUserId: string | null = null;
+
   private async assertKeyInPath(
     projectId: string,
     namespaceId: string,
@@ -45,18 +47,47 @@ export class TranslationService {
     return locale.id;
   }
 
+  private async getSystemUserId() {
+    if (this.systemUserId) {
+      return this.systemUserId;
+    }
+
+    const existing = await this.prisma.user.findUnique({
+      where: { username: 'system' },
+      select: { id: true },
+    });
+    if (existing) {
+      this.systemUserId = existing.id;
+      return existing.id;
+    }
+
+    const created = await this.prisma.user.create({
+      data: { username: 'system', role: 'ADMIN' },
+      select: { id: true },
+    });
+    this.systemUserId = created.id;
+    return created.id;
+  }
+
   private async createAuditLog(params: {
     action: string;
     targetId: string;
+    projectId?: string;
     payload?: Prisma.InputJsonValue;
   }) {
+    const systemUserId = await this.getSystemUserId();
     await this.prisma.auditLog.create({
       data: {
         action: params.action,
         targetType: 'Translation',
         targetId: params.targetId,
+        scopeType: params.projectId ? 'PROJECT' : 'GLOBAL',
+        projectId: params.projectId,
+        actorType: 'SYSTEM',
+        actorId: systemUserId,
+        userId: systemUserId,
         payload: params.payload,
-        userId: null,
+        version: 1,
       },
     });
   }
@@ -84,12 +115,17 @@ export class TranslationService {
     await this.createAuditLog({
       action: 'TRANSLATION_CREATE',
       targetId: created.id,
+      projectId,
       payload: {
-        projectId,
-        namespaceId,
-        keyId,
-        localeCode: createTranslationDto.localeCode,
-        status: created.status,
+        context: {
+          projectId,
+          namespaceId,
+          keyId,
+          localeCode: createTranslationDto.localeCode,
+        },
+        detail: {
+          status: created.status,
+        },
       },
     });
 
@@ -185,12 +221,17 @@ export class TranslationService {
       await this.createAuditLog({
         action: 'TRANSLATION_CREATE_VIA_PATCH',
         targetId: created.id,
+        projectId,
         payload: {
-          projectId,
-          namespaceId,
-          keyId,
-          localeCode,
-          status: created.status,
+          context: {
+            projectId,
+            namespaceId,
+            keyId,
+            localeCode,
+          },
+          detail: {
+            status: created.status,
+          },
         },
       });
 
@@ -224,12 +265,17 @@ export class TranslationService {
       await this.createAuditLog({
         action: 'TRANSLATION_UPDATE',
         targetId: updated.id,
+        projectId,
         payload: {
-          projectId,
-          namespaceId,
-          keyId,
-          localeCode,
-          status: updated.status,
+          context: {
+            projectId,
+            namespaceId,
+            keyId,
+            localeCode,
+          },
+          detail: {
+            status: updated.status,
+          },
         },
       });
 
@@ -274,13 +320,18 @@ export class TranslationService {
     await this.createAuditLog({
       action: 'TRANSLATION_SUBMIT_REVIEW',
       targetId: updated.id,
+      projectId,
       payload: {
-        projectId,
-        namespaceId,
-        keyId,
-        localeCode,
-        from: translation.status,
-        to: updated.status,
+        context: {
+          projectId,
+          namespaceId,
+          keyId,
+          localeCode,
+        },
+        detail: {
+          from: translation.status,
+          to: updated.status,
+        },
       },
     });
 
@@ -318,13 +369,18 @@ export class TranslationService {
     await this.createAuditLog({
       action: 'TRANSLATION_APPROVE',
       targetId: updated.id,
+      projectId,
       payload: {
-        projectId,
-        namespaceId,
-        keyId,
-        localeCode,
-        from: translation.status,
-        to: updated.status,
+        context: {
+          projectId,
+          namespaceId,
+          keyId,
+          localeCode,
+        },
+        detail: {
+          from: translation.status,
+          to: updated.status,
+        },
       },
     });
 
@@ -367,14 +423,19 @@ export class TranslationService {
     await this.createAuditLog({
       action: 'TRANSLATION_REJECT',
       targetId: updated.id,
+      projectId,
       payload: {
-        projectId,
-        namespaceId,
-        keyId,
-        localeCode,
-        from: translation.status,
-        to: updated.status,
-        reason: reason.trim(),
+        context: {
+          projectId,
+          namespaceId,
+          keyId,
+          localeCode,
+        },
+        detail: {
+          from: translation.status,
+          to: updated.status,
+          reason: reason.trim(),
+        },
       },
     });
 
@@ -407,13 +468,18 @@ export class TranslationService {
     await this.createAuditLog({
       action: 'TRANSLATION_PUBLISH',
       targetId: updated.id,
+      projectId,
       payload: {
-        projectId,
-        namespaceId,
-        keyId,
-        localeCode,
-        from: translation.status,
-        to: updated.status,
+        context: {
+          projectId,
+          namespaceId,
+          keyId,
+          localeCode,
+        },
+        detail: {
+          from: translation.status,
+          to: updated.status,
+        },
       },
     });
 
@@ -436,11 +502,14 @@ export class TranslationService {
       await this.createAuditLog({
         action: 'TRANSLATION_DELETE',
         targetId: `${keyId}:${localeId}`,
+        projectId,
         payload: {
-          projectId,
-          namespaceId,
-          keyId,
-          localeCode,
+          context: {
+            projectId,
+            namespaceId,
+            keyId,
+            localeCode,
+          },
         },
       });
 
