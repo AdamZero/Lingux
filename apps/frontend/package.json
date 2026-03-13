@@ -18,8 +18,10 @@
     "@tanstack/react-query": "^5.90.21",
     "antd": "^6.3.2",
     "axios": "^1.13.6",
+    "diff": "^5.2.2",
     "lucide-react": "^0.577.0",
     "react": "^18.2.0",
+    "react-diff-view": "^3.3.2",
     "react-dom": "^18.2.0",
     "react-router-dom": "^7.13.1",
     "zustand": "^5.0.11"
@@ -41,8 +43,8 @@
     "eslint-plugin-react-refresh": "^0.4.6",
     "globals": "^15.15.0",
     "jsdom": "^28.1.0",
-    "typescript-eslint": "^7.2.0",
     "typescript": "^5.2.2",
+    "typescript-eslint": "^7.2.0",
     "vite": "^5.2.0",
     "vitest": "^4.0.18"
   }

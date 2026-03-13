@@ -7,6 +7,7 @@ import { NamespaceModule } from './namespace/namespace.module';
 import { KeyModule } from './key/key.module';
 import { TranslationModule } from './translation/translation.module';
 import { LocaleModule } from './locale/locale.module';
+import { ReleaseModule } from './release/release.module';
 
 @Module({
   imports: [
@@ -16,6 +17,7 @@ import { LocaleModule } from './locale/locale.module';
     KeyModule,
     TranslationModule,
     LocaleModule,
+    ReleaseModule,
   ],
   controllers: [AppController],
   providers: [AppService],

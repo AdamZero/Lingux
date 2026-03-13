@@ -20,6 +20,9 @@ model Project {
   namespaces  Namespace[]
   projectLocales ProjectLocale[]
   users       User[]      @relation("ProjectUsers")
+  currentReleaseId String?   @unique
+  currentRelease   Release?   @relation("ProjectCurrentRelease", fields: [currentReleaseId], references: [id], onDelete: SetNull)
+  releases          Release[]  @relation("ProjectReleases")
 }
 
 model Locale {
@@ -163,6 +166,37 @@ model AuditLog {
   @@index([projectId, createdAt])
   @@index([targetType, targetId, createdAt])
   @@index([userId, createdAt])
+}
+
+model Release {
+  id              String   @id @default(uuid())
+  projectId        String
+  project          Project  @relation("ProjectReleases", fields: [projectId], references: [id], onDelete: Cascade)
+  currentForProject Project? @relation("ProjectCurrentRelease")
+  basedOnReleaseId String?
+  basedOnRelease   Release? @relation("ReleaseBase", fields: [basedOnReleaseId], references: [id], onDelete: SetNull)
+  derivedReleases  Release[] @relation("ReleaseBase")
+  version          Int
+  note             String?
+  scope            Json
+  createdAt        DateTime @default(now())
+
+  artifacts ReleaseArtifact[]
+
+  @@unique([projectId, version])
+  @@index([projectId, createdAt])
+}
+
+model ReleaseArtifact {
+  id        String   @id @default(uuid())
+  releaseId String
+  release   Release  @relation(fields: [releaseId], references: [id], onDelete: Cascade)
+  localeCode String
+  data      Json
+  createdAt DateTime @default(now())
+
+  @@unique([releaseId, localeCode])
+  @@index([localeCode])
 }
 
 model Asset {

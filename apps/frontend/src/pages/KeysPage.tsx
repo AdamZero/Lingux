@@ -24,8 +24,10 @@ import {
   DeleteOutlined, 
   EditOutlined,
   GlobalOutlined,
+  UploadOutlined,
 } from '@ant-design/icons';
 import apiClient from '@/api/client';
+import PublishDrawer from '@/components/release/PublishDrawer';
 
 const { Sider, Content } = Layout;
 const { Title, Text } = Typography;
@@ -71,6 +73,7 @@ interface LookupKeyCandidate {
 interface Project {
   id: string;
   baseLocale: string;
+  currentReleaseId?: string | null;
   locales: {
     id: string;
     code: string;
@@ -87,6 +90,7 @@ const KeysPage: React.FC = () => {
   // Modals state
   const [isNamespaceModalOpen, setIsNamespaceModalOpen] = useState(false);
   const [isKeyModalOpen, setIsKeyModalOpen] = useState(false);
+  const [isPublishOpen, setIsPublishOpen] = useState(false);
   
   // Edit Translation Drawer State
   const [editingKey, setEditingKey] = useState<Key | null>(null);
@@ -425,14 +429,23 @@ const KeysPage: React.FC = () => {
           <Title level={4} style={{ margin: 0 }}>
             {namespaces.find(n => n.id === selectedNamespaceId)?.name || 'Keys'}
           </Title>
-          <Button 
-            type="primary" 
-            icon={<PlusOutlined />} 
-            disabled={!selectedNamespaceId}
-            onClick={() => setIsKeyModalOpen(true)}
-          >
-            Create Key
-          </Button>
+          <Space>
+            <Button
+              icon={<UploadOutlined />}
+              disabled={!projectId || namespaces.length === 0}
+              onClick={() => setIsPublishOpen(true)}
+            >
+              Publish
+            </Button>
+            <Button 
+              type="primary" 
+              icon={<PlusOutlined />} 
+              disabled={!selectedNamespaceId}
+              onClick={() => setIsKeyModalOpen(true)}
+            >
+              Create Key
+            </Button>
+          </Space>
         </div>
 
         {!selectedNamespaceId ? (
@@ -544,6 +557,27 @@ const KeysPage: React.FC = () => {
           </Form.Item>
         </Form>
       </Modal>
+
+      {projectId && project?.locales?.length ? (
+        <PublishDrawer
+          open={isPublishOpen}
+          onClose={() => setIsPublishOpen(false)}
+          projectId={projectId}
+          baseLocale={project.baseLocale}
+          locales={project.locales.map((l) => ({ code: l.code, name: l.name }))}
+          currentReleaseId={project.currentReleaseId ?? null}
+          scope={
+            selectedNamespaceId
+              ? { type: 'namespaces', namespaceIds: [selectedNamespaceId] }
+              : { type: 'all' }
+          }
+          scopeLabel={
+            selectedNamespaceId
+              ? `Namespace: ${namespaces.find((n) => n.id === selectedNamespaceId)?.name ?? selectedNamespaceId}`
+              : 'All'
+          }
+        />
+      ) : null}
     </Layout>
   );
 };
