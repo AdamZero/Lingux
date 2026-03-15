@@ -86,6 +86,7 @@ const KeysPage: React.FC = () => {
   const { message } = AntdApp.useApp();
   const queryClient = useQueryClient();
   const [selectedNamespaceId, setSelectedNamespaceId] = useState<string | null>(null);
+  const [deletingKeyId, setDeletingKeyId] = useState<string | null>(null);
   
   // Modals state
   const [isNamespaceModalOpen, setIsNamespaceModalOpen] = useState(false);
@@ -172,7 +173,7 @@ const KeysPage: React.FC = () => {
       name: string;
       description?: string;
       type: string;
-      baseContent?: string;
+      baseContent: string;
     }) =>
       apiClient.post(`/projects/${projectId}/namespaces/${selectedNamespaceId}/keys`, {
         name: values.name,
@@ -183,7 +184,7 @@ const KeysPage: React.FC = () => {
       name: string;
       description?: string;
       type: string;
-      baseContent?: string;
+      baseContent: string;
     }) => {
       message.success('Key created');
       setIsKeyModalOpen(false);
@@ -199,20 +200,22 @@ const KeysPage: React.FC = () => {
         return;
       }
 
-      const baseContent = variables.baseContent?.trim();
+      const baseContent = variables.baseContent.trim();
       const defaultLocaleCode = project?.baseLocale || project?.locales?.[0]?.code;
-      if (baseContent && defaultLocaleCode) {
-        try {
-          await apiClient.patch(
-            `/projects/${projectId}/namespaces/${selectedNamespaceId}/keys/${createdKeyId}/translations/${defaultLocaleCode}`,
-            { content: baseContent },
-          );
-          queryClient.invalidateQueries({
-            queryKey: ['keys', projectId, selectedNamespaceId],
-          });
-        } catch {
-          return;
-        }
+      if (!defaultLocaleCode) {
+        return;
+      }
+
+      try {
+        await apiClient.patch(
+          `/projects/${projectId}/namespaces/${selectedNamespaceId}/keys/${createdKeyId}/translations/${defaultLocaleCode}`,
+          { content: baseContent },
+        );
+        queryClient.invalidateQueries({
+          queryKey: ['keys', projectId, selectedNamespaceId],
+        });
+      } catch {
+        return;
       }
 
       try {
@@ -268,6 +271,28 @@ const KeysPage: React.FC = () => {
         }
       }
 
+      return;
+    },
+  });
+
+  const deleteKeyMutation = useMutation({
+    mutationFn: (keyId: string) =>
+      apiClient.delete(
+        `/projects/${projectId}/namespaces/${selectedNamespaceId}/keys/${keyId}`,
+      ),
+    onSuccess: async (_data, keyId) => {
+      if (editingKey?.id === keyId) {
+        setIsDrawerOpen(false);
+        setEditingKey(null);
+      }
+      setDeletingKeyId(null);
+      message.success('Key deleted');
+      await queryClient.invalidateQueries({
+        queryKey: ['keys', projectId, selectedNamespaceId],
+      });
+    },
+    onError: () => {
+      setDeletingKeyId(null);
       return;
     },
   });
@@ -384,7 +409,25 @@ const KeysPage: React.FC = () => {
           >
             Translate
           </Button>
-          <Button type="text" danger size="small" icon={<DeleteOutlined />} />
+          <Button
+            type="text"
+            danger
+            size="small"
+            icon={<DeleteOutlined />}
+            loading={deleteKeyMutation.isPending && deletingKeyId === record.id}
+            onClick={() => {
+              Modal.confirm({
+                title: 'Delete Key',
+                content: `Are you sure you want to delete "${record.name}"?`,
+                okText: 'Delete',
+                okButtonProps: { danger: true },
+                onOk: async () => {
+                  setDeletingKeyId(record.id);
+                  await deleteKeyMutation.mutateAsync(record.id);
+                },
+              });
+            }}
+          />
         </Space>
       ),
     },
@@ -552,8 +595,9 @@ const KeysPage: React.FC = () => {
           <Form.Item
             name="baseContent"
             label={`Default (${project?.baseLocale || 'base locale'})`}
+            rules={[{ required: true, whitespace: true }]}
           >
-            <Input.TextArea rows={3} placeholder="Optional: input default locale text" />
+            <Input.TextArea rows={3} placeholder="Input default locale text" />
           </Form.Item>
         </Form>
       </Modal>

@@ -26,7 +26,17 @@ export type PreviewReleasePayload = {
   localeCodes?: string[];
 };
 
+export type ReleaseSessionStatus =
+  | 'DRAFT'
+  | 'IN_REVIEW'
+  | 'APPROVED'
+  | 'REJECTED'
+  | 'PUBLISHED'
+  | 'EXPIRED';
+
 export type PreviewReleaseResponse = {
+  sessionId: string;
+  status: ReleaseSessionStatus;
   baseReleaseId: string | null;
   canPublish: boolean;
   errors: ReleaseValidationError[];
@@ -34,11 +44,33 @@ export type PreviewReleaseResponse = {
   nextJson: string;
 };
 
-export type CreateReleasePayload = PreviewReleasePayload;
+export type PublishReleasePayload = { sessionId: string };
 
 export type CreateReleaseResponse = {
   releaseId: string;
   currentReleaseId: string;
+};
+
+export type ReleaseSession = {
+  id: string;
+  status: ReleaseSessionStatus;
+  baseReleaseId: string | null;
+  localeCodes?: string[];
+  note?: string | null;
+  reviewNote?: string | null;
+  baseJson: string;
+  nextJson: string;
+  validationErrors?: ReleaseValidationError[] | null;
+};
+
+export type GetActiveReleaseSessionResponse = {
+  currentReleaseId: string | null;
+  session: ReleaseSession | null;
+};
+
+export type GetReleaseSessionResponse = {
+  currentReleaseId: string | null;
+  session: ReleaseSession;
 };
 
 export type RollbackReleasePayload = { toReleaseId?: string };
@@ -49,6 +81,12 @@ export type BaseReleaseMismatchError = {
   code: 'BASE_RELEASE_MISMATCH';
   currentReleaseId: string;
   baseReleaseId: string;
+};
+
+export type ReleaseSessionLockedError = {
+  code: 'RELEASE_SESSION_LOCKED';
+  sessionId: string;
+  status: ReleaseSessionStatus;
 };
 
 export type ValidationFailedError = {

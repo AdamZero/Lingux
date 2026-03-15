@@ -280,18 +280,33 @@ describe('KeyService', () => {
     const id = 'key-1';
 
     it('should delete a key', async () => {
+      prisma.key.findFirst.mockResolvedValue({ id });
+      prisma.translation.deleteMany.mockResolvedValue({ count: 2 });
       prisma.key.delete.mockResolvedValue({ id });
 
       const result = await service.remove(projectId, namespaceId, id);
       expect(result).toEqual({ success: true });
+      expect(prisma.key.findFirst).toHaveBeenCalledWith({
+        where: {
+          id,
+          namespaceId,
+          namespace: { projectId },
+        },
+        select: { id: true },
+      });
+      expect(prisma.translation.deleteMany).toHaveBeenCalledWith({
+        where: { keyId: id },
+      });
       expect(prisma.key.delete).toHaveBeenCalledWith({ where: { id } });
     });
 
     it('should throw NotFoundException if key to delete is not found', async () => {
-      prisma.key.delete.mockRejectedValue(new Error());
+      prisma.key.findFirst.mockResolvedValue(null);
       await expect(service.remove(projectId, namespaceId, id)).rejects.toThrow(
         NotFoundException,
       );
+      expect(prisma.translation.deleteMany).not.toHaveBeenCalled();
+      expect(prisma.key.delete).not.toHaveBeenCalled();
     });
   });
 });

@@ -2,6 +2,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { ReleaseService } from './release.service';
 import { PrismaService } from '../prisma.service';
 import {
+  BadRequestException,
   ConflictException,
   NotFoundException,
   UnprocessableEntityException,
@@ -28,6 +29,11 @@ const mockPrismaService = {
     findMany: jest.fn(),
     createMany: jest.fn(),
     findUnique: jest.fn(),
+  },
+  releaseSession: {
+    findFirst: jest.fn(),
+    create: jest.fn(),
+    update: jest.fn(),
   },
   user: {
     findUnique: jest.fn(),
@@ -117,6 +123,11 @@ describe('ReleaseService', () => {
         { localeCode: 'en-US', data: { common: { 'login.submit': 'Old' } } },
       ]);
       prisma.key.findMany.mockResolvedValue([keyRow]);
+      prisma.releaseSession.findFirst.mockResolvedValue(null);
+      prisma.releaseSession.create.mockImplementation(
+        async ({ data }: { data: Record<string, unknown> }) =>
+          ({ id: 'sess-1', ...data }) as never,
+      );
 
       const result = await service.previewRelease(projectId, {
         baseReleaseId: 'rel-0',
@@ -124,6 +135,8 @@ describe('ReleaseService', () => {
         localeCodes: ['en-US'],
       });
 
+      expect(result.sessionId).toBe('sess-1');
+      expect(result.status).toBe('DRAFT');
       expect(result.baseReleaseId).toBe('rel-0');
       expect(result.canPublish).toBe(true);
       expect(result.errors).toEqual([]);
@@ -155,6 +168,11 @@ describe('ReleaseService', () => {
           ],
         },
       ]);
+      prisma.releaseSession.findFirst.mockResolvedValue(null);
+      prisma.releaseSession.create.mockImplementation(
+        async ({ data }: { data: Record<string, unknown> }) =>
+          ({ id: 'sess-2', ...data }) as never,
+      );
 
       const result = await service.previewRelease(projectId, {
         baseReleaseId: 'rel-0',
@@ -171,32 +189,90 @@ describe('ReleaseService', () => {
         }),
       ]);
     });
+
+    it('should throw ConflictException when active session is locked', async () => {
+      prisma.project.findUnique.mockResolvedValue(projectContext);
+      prisma.releaseArtifact.findMany.mockResolvedValue([]);
+      prisma.key.findMany.mockResolvedValue([keyRow]);
+      prisma.releaseSession.findFirst.mockResolvedValue({
+        id: 'sess-locked',
+        status: 'IN_REVIEW',
+      });
+
+      await expect(
+        service.previewRelease(projectId, {
+          baseReleaseId: 'rel-0',
+          scope: { type: 'all' },
+          localeCodes: ['en-US'],
+        }),
+      ).rejects.toThrow(ConflictException);
+    });
   });
 
-  describe('createRelease', () => {
+  describe('submitReleaseSession', () => {
+    it('should throw UnprocessableEntityException when session has validation errors', async () => {
+      prisma.releaseSession.findFirst.mockResolvedValue({
+        id: 'sess-1',
+        projectId,
+        status: 'DRAFT',
+        validationErrors: [
+          {
+            localeCode: 'en-US',
+            keyId: 'key-1',
+            namespaceId: 'ns-1',
+            keyName: 'login.submit',
+            namespaceName: 'common',
+            reason: 'MISSING_TRANSLATION',
+          },
+        ],
+      });
+
+      await expect(
+        service.submitReleaseSession(projectId, 'sess-1'),
+      ).rejects.toThrow(UnprocessableEntityException);
+    });
+  });
+
+  describe('publishReleaseSession', () => {
+    it('should throw BadRequestException when session not approved', async () => {
+      prisma.project.findUnique.mockResolvedValue(projectContext);
+      prisma.releaseSession.findFirst.mockResolvedValue({
+        id: 'sess-1',
+        projectId,
+        status: 'IN_REVIEW',
+      });
+
+      await expect(
+        service.publishReleaseSession(projectId, 'sess-1'),
+      ).rejects.toThrow(BadRequestException);
+    });
+
     it('should create release and update project currentReleaseId', async () => {
       prisma.project.findUnique.mockResolvedValue(projectContext);
-      prisma.releaseArtifact.findMany.mockResolvedValue([
-        { localeCode: 'en-US', data: { common: { 'login.submit': 'Old' } } },
-      ]);
-      prisma.key.findMany.mockResolvedValue([keyRow]);
+      prisma.releaseSession.findFirst.mockResolvedValue({
+        id: 'sess-1',
+        projectId,
+        status: 'APPROVED',
+        baseReleaseId: 'rel-0',
+        scope: { type: 'all', localeCodes: ['en-US'] },
+        localeCodes: ['en-US'],
+        note: 'v2',
+        nextArtifacts: {
+          'en-US': { common: { 'login.submit': 'Submit {name}' } },
+        },
+      });
       prisma.release.findFirst.mockResolvedValue({ version: 1 });
       prisma.release.create.mockResolvedValue({
         id: 'rel-2',
         projectId,
         basedOnReleaseId: 'rel-0',
         version: 2,
-        note: null,
-        scope: {},
+        note: 'v2',
+        scope: { type: 'all', localeCodes: ['en-US'] },
         createdAt: new Date(),
       });
 
-      const result = await service.createRelease(projectId, {
-        baseReleaseId: 'rel-0',
-        scope: { type: 'keys', keyIds: ['key-1'] },
-        localeCodes: ['en-US'],
-        note: 'v2',
-      });
+      const result = await service.publishReleaseSession(projectId, 'sess-1');
 
       expect(result.releaseId).toBe('rel-2');
       expect(result.currentReleaseId).toBe('rel-2');
@@ -205,60 +281,8 @@ describe('ReleaseService', () => {
         where: { id: projectId },
         data: { currentReleaseId: 'rel-2' },
       });
+      expect(prisma.releaseSession.update).toHaveBeenCalled();
       expect(prisma.auditLog.create).toHaveBeenCalled();
-    });
-
-    it('should preview namespace patch that deletes existing keys', async () => {
-      prisma.project.findUnique.mockResolvedValue(projectContext);
-      prisma.namespace.findMany.mockResolvedValue([
-        { id: 'ns-1', name: 'common' },
-      ]);
-      prisma.key.findMany.mockResolvedValue([]);
-      prisma.releaseArtifact.findMany.mockResolvedValue([
-        { localeCode: 'en-US', data: { common: { 'login.submit': 'Old' } } },
-      ]);
-
-      const result = await service.previewRelease(projectId, {
-        baseReleaseId: 'rel-0',
-        scope: { type: 'namespaces', namespaceIds: ['ns-1'] },
-        localeCodes: ['en-US'],
-      });
-
-      const base = JSON.parse(result.baseJson) as Record<
-        string,
-        Record<string, Record<string, string>>
-      >;
-      const next = JSON.parse(result.nextJson) as Record<
-        string,
-        Record<string, Record<string, string>>
-      >;
-      expect(base.common['login.submit']['en-US']).toBe('Old');
-      expect(next.common?.['login.submit']).toBeUndefined();
-    });
-
-    it('should throw UnprocessableEntityException when createRelease validation fails', async () => {
-      prisma.project.findUnique.mockResolvedValue(projectContext);
-      prisma.releaseArtifact.findMany.mockResolvedValue([]);
-      prisma.key.findMany.mockResolvedValue([
-        {
-          ...keyRow,
-          translations: [
-            {
-              locale: { code: 'zh-CN' },
-              content: '提交',
-              status: TranslationStatus.PENDING,
-            },
-          ],
-        },
-      ]);
-
-      await expect(
-        service.createRelease(projectId, {
-          baseReleaseId: 'rel-0',
-          scope: { type: 'keys', keyIds: ['key-1'] },
-          localeCodes: ['en-US'],
-        }),
-      ).rejects.toThrow(UnprocessableEntityException);
     });
   });
 

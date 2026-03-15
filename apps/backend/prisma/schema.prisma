@@ -10,7 +10,7 @@ datasource db {
 }
 
 model Project {
-  id          String   @id @default(uuid())
+  id          String   @id @default(cuid())
   name        String
   description String?
   baseLocale  String   @default("zh-CN")
@@ -23,10 +23,11 @@ model Project {
   currentReleaseId String?   @unique
   currentRelease   Release?   @relation("ProjectCurrentRelease", fields: [currentReleaseId], references: [id], onDelete: SetNull)
   releases          Release[]  @relation("ProjectReleases")
+  releaseSessions   ReleaseSession[]
 }
 
 model Locale {
-  id        String   @id @default(uuid())
+  id        String   @id @default(cuid())
   code      String   @unique // e.g., "en-US"
   name      String   // e.g., "English"
   createdAt DateTime @default(now())
@@ -52,7 +53,7 @@ model ProjectLocale {
 }
 
 model Namespace {
-  id          String   @id @default(uuid())
+  id          String   @id @default(cuid())
   name        String   // e.g., "common"
   description String?
   projectId   String
@@ -72,7 +73,7 @@ enum KeyType {
 }
 
 model Key {
-  id          String   @id @default(uuid())
+  id          String   @id @default(cuid())
   name        String   // e.g., "login.submit"
   description String?
   type        KeyType  @default(TEXT)
@@ -95,7 +96,7 @@ enum TranslationStatus {
 }
 
 model Translation {
-  id             String            @id @default(uuid())
+  id             String            @id @default(cuid())
   content        String
   status         TranslationStatus @default(PENDING)
   isLlmTranslated Boolean           @default(false)
@@ -134,7 +135,7 @@ enum AuditActorType {
 }
 
 model User {
-  id         String   @id @default(uuid())
+  id         String   @id @default(cuid())
   username   String   @unique
   email      String?  @unique
   role       UserRole @default(EDITOR)
@@ -148,7 +149,7 @@ model User {
 }
 
 model AuditLog {
-  id            String         @id @default(uuid())
+  id            String         @id @default(cuid())
   action        String
   targetType    String
   targetId      String
@@ -169,7 +170,7 @@ model AuditLog {
 }
 
 model Release {
-  id              String   @id @default(uuid())
+  id              String   @id @default(cuid())
   projectId        String
   project          Project  @relation("ProjectReleases", fields: [projectId], references: [id], onDelete: Cascade)
   currentForProject Project? @relation("ProjectCurrentRelease")
@@ -182,13 +183,15 @@ model Release {
   createdAt        DateTime @default(now())
 
   artifacts ReleaseArtifact[]
+  baseForReleaseSessions      ReleaseSession[] @relation("ReleaseSessionBase")
+  publishedForReleaseSessions ReleaseSession[] @relation("ReleaseSessionPublished")
 
   @@unique([projectId, version])
   @@index([projectId, createdAt])
 }
 
 model ReleaseArtifact {
-  id        String   @id @default(uuid())
+  id        String   @id @default(cuid())
   releaseId String
   release   Release  @relation(fields: [releaseId], references: [id], onDelete: Cascade)
   localeCode String
@@ -199,8 +202,50 @@ model ReleaseArtifact {
   @@index([localeCode])
 }
 
+enum ReleaseSessionStatus {
+  DRAFT
+  IN_REVIEW
+  APPROVED
+  REJECTED
+  PUBLISHED
+  EXPIRED
+}
+
+model ReleaseSession {
+  id            String              @id @default(cuid())
+  projectId     String
+  project       Project             @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  status        ReleaseSessionStatus @default(DRAFT)
+
+  baseReleaseId String?
+  baseRelease   Release?            @relation("ReleaseSessionBase", fields: [baseReleaseId], references: [id], onDelete: SetNull)
+
+  scope         Json
+  localeCodes   String[]
+  note          String?
+
+  validationErrors Json?
+  nextArtifacts     Json
+  baseJson          String?
+  nextJson          String?
+
+  submittedAt   DateTime?
+  reviewedAt    DateTime?
+  reviewNote    String?
+  publishedAt   DateTime?
+  publishedReleaseId String?
+  publishedRelease   Release?       @relation("ReleaseSessionPublished", fields: [publishedReleaseId], references: [id], onDelete: SetNull)
+
+  expiresAt    DateTime?
+  createdAt    DateTime            @default(now())
+  updatedAt    DateTime            @updatedAt
+
+  @@index([projectId, status])
+  @@index([projectId, createdAt])
+}
+
 model Asset {
-  id          String   @id @default(uuid())
+  id          String   @id @default(cuid())
   name        String
   url         String
   type        String   // e.g., "image", "video"

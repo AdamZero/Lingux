@@ -1,8 +1,10 @@
 import { Body, Controller, Get, Param, Post, Query } from '@nestjs/common';
 import {
-  CreateReleaseDto,
   ListReleasesQueryDto,
   PreviewReleaseDto,
+  PublishReleaseDto,
+  ReleaseSessionNoteDto,
+  ReleaseSessionRejectDto,
   RollbackReleaseDto,
 } from './dto/create-release.dto';
 import { ReleaseService } from './release.service';
@@ -20,8 +22,71 @@ export class ReleaseController {
   }
 
   @Post('releases')
-  create(@Param('projectId') projectId: string, @Body() dto: CreateReleaseDto) {
-    return this.releaseService.createRelease(projectId, dto);
+  create(
+    @Param('projectId') projectId: string,
+    @Body() dto: PublishReleaseDto,
+  ) {
+    return this.releaseService.publishReleaseSession(projectId, dto.sessionId);
+  }
+
+  @Get('release-sessions/active')
+  getActiveReleaseSession(@Param('projectId') projectId: string) {
+    return this.releaseService.getActiveReleaseSession(projectId);
+  }
+
+  @Get('release-sessions/:sessionId')
+  getReleaseSession(
+    @Param('projectId') projectId: string,
+    @Param('sessionId') sessionId: string,
+  ) {
+    return this.releaseService.getReleaseSession(projectId, sessionId);
+  }
+
+  @Post('release-sessions/:sessionId/submit')
+  submitReleaseSession(
+    @Param('projectId') projectId: string,
+    @Param('sessionId') sessionId: string,
+    @Body() dto: ReleaseSessionNoteDto,
+  ) {
+    return this.releaseService.submitReleaseSession(
+      projectId,
+      sessionId,
+      dto.note,
+    );
+  }
+
+  @Post('release-sessions/:sessionId/approve')
+  approveReleaseSession(
+    @Param('projectId') projectId: string,
+    @Param('sessionId') sessionId: string,
+    @Body() dto: ReleaseSessionNoteDto,
+  ) {
+    return this.releaseService.approveReleaseSession(
+      projectId,
+      sessionId,
+      dto.note,
+    );
+  }
+
+  @Post('release-sessions/:sessionId/reject')
+  rejectReleaseSession(
+    @Param('projectId') projectId: string,
+    @Param('sessionId') sessionId: string,
+    @Body() dto: ReleaseSessionRejectDto,
+  ) {
+    return this.releaseService.rejectReleaseSession(
+      projectId,
+      sessionId,
+      dto.reason,
+    );
+  }
+
+  @Post('release-sessions/:sessionId/publish')
+  publishReleaseSession(
+    @Param('projectId') projectId: string,
+    @Param('sessionId') sessionId: string,
+  ) {
+    return this.releaseService.publishReleaseSession(projectId, sessionId);
   }
 
   @Get('releases')

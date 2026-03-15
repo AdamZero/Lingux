@@ -26,6 +26,22 @@ export class CreateReleaseDto {
 
 export class PreviewReleaseDto extends CreateReleaseDto {}
 
+export class PublishReleaseDto {
+  @IsString()
+  sessionId!: string;
+}
+
+export class ReleaseSessionNoteDto {
+  @IsString()
+  @IsOptional()
+  note?: string;
+}
+
+export class ReleaseSessionRejectDto {
+  @IsString()
+  reason!: string;
+}
+
 export class ListReleasesQueryDto {
   @IsString()
   @IsOptional()

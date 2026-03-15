@@ -9,7 +9,11 @@ import {
   HttpCode,
   HttpStatus,
   Query,
+  UploadedFile,
+  UseInterceptors,
+  BadRequestException,
 } from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
 import { KeyService } from './key.service';
 import { CreateKeyDto } from './dto/create-key.dto';
 import { UpdateKeyDto } from './dto/update-key.dto';
@@ -80,13 +84,54 @@ export class KeyController {
     return this.keyService.update(projectId, namespaceId, id, updateKeyDto);
   }
 
-  @Delete(':keyId')
+  @Delete(':id')
   @HttpCode(HttpStatus.NO_CONTENT)
   remove(
     @Param('projectId') projectId: string,
     @Param('namespaceId') namespaceId: string,
-    @Param('keyId') id: string,
+    @Param('id') id: string,
   ) {
     return this.keyService.remove(projectId, namespaceId, id);
+  }
+
+  @Get('export')
+  async exportTranslations(
+    @Param('projectId') projectId: string,
+    @Param('namespaceId') namespaceId: string,
+    @Query('format') format: 'json' | 'yaml' = 'json',
+  ) {
+    const content = await this.keyService.exportTranslations(
+      projectId,
+      namespaceId,
+      format,
+    );
+    return {
+      content,
+      format,
+      fileName: `translations.${format}`,
+    };
+  }
+
+  @Post('import')
+  @UseInterceptors(FileInterceptor('file'))
+  async importTranslations(
+    @Param('projectId') projectId: string,
+    @Param('namespaceId') namespaceId: string,
+    @UploadedFile() file: Express.Multer.File,
+    @Query('format') format: 'json' | 'yaml' = 'json',
+    @Query('mode') mode: 'fillMissing' | 'overwrite' = 'fillMissing',
+  ) {
+    if (!file) {
+      throw new BadRequestException('File is required');
+    }
+
+    const fileContent = file.buffer.toString('utf8');
+    return this.keyService.importTranslations(
+      projectId,
+      namespaceId,
+      fileContent,
+      format,
+      mode,
+    );
   }
 }

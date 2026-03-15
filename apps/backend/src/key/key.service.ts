@@ -243,13 +243,27 @@ export class KeyService {
   }
 
   async remove(projectId: string, namespaceId: string, id: string) {
-    try {
-      await this.prisma.key.delete({
-        where: { id },
-      });
-      return { success: true };
-    } catch (error) {
+    const existing = await this.prisma.key.findFirst({
+      where: {
+        id,
+        namespaceId,
+        namespace: { projectId },
+      },
+      select: { id: true },
+    });
+    if (!existing) {
       throw new NotFoundException(`Key with ID ${id} not found`);
     }
+
+    await this.prisma.$transaction(async (tx) => {
+      await tx.translation.deleteMany({
+        where: { keyId: id },
+      });
+      await tx.key.delete({
+        where: { id },
+      });
+    });
+
+    return { success: true };
   }
 }

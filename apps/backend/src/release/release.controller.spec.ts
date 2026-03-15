@@ -4,7 +4,12 @@ import { ReleaseService } from './release.service';
 
 const mockReleaseService = {
   previewRelease: jest.fn(),
-  createRelease: jest.fn(),
+  publishReleaseSession: jest.fn(),
+  getActiveReleaseSession: jest.fn(),
+  getReleaseSession: jest.fn(),
+  submitReleaseSession: jest.fn(),
+  approveReleaseSession: jest.fn(),
+  rejectReleaseSession: jest.fn(),
   listReleases: jest.fn(),
   getRelease: jest.fn(),
   rollback: jest.fn(),
@@ -49,13 +54,16 @@ describe('ReleaseController', () => {
 
   it('should create release', async () => {
     const projectId = 'proj-1';
-    const dto = { baseReleaseId: 'rel-1', scope: { type: 'all' } };
+    const dto = { sessionId: 'sess-1' };
     const expected = { releaseId: 'rel-2', currentReleaseId: 'rel-2' };
-    service.createRelease.mockResolvedValue(expected);
+    service.publishReleaseSession.mockResolvedValue(expected);
 
     const result = await controller.create(projectId, dto as never);
     expect(result).toEqual(expected);
-    expect(service.createRelease).toHaveBeenCalledWith(projectId, dto);
+    expect(service.publishReleaseSession).toHaveBeenCalledWith(
+      projectId,
+      'sess-1',
+    );
   });
 
   it('should list releases', async () => {

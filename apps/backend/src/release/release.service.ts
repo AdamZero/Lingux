@@ -675,6 +675,275 @@ export class ReleaseService {
     };
   }
 
+  async getActiveReleaseSession(projectId: string) {
+    const project = await this.prisma.project.findUnique({
+      where: { id: projectId },
+      select: { currentReleaseId: true },
+    });
+    if (!project) {
+      throw new NotFoundException(`Project with ID ${projectId} not found`);
+    }
+
+    const session = await this.prisma.releaseSession.findFirst({
+      where: {
+        projectId,
+        status: {
+          in: ['DRAFT', 'IN_REVIEW', 'APPROVED'],
+        },
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    return { currentReleaseId: project.currentReleaseId, session };
+  }
+
+  async getReleaseSession(projectId: string, sessionId: string) {
+    const normalized = typeof sessionId === 'string' ? sessionId.trim() : '';
+    if (!normalized) {
+      throw new BadRequestException('sessionId is required');
+    }
+
+    const project = await this.prisma.project.findUnique({
+      where: { id: projectId },
+      select: { currentReleaseId: true },
+    });
+    if (!project) {
+      throw new NotFoundException(`Project with ID ${projectId} not found`);
+    }
+
+    const session = await this.prisma.releaseSession.findFirst({
+      where: { id: normalized, projectId },
+    });
+    if (!session) {
+      throw new NotFoundException(
+        `ReleaseSession with ID ${normalized} not found`,
+      );
+    }
+
+    return { currentReleaseId: project.currentReleaseId, session };
+  }
+
+  async submitReleaseSession(
+    projectId: string,
+    sessionId: string,
+    note?: string,
+  ) {
+    const normalized = typeof sessionId === 'string' ? sessionId.trim() : '';
+    if (!normalized) {
+      throw new BadRequestException('sessionId is required');
+    }
+
+    const session = await this.prisma.releaseSession.findFirst({
+      where: { id: normalized, projectId },
+    });
+    if (!session) {
+      throw new NotFoundException(
+        `ReleaseSession with ID ${normalized} not found`,
+      );
+    }
+
+    if (session.status !== 'DRAFT') {
+      throw new BadRequestException(
+        `ReleaseSession cannot be submitted from ${session.status}`,
+      );
+    }
+
+    const errorsValue = session.validationErrors as unknown;
+    const errors = Array.isArray(errorsValue) ? errorsValue : [];
+    if (errors.length) {
+      throw new UnprocessableEntityException({
+        code: 'VALIDATION_FAILED',
+        ok: false,
+        errors,
+      });
+    }
+
+    const updated = await this.prisma.releaseSession.update({
+      where: { id: normalized },
+      data: {
+        status: 'IN_REVIEW',
+        submittedAt: new Date(),
+        note: note?.trim() ? note.trim() : session.note,
+      },
+    });
+
+    return { session: updated };
+  }
+
+  async approveReleaseSession(
+    projectId: string,
+    sessionId: string,
+    note?: string,
+  ) {
+    const normalized = typeof sessionId === 'string' ? sessionId.trim() : '';
+    if (!normalized) {
+      throw new BadRequestException('sessionId is required');
+    }
+
+    const session = await this.prisma.releaseSession.findFirst({
+      where: { id: normalized, projectId },
+    });
+    if (!session) {
+      throw new NotFoundException(
+        `ReleaseSession with ID ${normalized} not found`,
+      );
+    }
+
+    if (session.status !== 'IN_REVIEW') {
+      throw new BadRequestException(
+        `ReleaseSession cannot be approved from ${session.status}`,
+      );
+    }
+
+    const updated = await this.prisma.releaseSession.update({
+      where: { id: normalized },
+      data: {
+        status: 'APPROVED',
+        reviewedAt: new Date(),
+        reviewNote: note?.trim() ? note.trim() : null,
+      },
+    });
+
+    return { session: updated };
+  }
+
+  async rejectReleaseSession(
+    projectId: string,
+    sessionId: string,
+    reason: string,
+  ) {
+    const normalized = typeof sessionId === 'string' ? sessionId.trim() : '';
+    if (!normalized) {
+      throw new BadRequestException('sessionId is required');
+    }
+    const normalizedReason = typeof reason === 'string' ? reason.trim() : '';
+    if (!normalizedReason) {
+      throw new BadRequestException('reason is required');
+    }
+
+    const session = await this.prisma.releaseSession.findFirst({
+      where: { id: normalized, projectId },
+    });
+    if (!session) {
+      throw new NotFoundException(
+        `ReleaseSession with ID ${normalized} not found`,
+      );
+    }
+
+    if (session.status !== 'IN_REVIEW') {
+      throw new BadRequestException(
+        `ReleaseSession cannot be rejected from ${session.status}`,
+      );
+    }
+
+    const updated = await this.prisma.releaseSession.update({
+      where: { id: normalized },
+      data: {
+        status: 'REJECTED',
+        reviewedAt: new Date(),
+        reviewNote: normalizedReason,
+      },
+    });
+
+    return { session: updated };
+  }
+
+  async publishReleaseSession(projectId: string, sessionId: string) {
+    const normalized = typeof sessionId === 'string' ? sessionId.trim() : '';
+    if (!normalized) {
+      throw new BadRequestException('sessionId is required');
+    }
+
+    const ctx = await this.getProjectContext(projectId);
+    const session = await this.prisma.releaseSession.findFirst({
+      where: { id: normalized, projectId },
+    });
+    if (!session) {
+      throw new NotFoundException(
+        `ReleaseSession with ID ${normalized} not found`,
+      );
+    }
+
+    if (session.status !== 'APPROVED') {
+      throw new BadRequestException('ReleaseSession is not approved');
+    }
+
+    const baseReleaseId = session.baseReleaseId ?? null;
+    if (ctx.currentReleaseId && baseReleaseId !== ctx.currentReleaseId) {
+      throw new ConflictException({
+        code: 'BASE_RELEASE_MISMATCH',
+        currentReleaseId: ctx.currentReleaseId,
+        baseReleaseId,
+      });
+    }
+
+    const nextArtifactsValue = session.nextArtifacts as unknown;
+    if (!this.isPlainObject(nextArtifactsValue)) {
+      throw new BadRequestException('Invalid session artifacts');
+    }
+
+    const localeCodes = Array.isArray(session.localeCodes)
+      ? session.localeCodes
+      : [];
+    const nextArtifacts = nextArtifactsValue as Record<string, ArtifactDict>;
+
+    const created = await this.prisma.$transaction(async (tx) => {
+      const last = await tx.release.findFirst({
+        where: { projectId },
+        orderBy: { version: 'desc' },
+        select: { version: true },
+      });
+      const version = (last?.version ?? 0) + 1;
+
+      const release = await tx.release.create({
+        data: {
+          projectId,
+          basedOnReleaseId: baseReleaseId,
+          version,
+          note: session.note,
+          scope: (session.scope ?? {}) as Prisma.InputJsonValue,
+        },
+      });
+
+      await tx.releaseArtifact.createMany({
+        data: localeCodes.map((localeCode) => ({
+          releaseId: release.id,
+          localeCode,
+          data: nextArtifacts[localeCode] ?? {},
+        })),
+      });
+
+      await tx.project.update({
+        where: { id: projectId },
+        data: { currentReleaseId: release.id },
+      });
+
+      await tx.releaseSession.update({
+        where: { id: normalized },
+        data: {
+          status: 'PUBLISHED',
+          publishedReleaseId: release.id,
+          publishedAt: new Date(),
+        },
+      });
+
+      return release;
+    });
+
+    await this.createAuditLog({
+      action: 'RELEASE_PUBLISH',
+      targetId: created.id,
+      projectId,
+      payload: {
+        sessionId: normalized,
+        baseReleaseId,
+        localeCodes,
+      },
+    });
+
+    return { releaseId: created.id, currentReleaseId: created.id };
+  }
+
   async previewRelease(projectId: string, dto: CreateReleaseDto) {
     const ctx = await this.getProjectContext(projectId);
     const scope = this.parseScope(dto.scope);
@@ -719,111 +988,61 @@ export class ReleaseService {
       localeCodes,
     });
 
+    const active = await this.prisma.releaseSession.findFirst({
+      where: {
+        projectId,
+        status: {
+          in: ['DRAFT', 'IN_REVIEW', 'APPROVED'],
+        },
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    if (active && active.status !== 'DRAFT') {
+      throw new ConflictException({
+        code: 'RELEASE_SESSION_LOCKED',
+        sessionId: active.id,
+        status: active.status,
+      });
+    }
+
+    const data = {
+      status: 'DRAFT',
+      baseReleaseId: baseReleaseId ?? null,
+      scope: {
+        type: scope.type,
+        ...(scope.type === 'namespaces'
+          ? { namespaceIds: scope.namespaceIds }
+          : {}),
+        ...(scope.type === 'keys' ? { keyIds: scope.keyIds } : {}),
+        localeCodes,
+      },
+      localeCodes,
+      note: dto.note?.trim() ? dto.note.trim() : null,
+      validationErrors: built.errors as unknown as Prisma.InputJsonValue,
+      nextArtifacts: built.artifacts as unknown as Prisma.InputJsonValue,
+      baseJson: this.stringifyJson(base),
+      nextJson: this.stringifyJson(next),
+    } as const;
+
+    const session = active
+      ? await this.prisma.releaseSession.update({
+          where: { id: active.id },
+          data,
+        })
+      : await this.prisma.releaseSession.create({
+          data: { projectId, ...data },
+        });
+
     return {
+      sessionId: session.id,
+      status: session.status,
       baseReleaseId: baseReleaseId ?? null,
       canPublish: built.errors.length === 0,
       errors: built.errors,
-      baseJson: this.stringifyJson(base),
-      nextJson: this.stringifyJson(next),
+      baseJson: data.baseJson,
+      nextJson: data.nextJson,
     };
-  }
-
-  async createRelease(projectId: string, dto: CreateReleaseDto) {
-    const ctx = await this.getProjectContext(projectId);
-    const scope = this.parseScope(dto.scope);
-
-    const localeCodes = this.resolveLocaleCodes({
-      requested: dto.localeCodes,
-      enabled: ctx.enabledLocaleCodes,
-    });
-
-    const baseReleaseId =
-      typeof dto.baseReleaseId === 'string' && dto.baseReleaseId.trim()
-        ? dto.baseReleaseId.trim()
-        : ctx.currentReleaseId;
-
-    if (ctx.currentReleaseId && baseReleaseId !== ctx.currentReleaseId) {
-      throw new ConflictException({
-        code: 'BASE_RELEASE_MISMATCH',
-        currentReleaseId: ctx.currentReleaseId,
-        baseReleaseId,
-      });
-    }
-
-    const baseArtifacts = await this.loadBaseArtifacts({
-      baseReleaseId: baseReleaseId ?? null,
-      localeCodes,
-    });
-
-    const built = await this.computeArtifacts({
-      projectId,
-      baseLocale: ctx.baseLocale,
-      scope,
-      localeCodes,
-      baseArtifacts,
-    });
-
-    if (built.errors.length) {
-      throw new UnprocessableEntityException({
-        code: 'VALIDATION_FAILED',
-        ok: false,
-        errors: built.errors,
-      });
-    }
-
-    const created = await this.prisma.$transaction(async (tx) => {
-      const last = await tx.release.findFirst({
-        where: { projectId },
-        orderBy: { version: 'desc' },
-        select: { version: true },
-      });
-      const version = (last?.version ?? 0) + 1;
-
-      const release = await tx.release.create({
-        data: {
-          projectId,
-          basedOnReleaseId: baseReleaseId ?? null,
-          version,
-          note: dto.note?.trim() ? dto.note.trim() : null,
-          scope: {
-            type: scope.type,
-            ...(scope.type === 'namespaces'
-              ? { namespaceIds: scope.namespaceIds }
-              : {}),
-            ...(scope.type === 'keys' ? { keyIds: scope.keyIds } : {}),
-            localeCodes,
-          },
-        },
-      });
-
-      await tx.releaseArtifact.createMany({
-        data: localeCodes.map((localeCode) => ({
-          releaseId: release.id,
-          localeCode,
-          data: built.artifacts[localeCode] ?? {},
-        })),
-      });
-
-      await tx.project.update({
-        where: { id: projectId },
-        data: { currentReleaseId: release.id },
-      });
-
-      return release;
-    });
-
-    await this.createAuditLog({
-      action: 'RELEASE_CREATE',
-      targetId: created.id,
-      projectId,
-      payload: {
-        baseReleaseId: baseReleaseId ?? null,
-        scope,
-        localeCodes,
-      },
-    });
-
-    return { releaseId: created.id, currentReleaseId: created.id };
   }
 
   async listReleases(projectId: string, query: ListReleasesQueryDto) {

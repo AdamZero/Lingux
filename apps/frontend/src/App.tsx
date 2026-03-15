@@ -5,6 +5,7 @@ import { ConfigProvider, App as AntdApp, theme as antdTheme } from 'antd';
 import MainLayout from '@/layout/MainLayout';
 import ProjectPage from '@/pages/ProjectPage';
 import KeysPage from '@/pages/KeysPage';
+import LoginPage from '@/pages/LoginPage';
 import { useAppStore } from '@/store/useAppStore';
 
 // Create a query client
@@ -16,6 +17,15 @@ const queryClient = new QueryClient({
     },
   },
 });
+
+// Protected route component
+const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const { isAuthenticated } = useAppStore();
+  if (!isAuthenticated) {
+    return <Navigate to="/login" replace />;
+  }
+  return <>{children}</>;
+};
 
 const App: React.FC = () => {
   const { theme } = useAppStore();
@@ -30,7 +40,8 @@ const App: React.FC = () => {
         <AntdApp>
           <BrowserRouter>
             <Routes>
-              <Route path="/" element={<MainLayout />}>
+              <Route path="/login" element={<LoginPage />} />
+              <Route path="/" element={<ProtectedRoute><MainLayout /></ProtectedRoute>}>
                 <Route index element={<Navigate to="/projects" replace />} />
                 <Route path="projects" element={<ProjectPage />} />
                 
