@@ -15,7 +15,7 @@ export class QixinStrategy extends PassportStrategy(Strategy, 'qixin') {
         process.env.QIXIN_CLIENT_SECRET || 'your-qixin-client-secret',
       callbackURL:
         process.env.QIXIN_CALLBACK_URL ||
-        'http://localhost:3001/auth/qixin/callback',
+        '/auth/qixin/callback',
       scope: 'user_info',
     });
   }

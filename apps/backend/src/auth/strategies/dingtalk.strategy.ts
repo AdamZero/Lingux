@@ -16,7 +16,7 @@ export class DingTalkStrategy extends PassportStrategy(Strategy, 'dingtalk') {
         process.env.DINGTALK_CLIENT_SECRET || 'your-dingtalk-client-secret',
       callbackURL:
         process.env.DINGTALK_CALLBACK_URL ||
-        'http://localhost:3001/auth/dingtalk/callback',
+        '/auth/dingtalk/callback',
       scope: 'snsapi_login',
     });
   }

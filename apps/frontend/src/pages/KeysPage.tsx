@@ -25,6 +25,8 @@ import {
   EditOutlined,
   GlobalOutlined,
   UploadOutlined,
+  DownloadOutlined,
+  InboxOutlined,
 } from '@ant-design/icons';
 import apiClient from '@/api/client';
 import PublishDrawer from '@/components/release/PublishDrawer';
@@ -97,9 +99,20 @@ const KeysPage: React.FC = () => {
   const [editingKey, setEditingKey] = useState<Key | null>(null);
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   
+  // Import/Export State
+  const [isImportModalOpen, setIsImportModalOpen] = useState(false);
+  const [importFormat, setImportFormat] = useState<'json' | 'yaml'>('json');
+  const [importMode, setImportMode] = useState<'fillMissing' | 'overwrite'>('fillMissing');
+  const [importFile, setImportFile] = useState<File | null>(null);
+  
+  // Search and Filter State
+  const [searchKeyword, setSearchKeyword] = useState('');
+  const [statusFilter, setStatusFilter] = useState<string | null>(null);
+  
   const [namespaceForm] = Form.useForm();
   const [keyForm] = Form.useForm();
   const [translationForm] = Form.useForm();
+  const [importForm] = Form.useForm();
 
   const isRecord = (value: unknown): value is Record<string, unknown> =>
     typeof value === 'object' && value !== null;
@@ -144,10 +157,18 @@ const KeysPage: React.FC = () => {
 
   // Fetch Keys
   const { data: keys = [], isLoading: isKeysLoading } = useQuery<Key[]>({
-    queryKey: ['keys', projectId, selectedNamespaceId],
+    queryKey: ['keys', projectId, selectedNamespaceId, searchKeyword, statusFilter],
     queryFn: async () => {
+      const params: Record<string, string> = {};
+      if (searchKeyword) {
+        params.search = searchKeyword;
+      }
+      if (statusFilter) {
+        params.status = statusFilter;
+      }
       return await apiClient.get(
         `/projects/${projectId}/namespaces/${selectedNamespaceId}/keys`,
+        { params }
       );
     },
     enabled: !!projectId && !!selectedNamespaceId,
@@ -344,6 +365,127 @@ const KeysPage: React.FC = () => {
     }
   });
 
+  const handleSubmitReview = async (keyId: string, localeCode: string) => {
+    try {
+      await apiClient.post(`/projects/${projectId}/namespaces/${selectedNamespaceId}/keys/${keyId}/translations/${localeCode}/submit-review`);
+      message.success('Translation submitted for review');
+      queryClient.invalidateQueries({ queryKey: ['keys', projectId, selectedNamespaceId] });
+      // Refresh editing key
+      if (editingKey?.id === keyId) {
+        const updatedKey = await fetchKeyById(keyId);
+        setEditingKey(updatedKey);
+      }
+    } catch (error) {
+      message.error('Failed to submit for review');
+    }
+  };
+
+  const handleApprove = async (keyId: string, localeCode: string) => {
+    try {
+      await apiClient.post(`/projects/${projectId}/namespaces/${selectedNamespaceId}/keys/${keyId}/translations/${localeCode}/approve`);
+      message.success('Translation approved');
+      queryClient.invalidateQueries({ queryKey: ['keys', projectId, selectedNamespaceId] });
+      // Refresh editing key
+      if (editingKey?.id === keyId) {
+        const updatedKey = await fetchKeyById(keyId);
+        setEditingKey(updatedKey);
+      }
+    } catch (error) {
+      message.error('Failed to approve translation');
+    }
+  };
+
+  const handleReject = async (keyId: string, localeCode: string) => {
+    const reason = prompt('Please enter the reason for rejection:');
+    if (!reason) return;
+    
+    try {
+      await apiClient.post(`/projects/${projectId}/namespaces/${selectedNamespaceId}/keys/${keyId}/translations/${localeCode}/reject`, { reason });
+      message.success('Translation rejected');
+      queryClient.invalidateQueries({ queryKey: ['keys', projectId, selectedNamespaceId] });
+      // Refresh editing key
+      if (editingKey?.id === keyId) {
+        const updatedKey = await fetchKeyById(keyId);
+        setEditingKey(updatedKey);
+      }
+    } catch (error) {
+      message.error('Failed to reject translation');
+    }
+  };
+
+  const handlePublish = async (keyId: string, localeCode: string) => {
+    try {
+      await apiClient.post(`/projects/${projectId}/namespaces/${selectedNamespaceId}/keys/${keyId}/translations/${localeCode}/publish`);
+      message.success('Translation published');
+      queryClient.invalidateQueries({ queryKey: ['keys', projectId, selectedNamespaceId] });
+      // Refresh editing key
+      if (editingKey?.id === keyId) {
+        const updatedKey = await fetchKeyById(keyId);
+        setEditingKey(updatedKey);
+      }
+    } catch (error) {
+      message.error('Failed to publish translation');
+    }
+  };
+
+  const handleExport = async () => {
+    try {
+      const format = 'json'; // Default format
+      const response = await apiClient.get(`/projects/${projectId}/namespaces/${selectedNamespaceId}/keys/export`, {
+        params: { format },
+      });
+      
+      // Create download link
+      const blob = new Blob([response.content], { type: format === 'json' ? 'application/json' : 'application/yaml' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = response.fileName;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      
+      message.success('Translations exported successfully');
+    } catch (error) {
+      message.error('Failed to export translations');
+    }
+  };
+
+  const handleImport = async () => {
+    if (!importFile) {
+      message.error('Please select a file to import');
+      return;
+    }
+
+    try {
+      const formData = new FormData();
+      formData.append('file', importFile);
+      formData.append('format', importFormat);
+      formData.append('mode', importMode);
+      
+      const response = await apiClient.post(`/projects/${projectId}/namespaces/${selectedNamespaceId}/keys/import`, formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+      });
+      
+      message.success(`Imported successfully: ${response.createdKeys} created, ${response.updatedKeys} updated, ${response.skippedKeys} skipped`);
+      setIsImportModalOpen(false);
+      setImportFile(null);
+      importForm.resetFields();
+      queryClient.invalidateQueries({ queryKey: ['keys', projectId, selectedNamespaceId] });
+    } catch (error) {
+      message.error('Failed to import translations');
+    }
+  };
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files[0]) {
+      setImportFile(e.target.files[0]);
+    }
+  };
+
   const openEditDrawer = (key: Key) => {
     setEditingKey(key);
     // Pre-fill form
@@ -480,6 +622,20 @@ const KeysPage: React.FC = () => {
             >
               Publish
             </Button>
+            <Button
+              icon={<DownloadOutlined />}
+              disabled={!selectedNamespaceId}
+              onClick={handleExport}
+            >
+              Export
+            </Button>
+            <Button
+              icon={<InboxOutlined />}
+              disabled={!selectedNamespaceId}
+              onClick={() => setIsImportModalOpen(true)}
+            >
+              Import
+            </Button>
             <Button 
               type="primary" 
               icon={<PlusOutlined />} 
@@ -489,6 +645,28 @@ const KeysPage: React.FC = () => {
               Create Key
             </Button>
           </Space>
+        </div>
+
+        {/* Search and Filter */}
+        <div style={{ display: 'flex', gap: 16, marginBottom: 16, flexWrap: 'wrap' }}>
+          <Input.Search
+            placeholder="Search keys..."
+            style={{ width: 300 }}
+            onSearch={(value) => handleSearch(value)}
+            allowClear
+          />
+          <Select
+            placeholder="Filter by status"
+            style={{ width: 150 }}
+            onChange={(value) => handleStatusFilter(value)}
+            allowClear
+          >
+            <Option value="PENDING">Pending</Option>
+            <Option value="TRANSLATING">Translating</Option>
+            <Option value="REVIEWING">Reviewing</Option>
+            <Option value="APPROVED">Approved</Option>
+            <Option value="PUBLISHED">Published</Option>
+          </Select>
         </div>
 
         {!selectedNamespaceId ? (
@@ -524,20 +702,78 @@ const KeysPage: React.FC = () => {
           layout="vertical"
           onFinish={(values) => saveTranslationsMutation.mutate(values)}
         >
-          {project?.locales.map(locale => (
-            <Form.Item
-              key={locale.code}
-              name={locale.code}
-              label={
-                <Space>
-                  <GlobalOutlined />
-                  {locale.name} ({locale.code})
-                </Space>
-              }
-            >
-              <Input.TextArea rows={3} placeholder={`Enter translation for ${locale.name}...`} />
-            </Form.Item>
-          ))}
+          {project?.locales.map(locale => {
+            const translation = editingKey?.translations.find(t => t.locale.code === locale.code);
+            const statusColor = {
+              PENDING: 'default',
+              TRANSLATING: 'processing',
+              REVIEWING: 'warning',
+              APPROVED: 'success',
+              PUBLISHED: 'geekblue'
+            }[translation?.status || 'PENDING'];
+            
+            return (
+              <Form.Item
+                key={locale.code}
+                name={locale.code}
+                label={
+                  <Space>
+                    <GlobalOutlined />
+                    {locale.name} ({locale.code})
+                    <Tag color={statusColor}>{translation?.status || 'PENDING'}</Tag>
+                  </Space>
+                }
+              >
+                <Input.TextArea rows={3} placeholder={`Enter translation for ${locale.name}...`} />
+                {translation?.reviewComment && (
+                  <div style={{ marginTop: 8, color: '#ff4d4f' }}>
+                    <Text type="danger">Review Comment: {translation.reviewComment}</Text>
+                  </div>
+                )}
+                <div style={{ marginTop: 8, display: 'flex', gap: 8 }}>
+                  {translation && (
+                    <>
+                      {translation.status === 'PENDING' && (
+                        <Button
+                          size="small"
+                          onClick={() => handleSubmitReview(editingKey.id, locale.code)}
+                        >
+                          Submit for Review
+                        </Button>
+                      )}
+                      {translation.status === 'REVIEWING' && (
+                        <>
+                          <Button
+                            size="small"
+                            type="primary"
+                            onClick={() => handleApprove(editingKey.id, locale.code)}
+                          >
+                            Approve
+                          </Button>
+                          <Button
+                            size="small"
+                            danger
+                            onClick={() => handleReject(editingKey.id, locale.code)}
+                          >
+                            Reject
+                          </Button>
+                        </>
+                      )}
+                      {translation.status === 'APPROVED' && (
+                        <Button
+                          size="small"
+                          type="primary"
+                          onClick={() => handlePublish(editingKey.id, locale.code)}
+                        >
+                          Publish
+                        </Button>
+                      )}
+                    </>
+                  )}
+                </div>
+              </Form.Item>
+            );
+          })}
         </Form>
       </Drawer>
 
@@ -598,6 +834,46 @@ const KeysPage: React.FC = () => {
             rules={[{ required: true, whitespace: true }]}
           >
             <Input.TextArea rows={3} placeholder="Input default locale text" />
+          </Form.Item>
+        </Form>
+      </Modal>
+
+      {/* Import Modal */}
+      <Modal
+        title="Import Translations"
+        open={isImportModalOpen}
+        onOk={handleImport}
+        onCancel={() => setIsImportModalOpen(false)}
+      >
+        <Form
+          form={importForm}
+          layout="vertical"
+        >
+          <Form.Item label="File">
+            <input
+              type="file"
+              accept=".json,.yaml,.yml"
+              onChange={handleFileChange}
+            />
+            {importFile && <div style={{ marginTop: 8 }}>Selected: {importFile.name}</div>}
+          </Form.Item>
+          <Form.Item label="Format">
+            <Select
+              value={importFormat}
+              onChange={(value) => setImportFormat(value)}
+            >
+              <Option value="json">JSON</Option>
+              <Option value="yaml">YAML</Option>
+            </Select>
+          </Form.Item>
+          <Form.Item label="Mode">
+            <Select
+              value={importMode}
+              onChange={(value) => setImportMode(value)}
+            >
+              <Option value="fillMissing">Fill Missing</Option>
+              <Option value="overwrite">Overwrite</Option>
+            </Select>
           </Form.Item>
         </Form>
       </Modal>

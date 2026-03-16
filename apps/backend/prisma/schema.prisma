@@ -134,6 +134,32 @@ enum AuditActorType {
   LLM
 }
 
+model Enterprise {
+  id         String   @id @default(cuid())
+  name       String
+  domain     String?  @unique
+  externalId String?  @unique
+  platform   String   // feishu, qixin, dingtalk
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  members    EnterpriseMember[]
+}
+
+model EnterpriseMember {
+  id           String   @id @default(cuid())
+  enterpriseId String
+  userId       String
+  role         String   @default("member") // admin, member
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  enterprise   Enterprise @relation(fields: [enterpriseId], references: [id], onDelete: Cascade)
+  user         User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([enterpriseId, userId])
+}
+
 model User {
   id         String   @id @default(cuid())
   username   String   @unique
@@ -143,9 +169,10 @@ model User {
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
 
-  projects     Project[]     @relation("ProjectUsers")
-  reviews      Translation[] @relation("Reviewer")
+  projects     Project[]          @relation("ProjectUsers")
+  reviews      Translation[]      @relation("Reviewer")
   auditLogs    AuditLog[]
+  enterprises  EnterpriseMember[]
 }
 
 model AuditLog {

@@ -8,6 +8,7 @@ import { TranslationStatus } from '@prisma/client';
 import { CreateKeyDto } from './dto/create-key.dto';
 import { UpdateKeyDto } from './dto/update-key.dto';
 import { PrismaService } from '../prisma.service';
+import * as yaml from 'js-yaml';
 
 @Injectable()
 export class KeyService {
@@ -265,5 +266,176 @@ export class KeyService {
     });
 
     return { success: true };
+  }
+
+  async exportTranslations(
+    projectId: string,
+    namespaceId: string,
+    format: 'json' | 'yaml' = 'json',
+  ) {
+    // Verify project and namespace relationship
+    const namespace = await this.prisma.namespace.findFirst({
+      where: { id: namespaceId, projectId },
+    });
+    if (!namespace) {
+      throw new NotFoundException(
+        `Namespace with ID ${namespaceId} not found in project ${projectId}`,
+      );
+    }
+
+    // Get all keys with translations
+    const keys = await this.prisma.key.findMany({
+      where: {
+        namespaceId,
+        namespace: { projectId },
+      },
+      include: {
+        translations: {
+          include: {
+            locale: true,
+          },
+        },
+      },
+    });
+
+    // Convert to export format
+    const exportData: Record<string, Record<string, string>> = {};
+    keys.forEach((key) => {
+      const translations: Record<string, string> = {};
+      key.translations.forEach((translation) => {
+        translations[translation.locale.code] = translation.content;
+      });
+      exportData[key.name] = translations;
+    });
+
+    // Format based on requested format
+    if (format === 'yaml') {
+      return yaml.dump(exportData);
+    } else {
+      return JSON.stringify(exportData, null, 2);
+    }
+  }
+
+  async importTranslations(
+    projectId: string,
+    namespaceId: string,
+    fileContent: string,
+    format: 'json' | 'yaml' = 'json',
+    mode: 'fillMissing' | 'overwrite' = 'fillMissing',
+  ) {
+    // Verify project and namespace relationship
+    const namespace = await this.prisma.namespace.findFirst({
+      where: { id: namespaceId, projectId },
+    });
+    if (!namespace) {
+      throw new NotFoundException(
+        `Namespace with ID ${namespaceId} not found in project ${projectId}`,
+      );
+    }
+
+    // Parse file content
+    let importData: Record<string, Record<string, string>>;
+    try {
+      if (format === 'yaml') {
+        importData = yaml.load(fileContent) as Record<
+          string,
+          Record<string, string>
+        >;
+      } else {
+        importData = JSON.parse(fileContent) as Record<
+          string,
+          Record<string, string>
+        >;
+      }
+    } catch (error) {
+      throw new BadRequestException(`Invalid ${format} file: ${error.message}`);
+    }
+
+    if (!importData || typeof importData !== 'object') {
+      throw new BadRequestException('Invalid import data format');
+    }
+
+    // Process each key and translation
+    let createdKeys = 0;
+    let updatedKeys = 0;
+    let skippedKeys = 0;
+
+    await this.prisma.$transaction(async (tx) => {
+      for (const [keyName, translations] of Object.entries(importData)) {
+        // Check if key exists
+        let key = await tx.key.findFirst({
+          where: {
+            namespaceId,
+            name: keyName,
+          },
+        });
+
+        if (!key) {
+          // Create new key
+          key = await tx.key.create({
+            data: {
+              name: keyName,
+              namespaceId,
+              type: 'TEXT', // Default type
+            },
+          });
+          createdKeys++;
+        } else {
+          updatedKeys++;
+        }
+
+        // Process translations
+        for (const [localeCode, content] of Object.entries(translations)) {
+          // Find locale
+          const locale = await tx.locale.findUnique({
+            where: { code: localeCode },
+          });
+          if (!locale) {
+            continue; // Skip unknown locales
+          }
+
+          // Check if translation exists
+          const existingTranslation = await tx.translation.findUnique({
+            where: {
+              keyId_localeId: { keyId: key.id, localeId: locale.id },
+            },
+          });
+
+          if (!existingTranslation) {
+            // Create new translation
+            await tx.translation.create({
+              data: {
+                keyId: key.id,
+                localeId: locale.id,
+                content,
+                status: TranslationStatus.PENDING,
+              },
+            });
+          } else if (mode === 'overwrite') {
+            // Update existing translation
+            await tx.translation.update({
+              where: {
+                keyId_localeId: { keyId: key.id, localeId: locale.id },
+              },
+              data: {
+                content,
+                status: TranslationStatus.PENDING,
+              },
+            });
+          } else {
+            // Skip if fillMissing mode and translation exists
+            skippedKeys++;
+          }
+        }
+      }
+    });
+
+    return {
+      createdKeys,
+      updatedKeys,
+      skippedKeys,
+      totalKeys: Object.keys(importData).length,
+      mode,
+    };
   }
 }

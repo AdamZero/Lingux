@@ -1,4 +1,4 @@
-import { Controller, Get, UseGuards, Req, Res } from '@nestjs/common';
+import { Controller, Get, UseGuards, Req, Res, Logger } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
 import { AuthService } from './auth.service';
 import type { Request, Response } from 'express';
@@ -12,6 +12,8 @@ interface User {
 
 @Controller('auth')
 export class AuthController {
+  private readonly logger = new Logger(AuthController.name);
+
   constructor(private readonly authService: AuthService) {}
 
   @Get('feishu')
@@ -23,16 +25,25 @@ export class AuthController {
   @Get('feishu/callback')
   @UseGuards(AuthGuard('feishu'))
   async feishuCallback(@Req() req: Request, @Res() res: Response) {
-    const user = req.user as User;
-    if (!user) {
-      return res.status(401).send('Authentication failed');
+    try {
+      this.logger.log('Feishu callback received');
+      const user = req.user as User;
+      if (!user) {
+        this.logger.error('No user found in request');
+        return res.status(401).send('Authentication failed');
+      }
+      this.logger.log('User authenticated:', user);
+      const loginResult = await this.authService.login(user);
+      this.logger.log('Login result:', loginResult);
+      
+      // Redirect to frontend with token (using hash fragment for better security)
+      res.redirect(
+        `/login#token=${loginResult.access_token}&user=${JSON.stringify(loginResult.user)}`,
+      );
+    } catch (error) {
+      this.logger.error('Feishu callback error:', error);
+      return res.status(500).send('Internal server error');
     }
-    const loginResult = await this.authService.login(user);
-    
-    // Redirect to frontend with token (using hash fragment for better security)
-    res.redirect(
-      `http://localhost:3000/login#token=${loginResult.access_token}&user=${JSON.stringify(loginResult.user)}`,
-    );
   }
 
   @Get('qixin')
@@ -52,7 +63,7 @@ export class AuthController {
     
     // Redirect to frontend with token (using hash fragment for better security)
     res.redirect(
-      `http://localhost:3000/login#token=${loginResult.access_token}&user=${JSON.stringify(loginResult.user)}`,
+      `/login#token=${loginResult.access_token}&user=${JSON.stringify(loginResult.user)}`,
     );
   }
 
@@ -73,7 +84,7 @@ export class AuthController {
     
     // Redirect to frontend with token (using hash fragment for better security)
     res.redirect(
-      `http://localhost:3000/login#token=${loginResult.access_token}&user=${JSON.stringify(loginResult.user)}`,
+      `/login#token=${loginResult.access_token}&user=${JSON.stringify(loginResult.user)}`,
     );
   }
 

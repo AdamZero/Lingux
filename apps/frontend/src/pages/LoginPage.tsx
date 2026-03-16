@@ -48,15 +48,15 @@ const LoginPage: React.FC = () => {
   }, [isAuthenticated, navigate]);
 
   const handleFeishuLogin = () => {
-    window.location.href = 'http://localhost:3001/auth/feishu';
+    window.location.href = '/api/v1/auth/feishu';
   };
 
   const handleQixinLogin = () => {
-    window.location.href = 'http://localhost:3001/auth/qixin';
+    window.location.href = '/api/v1/auth/qixin';
   };
 
   const handleDingTalkLogin = () => {
-    window.location.href = 'http://localhost:3001/auth/dingtalk';
+    window.location.href = '/api/v1/auth/dingtalk';
   };
 
   return (
