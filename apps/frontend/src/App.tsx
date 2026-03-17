@@ -6,7 +6,10 @@ import MainLayout from "@/layout/MainLayout";
 import ProjectPage from "@/pages/ProjectPage";
 import KeysPage from "@/pages/KeysPage";
 import LoginPage from "@/pages/LoginPage";
+import DashboardPage from "@/pages/DashboardPage";
+import ReleaseCenter from "@/pages/ReleaseCenter";
 import { useAppStore, selectIsAuthenticated } from "@/store/useAppStore";
+import { usePermission } from "@/hooks/usePermission";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -23,6 +26,17 @@ const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({
   const isAuthenticated = useAppStore(selectIsAuthenticated);
   if (!isAuthenticated) {
     return <Navigate to="/login" replace />;
+  }
+  return <>{children}</>;
+};
+
+const RequireRole: React.FC<{ children: React.ReactNode; roles: string[] }> = ({
+  children,
+  roles,
+}) => {
+  const { user } = usePermission();
+  if (!user || !roles.includes(user.role)) {
+    return <Navigate to="/workspace" replace />;
   }
   return <>{children}</>;
 };
@@ -52,13 +66,36 @@ const App: React.FC = () => {
                   </ProtectedRoute>
                 }
               >
-                <Route index element={<Navigate to="/projects" replace />} />
+                {/* 默认跳转工作台 */}
+                <Route index element={<Navigate to="/workspace" replace />} />
+
+                {/* 工作台 */}
+                <Route path="workspace" element={<DashboardPage />} />
+
+                {/* 项目列表 */}
                 <Route path="projects" element={<ProjectPage />} />
+
+                {/* 翻译管理 */}
                 <Route path="project/:projectId">
                   <Route index element={<Navigate to="keys" replace />} />
                   <Route path="keys" element={<KeysPage />} />
                   <Route path="settings" element={<div>Settings Page</div>} />
                 </Route>
+
+                {/* 审核工作台（预留） */}
+                <Route
+                  path="reviews"
+                  element={
+                    <RequireRole roles={["REVIEWER", "ADMIN"]}>
+                      <div>Review Dashboard (Coming Soon)</div>
+                    </RequireRole>
+                  }
+                />
+
+                {/* 发布中心 */}
+                <Route path="releases" element={<ReleaseCenter />} />
+
+                {/* 404 */}
                 <Route path="*" element={<div>404 Not Found</div>} />
               </Route>
             </Routes>

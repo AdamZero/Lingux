@@ -20,6 +20,9 @@ import { AsyncContextModule } from './common/context/async-context.module';
 import { HttpExceptionFilter } from './common/filters/http-exception.filter';
 import { RequestLogMiddleware } from './common/middleware/request-log.middleware';
 import { APP_FILTER } from '@nestjs/core';
+import { WorkspaceModule } from './workspace/workspace.module';
+import { ConfigModule } from './config/config.module';
+import { ReviewsModule } from './reviews/reviews.module';
 
 @Module({
   imports: [
@@ -34,6 +37,9 @@ import { APP_FILTER } from '@nestjs/core';
     TranslationModule,
     LocaleModule,
     ReleaseModule,
+    WorkspaceModule,
+    ConfigModule,
+    ReviewsModule,
   ],
   controllers: [AppController],
   providers: [

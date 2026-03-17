@@ -3,8 +3,11 @@ import { Layout, Menu, theme, Button } from "antd";
 import {
   MenuFoldOutlined,
   MenuUnfoldOutlined,
+  HomeOutlined,
   ProjectOutlined,
   KeyOutlined,
+  CheckCircleOutlined,
+  RocketOutlined,
   SettingOutlined,
   ArrowLeftOutlined,
   SunOutlined,
@@ -12,6 +15,7 @@ import {
 } from "@ant-design/icons";
 import { Outlet, useNavigate, useLocation, useParams } from "react-router-dom";
 import { useAppStore } from "@/store/useAppStore";
+import { usePermission } from "@/hooks/usePermission";
 
 const { Header, Sider, Content } = Layout;
 
@@ -25,11 +29,13 @@ const MainLayout: React.FC = () => {
     theme: appTheme,
     toggleTheme,
   } = useAppStore();
+  const { canReview, features } = usePermission();
   const {
     token: { colorBgContainer, borderRadiusLG, colorBgLayout },
   } = theme.useToken();
 
   const menuItems = useMemo(() => {
+    // 项目内菜单
     if (projectId) {
       return [
         {
@@ -54,14 +60,38 @@ const MainLayout: React.FC = () => {
       ];
     }
 
-    return [
+    // 全局菜单
+    const items = [
+      {
+        key: "/workspace",
+        icon: <HomeOutlined />,
+        label: "工作台",
+      },
       {
         key: "/projects",
         icon: <ProjectOutlined />,
-        label: "Projects",
+        label: "项目列表",
       },
     ];
-  }, [projectId, navigate]);
+
+    // 审核工作台（需要权限且功能开关开启）
+    if (canReview && features?.review) {
+      items.push({
+        key: "/reviews",
+        icon: <CheckCircleOutlined />,
+        label: "审核工作台",
+      });
+    }
+
+    // 发布中心
+    items.push({
+      key: "/releases",
+      icon: <RocketOutlined />,
+      label: "发布中心",
+    });
+
+    return items;
+  }, [projectId, navigate, canReview, features]);
 
   return (
     <Layout style={{ minHeight: "100vh", background: colorBgLayout }}>

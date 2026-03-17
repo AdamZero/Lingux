@@ -37,8 +37,9 @@ export class AuthService {
         where: { externalId },
       });
 
-      // 生成 username：优先使用 name，否则使用 provider_externalId 格式
-      const username = name || `${provider}_${externalId}`;
+      // 生成 username：优先使用 name（清理空格），否则使用 provider_externalId 格式
+      const sanitizedName = name?.replace(/\s+/g, '_');
+      const username = sanitizedName || `${provider}_${externalId}`;
 
       if (!user) {
         // Create new user if not exists
@@ -60,10 +61,10 @@ export class AuthService {
           where: { id: user.id },
           data: {
             username,
-            name: name || user.name,
-            email: email || user.email,
-            avatar: avatar || user.avatar,
-            mobile: mobile || user.mobile,
+            name: name ?? user.name,
+            email: email ?? user.email,
+            avatar: avatar ?? user.avatar,
+            mobile: mobile ?? user.mobile,
             provider,
           },
         });
