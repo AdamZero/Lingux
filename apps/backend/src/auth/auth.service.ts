@@ -2,6 +2,7 @@ import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { PrismaService } from '../prisma.service';
 import { JwtService } from '@nestjs/jwt';
 import { EnterpriseService } from '../enterprise/enterprise.service';
+import { WinstonLoggerService } from '../common/logger/logger.service';
 
 interface UserInfo {
   externalId: string;
@@ -18,6 +19,7 @@ export class AuthService {
     private readonly prisma: PrismaService,
     private readonly jwtService: JwtService,
     private readonly enterpriseService: EnterpriseService,
+    private readonly logger: WinstonLoggerService,
   ) {}
 
   async validateUser(
@@ -91,7 +93,11 @@ export class AuthService {
 
       return user;
     } catch (error) {
-      console.error('User validation error:', error);
+      this.logger.error(
+        'User validation error',
+        error instanceof Error ? error.stack : undefined,
+        { externalId, provider },
+      );
       throw new Error('Failed to validate or create user');
     }
   }
@@ -120,7 +126,11 @@ export class AuthService {
         },
       };
     } catch (error) {
-      console.error('Login error:', error);
+      this.logger.error(
+        'Login error',
+        error instanceof Error ? error.stack : undefined,
+        { userId: user.id, username: user.username },
+      );
       throw new Error('Failed to generate access token');
     }
   }

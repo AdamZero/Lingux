@@ -1,4 +1,9 @@
-import { Module } from '@nestjs/common';
+import {
+  Module,
+  NestModule,
+  MiddlewareConsumer,
+  RequestMethod,
+} from '@nestjs/common';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { PrismaModule } from './prisma.module';
@@ -10,9 +15,16 @@ import { LocaleModule } from './locale/locale.module';
 import { ReleaseModule } from './release/release.module';
 import { AuthModule } from './auth/auth.module';
 import { EnterpriseModule } from './enterprise/enterprise.module';
+import { LoggerModule } from './common/logger/logger.module';
+import { AsyncContextModule } from './common/context/async-context.module';
+import { HttpExceptionFilter } from './common/filters/http-exception.filter';
+import { RequestLogMiddleware } from './common/middleware/request-log.middleware';
+import { APP_FILTER } from '@nestjs/core';
 
 @Module({
   imports: [
+    AsyncContextModule,
+    LoggerModule,
     PrismaModule,
     AuthModule,
     EnterpriseModule,
@@ -24,6 +36,18 @@ import { EnterpriseModule } from './enterprise/enterprise.module';
     ReleaseModule,
   ],
   controllers: [AppController],
-  providers: [AppService],
+  providers: [
+    AppService,
+    {
+      provide: APP_FILTER,
+      useClass: HttpExceptionFilter,
+    },
+  ],
 })
-export class AppModule {}
+export class AppModule implements NestModule {
+  configure(consumer: MiddlewareConsumer) {
+    consumer
+      .apply(RequestLogMiddleware)
+      .forRoutes({ path: '*', method: RequestMethod.ALL });
+  }
+}

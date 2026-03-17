@@ -52,7 +52,10 @@
     "passport-oauth2": "^1.8.0",
     "pg": "^8.20.0",
     "reflect-metadata": "^0.2.0",
-    "rxjs": "^7.8.1"
+    "rxjs": "^7.8.1",
+    "uuid": "^9.0.1",
+    "winston": "^3.11.0",
+    "winston-daily-rotate-file": "^4.7.1"
   },
   "devDependencies": {
     "@nestjs/cli": "^10.0.0",
@@ -63,6 +66,7 @@
     "@types/jest": "^29.5.2",
     "@types/node": "^20.3.1",
     "@types/supertest": "^6.0.0",
+    "@types/uuid": "^9.0.8",
     "eslint": "^8.57.0",
     "eslint-config-custom": "*",
     "jest": "^29.5.0",

@@ -28,22 +28,18 @@ interface FeishuUserInfo {
   code: number;
   msg: string;
   data: {
-    user: {
-      open_id: string;
-      union_id: string;
-      user_id?: string;
-      name: string;
-      en_name?: string;
-      email?: string;
-      mobile?: string;
-      avatar?: {
-        avatar_origin: string;
-        avatar_72: string;
-        avatar_240: string;
-        avatar_640: string;
-      };
-      tenant_key: string;
-    };
+    open_id: string;
+    union_id: string;
+    user_id?: string;
+    name: string;
+    en_name?: string;
+    email?: string;
+    mobile?: string;
+    avatar_url?: string;
+    avatar_thumb?: string;
+    avatar_middle?: string;
+    avatar_big?: string;
+    tenant_key: string;
   };
 }
 
@@ -149,9 +145,18 @@ export class AuthController {
       });
 
       this.logger.log('User created/updated:', user);
+      this.logger.log('User object type:', typeof user);
+      this.logger.log('User is null?:', user === null);
+      this.logger.log('User is undefined?:', user === undefined);
+      if (user) {
+        this.logger.log('User.name:', user.name);
+        this.logger.log('User.id:', user.id);
+        this.logger.log('User.username:', user.username);
+        this.logger.log('User.role:', user.role);
+      }
       const loginResult = await this.authService.login({
         ...user,
-        name: user.name ?? undefined,
+        name: user?.name ?? undefined,
       });
       this.logger.log('Login result:', loginResult);
 
@@ -189,11 +194,27 @@ export class AuthController {
       throw new Error(`Failed to get user info: ${data.msg}`);
     }
 
-    const user = data.data.user;
+    // 检查 data.data 是否存在
+    if (!data.data) {
+      this.logger.error('Invalid user data structure:', data);
+      throw new Error('Invalid user data structure from Feishu');
+    }
+
+    const user = data.data;
+    this.logger.log('Raw user data from Feishu:', JSON.stringify(user));
+    this.logger.log('User name:', user.name);
+    this.logger.log('User en_name:', user.en_name);
+    this.logger.log('User open_id:', user.open_id);
+    this.logger.log('User email:', user.email);
+    this.logger.log('User mobile:', user.mobile);
+    this.logger.log('User avatar_url:', user.avatar_url);
+    // 优先使用 name，如果没有则使用 en_name，如果都没有则使用 open_id 作为后备
+    const name = user.name || user.en_name || user.open_id;
+    this.logger.log('Final resolved name:', name);
     return {
-      name: user.name,
+      name,
       email: user.email,
-      avatar: user.avatar?.avatar_72 || user.avatar?.avatar_origin,
+      avatar: user.avatar_thumb || user.avatar_url,
       mobile: user.mobile,
     };
   }

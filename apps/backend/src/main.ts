@@ -6,9 +6,7 @@ import * as path from 'path';
 
 async function bootstrap() {
   const envPath = path.join(__dirname, '../../.env');
-  console.log('Loading env from:', envPath);
   dotenv.config({ path: envPath });
-  console.log('DATABASE_URL after dotenv:', process.env.DATABASE_URL);
 
   const app = await NestFactory.create(AppModule);
 

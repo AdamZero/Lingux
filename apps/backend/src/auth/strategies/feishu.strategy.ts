@@ -21,22 +21,18 @@ interface FeishuUserInfo {
   code: number;
   msg: string;
   data: {
-    user: {
-      open_id: string;
-      union_id: string;
-      user_id?: string;
-      name: string;
-      en_name?: string;
-      email?: string;
-      mobile?: string;
-      avatar?: {
-        avatar_origin: string;
-        avatar_72: string;
-        avatar_240: string;
-        avatar_640: string;
-      };
-      tenant_key: string;
-    };
+    open_id: string;
+    union_id: string;
+    user_id?: string;
+    name: string;
+    en_name?: string;
+    email?: string;
+    mobile?: string;
+    avatar_url?: string;
+    avatar_thumb?: string;
+    avatar_middle?: string;
+    avatar_big?: string;
+    tenant_key: string;
   };
 }
 
@@ -151,11 +147,11 @@ export class FeishuStrategy extends PassportStrategy(Strategy, 'feishu') {
       throw new Error(`Failed to get user info: ${data.msg}`);
     }
 
-    const user = data.data.user;
+    const user = data.data;
     return {
-      name: user.name,
+      name: user.name || user.en_name || user.open_id,
       email: user.email,
-      avatar: user.avatar?.avatar_72 || user.avatar?.avatar_origin,
+      avatar: user.avatar_thumb || user.avatar_url,
       mobile: user.mobile,
     };
   }
