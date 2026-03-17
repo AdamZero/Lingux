@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   App as AntdApp,
   Button,
@@ -12,12 +12,12 @@ import {
   Space,
   Table,
   Typography,
-} from 'antd';
-import { useMutation } from '@tanstack/react-query';
-import type { ColumnsType } from 'antd/es/table';
-import { createTwoFilesPatch } from 'diff';
-import { Diff, Hunk, parseDiff } from 'react-diff-view';
-import 'react-diff-view/style/index.css';
+} from "antd";
+import { useMutation } from "@tanstack/react-query";
+import type { ColumnsType } from "antd/es/table";
+import { createTwoFilesPatch } from "diff";
+import { Diff, Hunk, parseDiff } from "react-diff-view";
+import "react-diff-view/style/index.css";
 import {
   approveReleaseSession,
   getActiveReleaseSession,
@@ -26,7 +26,7 @@ import {
   rejectReleaseSession,
   submitReleaseSession,
   previewRelease,
-} from '@/api/releases';
+} from "@/api/releases";
 import type {
   BaseReleaseMismatchError,
   GetReleaseSessionResponse,
@@ -36,7 +36,7 @@ import type {
   ReleaseSessionLockedError,
   ReleaseValidationError,
   ValidationFailedError,
-} from '@/types/release';
+} from "@/types/release";
 
 type LocaleOption = { code: string; name: string };
 
@@ -47,31 +47,38 @@ type Props = {
   baseLocale?: string;
   locales: LocaleOption[];
   currentReleaseId?: string | null;
-  scope: PreviewReleasePayload['scope'];
+  scope: PreviewReleasePayload["scope"];
   scopeLabel: string;
 };
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
-  typeof value === 'object' && value !== null;
+  typeof value === "object" && value !== null;
 
 const extractApiError = (error: unknown) => {
   if (!isRecord(error)) {
-    return { status: undefined as number | undefined, data: undefined as unknown };
+    return {
+      status: undefined as number | undefined,
+      data: undefined as unknown,
+    };
   }
   const response = error.response;
   if (!isRecord(response)) {
-    return { status: undefined as number | undefined, data: undefined as unknown };
+    return {
+      status: undefined as number | undefined,
+      data: undefined as unknown,
+    };
   }
-  const status = typeof response.status === 'number' ? response.status : undefined;
+  const status =
+    typeof response.status === "number" ? response.status : undefined;
   const data = response.data;
   return { status, data };
 };
 
-const reasonText: Record<ReleaseValidationError['reason'], string> = {
-  MISSING_TRANSLATION: '缺少翻译',
-  EMPTY_CONTENT: '内容为空',
-  PLACEHOLDER_MISMATCH: '占位符不一致',
-  ICU_INVALID: '花括号不平衡',
+const reasonText: Record<ReleaseValidationError["reason"], string> = {
+  MISSING_TRANSLATION: "缺少翻译",
+  EMPTY_CONTENT: "内容为空",
+  PLACEHOLDER_MISMATCH: "占位符不一致",
+  ICU_INVALID: "花括号不平衡",
 };
 
 const PublishDrawer: React.FC<Props> = (props) => {
@@ -82,9 +89,12 @@ const PublishDrawer: React.FC<Props> = (props) => {
   const isInitializingRef = useRef(false);
   const autoPreviewTimerRef = useRef<number | null>(null);
   const lastAutoPreviewKeyRef = useRef<string | null>(null);
-  const watchedLocaleCodes = Form.useWatch('localeCodes', form);
+  const watchedLocaleCodes = Form.useWatch("localeCodes", form);
 
-  const allLocaleCodes = useMemo(() => props.locales.map((l) => l.code), [props.locales]);
+  const allLocaleCodes = useMemo(
+    () => props.locales.map((l) => l.code),
+    [props.locales],
+  );
   const defaultLocaleCodes = useMemo(() => {
     if (!props.baseLocale) {
       return allLocaleCodes;
@@ -95,40 +105,57 @@ const PublishDrawer: React.FC<Props> = (props) => {
   }, [allLocaleCodes, props.baseLocale]);
 
   const errorColumns: ColumnsType<ReleaseValidationError> = [
-    { title: 'Locale', dataIndex: 'localeCode', key: 'localeCode', width: 110 },
-    { title: 'Namespace', dataIndex: 'namespaceName', key: 'namespaceName', width: 140 },
-    { title: 'Key', dataIndex: 'keyName', key: 'keyName', width: 220 },
+    { title: "Locale", dataIndex: "localeCode", key: "localeCode", width: 110 },
     {
-      title: 'Reason',
-      dataIndex: 'reason',
-      key: 'reason',
-      render: (value: ReleaseValidationError['reason']) => reasonText[value] ?? value,
+      title: "Namespace",
+      dataIndex: "namespaceName",
+      key: "namespaceName",
+      width: 140,
+    },
+    { title: "Key", dataIndex: "keyName", key: "keyName", width: 220 },
+    {
+      title: "Reason",
+      dataIndex: "reason",
+      key: "reason",
+      render: (value: ReleaseValidationError["reason"]) =>
+        reasonText[value] ?? value,
     },
   ];
 
-  const toPreviewFromSession = (session: ReleaseSession): PreviewReleaseResponse => {
-    const errors = Array.isArray(session.validationErrors) ? session.validationErrors : [];
+  const toPreviewFromSession = (
+    session: ReleaseSession,
+  ): PreviewReleaseResponse => {
+    const errors = Array.isArray(session.validationErrors)
+      ? session.validationErrors
+      : [];
     return {
       sessionId: session.id,
       status: session.status,
       baseReleaseId: session.baseReleaseId ?? null,
       canPublish: errors.length === 0,
       errors,
-      baseJson: session.baseJson ?? '',
-      nextJson: session.nextJson ?? '',
+      baseJson: session.baseJson ?? "",
+      nextJson: session.nextJson ?? "",
     };
   };
 
   const loadSession = async (sessionId: string) => {
-    const result = (await getReleaseSession(props.projectId, sessionId)) as GetReleaseSessionResponse;
+    const result = (await getReleaseSession(
+      props.projectId,
+      sessionId,
+    )) as GetReleaseSessionResponse;
     setPreview(toPreviewFromSession(result.session));
-    if (Array.isArray(result.session.localeCodes) && result.session.localeCodes.length) {
+    if (
+      Array.isArray(result.session.localeCodes) &&
+      result.session.localeCodes.length
+    ) {
       form.setFieldsValue({ localeCodes: result.session.localeCodes });
     }
   };
 
   const previewMutation = useMutation({
-    mutationFn: async (payload: PreviewReleasePayload) => previewRelease(props.projectId, payload),
+    mutationFn: async (payload: PreviewReleasePayload) =>
+      previewRelease(props.projectId, payload),
     onSuccess: (data, variables) => {
       setPreview(data);
       if (Array.isArray(variables.localeCodes)) {
@@ -137,37 +164,48 @@ const PublishDrawer: React.FC<Props> = (props) => {
     },
     onError: (error: unknown) => {
       const { status, data } = extractApiError(error);
-      if (status === 409 && isRecord(data) && data.code === 'BASE_RELEASE_MISMATCH') {
+      if (
+        status === 409 &&
+        isRecord(data) &&
+        data.code === "BASE_RELEASE_MISMATCH"
+      ) {
         const d = data as unknown as BaseReleaseMismatchError;
         setPreview(null);
-        message.error(`线上版本已变化，请重新预览（current=${d.currentReleaseId}）`);
+        message.error(
+          `线上版本已变化，请重新预览（current=${d.currentReleaseId}）`,
+        );
         return;
       }
-      if (status === 409 && isRecord(data) && data.code === 'RELEASE_SESSION_LOCKED') {
+      if (
+        status === 409 &&
+        isRecord(data) &&
+        data.code === "RELEASE_SESSION_LOCKED"
+      ) {
         const d = data as unknown as ReleaseSessionLockedError;
         message.warning(`已有进行中的发布会话（${d.status}），已切换到该会话`);
         void loadSession(d.sessionId);
         return;
       }
-      message.error('预览失败');
+      message.error("预览失败");
     },
   });
 
   const submitMutation = useMutation({
-    mutationFn: async (sessionId: string) => submitReleaseSession(props.projectId, sessionId),
+    mutationFn: async (sessionId: string) =>
+      submitReleaseSession(props.projectId, sessionId),
     onSuccess: async () => {
       if (!preview) {
         return;
       }
       await loadSession(preview.sessionId);
-      message.success('已提交审核');
+      message.success("已提交审核");
     },
     onError: (error: unknown) => {
       const { status, data } = extractApiError(error);
       if (
         status === 422 &&
         isRecord(data) &&
-        data.code === 'VALIDATION_FAILED' &&
+        data.code === "VALIDATION_FAILED" &&
         Array.isArray(data.errors)
       ) {
         const d = data as unknown as ValidationFailedError;
@@ -180,44 +218,48 @@ const PublishDrawer: React.FC<Props> = (props) => {
               }
             : prev,
         );
-        message.error('校验失败，请先修复翻译后再提交审核');
+        message.error("校验失败，请先修复翻译后再提交审核");
         return;
       }
-      message.error('提交失败');
+      message.error("提交失败");
     },
   });
 
   const approveMutation = useMutation({
-    mutationFn: async (sessionId: string) => approveReleaseSession(props.projectId, sessionId),
+    mutationFn: async (sessionId: string) =>
+      approveReleaseSession(props.projectId, sessionId),
     onSuccess: async () => {
       if (!preview) {
         return;
       }
       await loadSession(preview.sessionId);
-      message.success('已审核通过');
+      message.success("已审核通过");
     },
     onError: () => {
-      message.error('审核失败');
+      message.error("审核失败");
     },
   });
 
   const rejectMutation = useMutation({
     mutationFn: async (params: { sessionId: string; reason: string }) =>
-      rejectReleaseSession(props.projectId, params.sessionId, { reason: params.reason }),
+      rejectReleaseSession(props.projectId, params.sessionId, {
+        reason: params.reason,
+      }),
     onSuccess: async () => {
       if (!preview) {
         return;
       }
       await loadSession(preview.sessionId);
-      message.success('已驳回');
+      message.success("已驳回");
     },
     onError: () => {
-      message.error('驳回失败');
+      message.error("驳回失败");
     },
   });
 
   const publishMutation = useMutation({
-    mutationFn: async (sessionId: string) => publishReleaseSession(props.projectId, sessionId),
+    mutationFn: async (sessionId: string) =>
+      publishReleaseSession(props.projectId, sessionId),
     onSuccess: (res) => {
       message.success(`发布成功：${res.releaseId}`);
       setPreview(null);
@@ -229,7 +271,7 @@ const PublishDrawer: React.FC<Props> = (props) => {
       if (
         status === 422 &&
         isRecord(data) &&
-        data.code === 'VALIDATION_FAILED' &&
+        data.code === "VALIDATION_FAILED" &&
         Array.isArray(data.errors)
       ) {
         const d = data as unknown as ValidationFailedError;
@@ -242,10 +284,10 @@ const PublishDrawer: React.FC<Props> = (props) => {
               }
             : prev,
         );
-        message.error('校验失败，请先修复翻译后再发布');
+        message.error("校验失败，请先修复翻译后再发布");
         return;
       }
-      message.error('发布失败');
+      message.error("发布失败");
     },
   });
 
@@ -253,22 +295,22 @@ const PublishDrawer: React.FC<Props> = (props) => {
     if (!preview) {
       return null;
     }
-    const oldText = preview.baseJson ?? '';
-    const newText = preview.nextJson ?? '';
-    const fileName = 'release.json';
+    const oldText = preview.baseJson ?? "";
+    const newText = preview.nextJson ?? "";
+    const fileName = "release.json";
     const patch = createTwoFilesPatch(
       `a/${fileName}`,
       `b/${fileName}`,
       oldText,
       newText,
-      '',
-      '',
+      "",
+      "",
       { context: 3 },
     );
     const lines = patch
-      .split('\n')
-      .filter((l) => !l.startsWith('Index: ') && !l.startsWith('===='));
-    return [`diff --git a/${fileName} b/${fileName}`, ...lines].join('\n');
+      .split("\n")
+      .filter((l) => !l.startsWith("Index: ") && !l.startsWith("===="));
+    return [`diff --git a/${fileName} b/${fileName}`, ...lines].join("\n");
   }, [preview]);
 
   const parsedFile = useMemo(() => {
@@ -280,8 +322,8 @@ const PublishDrawer: React.FC<Props> = (props) => {
   }, [diffText]);
 
   const submitPreview = async () => {
-    if (preview && preview.status !== 'DRAFT') {
-      message.error('当前会话已提交或已审核，不能重新预览');
+    if (preview && preview.status !== "DRAFT") {
+      message.error("当前会话已提交或已审核，不能重新预览");
       return;
     }
     const values = await form.validateFields();
@@ -309,7 +351,10 @@ const PublishDrawer: React.FC<Props> = (props) => {
         const res = await getActiveReleaseSession(props.projectId);
         if (res.session) {
           setPreview(toPreviewFromSession(res.session));
-          if (Array.isArray(res.session.localeCodes) && res.session.localeCodes.length) {
+          if (
+            Array.isArray(res.session.localeCodes) &&
+            res.session.localeCodes.length
+          ) {
             form.setFieldsValue({ localeCodes: res.session.localeCodes });
           }
           isInitializingRef.current = false;
@@ -327,7 +372,14 @@ const PublishDrawer: React.FC<Props> = (props) => {
         return;
       }
     })();
-  }, [defaultLocaleCodes, form, previewMutation, props.open, props.projectId, props.scope]);
+  }, [
+    defaultLocaleCodes,
+    form,
+    previewMutation,
+    props.open,
+    props.projectId,
+    props.scope,
+  ]);
 
   useEffect(() => {
     if (!props.open) {
@@ -335,8 +387,12 @@ const PublishDrawer: React.FC<Props> = (props) => {
     }
     const localeCodes = watchedLocaleCodes as string[] | undefined;
     const canAutoPreview =
-      !isInitializingRef.current && (!preview || preview.status === 'DRAFT');
-    if (!canAutoPreview || !Array.isArray(localeCodes) || localeCodes.length === 0) {
+      !isInitializingRef.current && (!preview || preview.status === "DRAFT");
+    if (
+      !canAutoPreview ||
+      !Array.isArray(localeCodes) ||
+      localeCodes.length === 0
+    ) {
       return;
     }
     if (previewMutation.isPending) {
@@ -344,7 +400,10 @@ const PublishDrawer: React.FC<Props> = (props) => {
     }
 
     const normalized = Array.from(new Set(localeCodes)).sort();
-    const autoPreviewKey = JSON.stringify({ scope: props.scope, localeCodes: normalized });
+    const autoPreviewKey = JSON.stringify({
+      scope: props.scope,
+      localeCodes: normalized,
+    });
     if (lastAutoPreviewKeyRef.current === autoPreviewKey) {
       return;
     }
@@ -382,26 +441,38 @@ const PublishDrawer: React.FC<Props> = (props) => {
         </Space>
       }
     >
-      <Space direction="vertical" style={{ width: '100%' }} size="large">
+      <Space direction="vertical" style={{ width: "100%" }} size="large">
         <Card>
           <Descriptions size="small" column={1}>
-            <Descriptions.Item label="Scope">{props.scopeLabel}</Descriptions.Item>
+            <Descriptions.Item label="Scope">
+              {props.scopeLabel}
+            </Descriptions.Item>
             <Descriptions.Item label="Current Release">
-              <Typography.Text code>{props.currentReleaseId || '-'}</Typography.Text>
+              <Typography.Text code>
+                {props.currentReleaseId || "-"}
+              </Typography.Text>
             </Descriptions.Item>
             <Descriptions.Item label="Session">
               <Space>
-                <Typography.Text code>{preview?.sessionId ?? '-'}</Typography.Text>
-                <Typography.Text type="secondary">{preview?.status ?? '-'}</Typography.Text>
+                <Typography.Text code>
+                  {preview?.sessionId ?? "-"}
+                </Typography.Text>
+                <Typography.Text type="secondary">
+                  {preview?.status ?? "-"}
+                </Typography.Text>
               </Space>
             </Descriptions.Item>
             <Descriptions.Item label="Base Release">
-              <Typography.Text code>{preview?.baseReleaseId ?? '-'}</Typography.Text>
+              <Typography.Text code>
+                {preview?.baseReleaseId ?? "-"}
+              </Typography.Text>
             </Descriptions.Item>
             <Descriptions.Item label="Can Publish">
               {preview ? (
-                <Typography.Text type={preview.canPublish ? 'success' : 'danger'}>
-                  {preview.canPublish ? 'YES' : 'NO'}
+                <Typography.Text
+                  type={preview.canPublish ? "success" : "danger"}
+                >
+                  {preview.canPublish ? "YES" : "NO"}
                 </Typography.Text>
               ) : (
                 <Typography.Text type="secondary">-</Typography.Text>
@@ -421,13 +492,13 @@ const PublishDrawer: React.FC<Props> = (props) => {
             <Form.Item
               name="localeCodes"
               label="Locales"
-              rules={[{ required: true, message: '请选择至少一个 locale' }]}
+              rules={[{ required: true, message: "请选择至少一个 locale" }]}
             >
               <Select
                 mode="multiple"
                 showSearch
                 optionFilterProp="label"
-                disabled={!!preview && preview.status !== 'DRAFT'}
+                disabled={!!preview && preview.status !== "DRAFT"}
                 options={props.locales.map((l) => ({
                   value: l.code,
                   label: `${l.name} (${l.code})`,
@@ -441,7 +512,9 @@ const PublishDrawer: React.FC<Props> = (props) => {
               Refresh Preview
             </Button>
             <Button
-              disabled={!preview || preview.status !== 'DRAFT' || !preview.canPublish}
+              disabled={
+                !preview || preview.status !== "DRAFT" || !preview.canPublish
+              }
               loading={submitMutation.isPending}
               onClick={() => {
                 if (!preview) {
@@ -453,7 +526,7 @@ const PublishDrawer: React.FC<Props> = (props) => {
               Submit
             </Button>
             <Button
-              disabled={!preview || preview.status !== 'IN_REVIEW'}
+              disabled={!preview || preview.status !== "IN_REVIEW"}
               loading={approveMutation.isPending}
               onClick={() => {
                 if (!preview) {
@@ -466,15 +539,15 @@ const PublishDrawer: React.FC<Props> = (props) => {
             </Button>
             <Button
               danger
-              disabled={!preview || preview.status !== 'IN_REVIEW'}
+              disabled={!preview || preview.status !== "IN_REVIEW"}
               loading={rejectMutation.isPending}
               onClick={() => {
                 if (!preview) {
                   return;
                 }
-                let reason = '';
+                let reason = "";
                 Modal.confirm({
-                  title: '驳回原因',
+                  title: "驳回原因",
                   content: (
                     <Input.TextArea
                       autoSize={{ minRows: 3, maxRows: 8 }}
@@ -483,12 +556,12 @@ const PublishDrawer: React.FC<Props> = (props) => {
                       }}
                     />
                   ),
-                  okText: 'Reject',
-                  cancelText: 'Cancel',
+                  okText: "Reject",
+                  cancelText: "Cancel",
                   onOk: async () => {
                     if (!reason.trim()) {
-                      message.error('请输入原因');
-                      throw new Error('reason required');
+                      message.error("请输入原因");
+                      throw new Error("reason required");
                     }
                     await rejectMutation.mutateAsync({
                       sessionId: preview.sessionId,
@@ -502,7 +575,9 @@ const PublishDrawer: React.FC<Props> = (props) => {
             </Button>
             <Button
               type="primary"
-              disabled={!preview || preview.status !== 'APPROVED' || !preview.canPublish}
+              disabled={
+                !preview || preview.status !== "APPROVED" || !preview.canPublish
+              }
               loading={publishMutation.isPending}
               onClick={() => {
                 if (!preview) {
@@ -523,7 +598,9 @@ const PublishDrawer: React.FC<Props> = (props) => {
             >
               <Table
                 size="small"
-                rowKey={(r) => `${r.localeCode}:${r.namespaceId}:${r.keyId}:${r.reason}`}
+                rowKey={(r) =>
+                  `${r.localeCode}:${r.namespaceId}:${r.keyId}:${r.reason}`
+                }
                 columns={errorColumns}
                 dataSource={preview.errors}
                 pagination={{ pageSize: 8 }}
@@ -532,14 +609,24 @@ const PublishDrawer: React.FC<Props> = (props) => {
           ) : null}
 
           {parsedFile ? (
-            <Card size="small" style={{ marginTop: 16 }} title="Diff (side-by-side)">
-              <Diff viewType="split" diffType={parsedFile.type} hunks={parsedFile.hunks}>
-                {(hunks) => hunks.map((hunk) => <Hunk key={hunk.content} hunk={hunk} />)}
+            <Card
+              size="small"
+              style={{ marginTop: 16 }}
+              title="Diff (side-by-side)"
+            >
+              <Diff
+                viewType="split"
+                diffType={parsedFile.type}
+                hunks={parsedFile.hunks}
+              >
+                {(hunks) =>
+                  hunks.map((hunk) => <Hunk key={hunk.content} hunk={hunk} />)
+                }
               </Diff>
             </Card>
           ) : (
             <Typography.Text type="secondary">
-              {previewMutation.isPending ? '正在加载预览...' : '暂无预览'}
+              {previewMutation.isPending ? "正在加载预览..." : "暂无预览"}
             </Typography.Text>
           )}
         </Card>

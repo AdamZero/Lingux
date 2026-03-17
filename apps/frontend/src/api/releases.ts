@@ -1,4 +1,4 @@
-import apiClient from '@/api/client';
+import apiClient from "@/api/client";
 import type {
   CreateReleaseResponse,
   GetActiveReleaseSessionResponse,
@@ -6,7 +6,7 @@ import type {
   PublishReleasePayload,
   PreviewReleasePayload,
   PreviewReleaseResponse,
-} from '@/types/release';
+} from "@/types/release";
 
 export const previewRelease = async (
   projectId: string,
@@ -34,7 +34,10 @@ export const getActiveReleaseSession = async (projectId: string) => {
   )) as GetActiveReleaseSessionResponse;
 };
 
-export const getReleaseSession = async (projectId: string, sessionId: string) => {
+export const getReleaseSession = async (
+  projectId: string,
+  sessionId: string,
+) => {
   return (await apiClient.get(
     `/projects/${projectId}/release-sessions/${sessionId}`,
   )) as GetReleaseSessionResponse;
@@ -73,7 +76,10 @@ export const rejectReleaseSession = async (
   )) as { session: unknown };
 };
 
-export const publishReleaseSession = async (projectId: string, sessionId: string) => {
+export const publishReleaseSession = async (
+  projectId: string,
+  sessionId: string,
+) => {
   return (await apiClient.post(
     `/projects/${projectId}/release-sessions/${sessionId}/publish`,
     {},

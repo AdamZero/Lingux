@@ -1,15 +1,15 @@
-export type ReleaseScopeType = 'all' | 'namespaces' | 'keys';
+export type ReleaseScopeType = "all" | "namespaces" | "keys";
 
 export type ReleaseScope =
-  | { type: 'all' }
-  | { type: 'namespaces'; namespaceIds: string[] }
-  | { type: 'keys'; keyIds: string[] };
+  | { type: "all" }
+  | { type: "namespaces"; namespaceIds: string[] }
+  | { type: "keys"; keyIds: string[] };
 
 export type ValidationErrorCode =
-  | 'MISSING_TRANSLATION'
-  | 'EMPTY_CONTENT'
-  | 'PLACEHOLDER_MISMATCH'
-  | 'ICU_INVALID';
+  | "MISSING_TRANSLATION"
+  | "EMPTY_CONTENT"
+  | "PLACEHOLDER_MISMATCH"
+  | "ICU_INVALID";
 
 export type ReleaseValidationError = {
   localeCode: string;
@@ -27,12 +27,12 @@ export type PreviewReleasePayload = {
 };
 
 export type ReleaseSessionStatus =
-  | 'DRAFT'
-  | 'IN_REVIEW'
-  | 'APPROVED'
-  | 'REJECTED'
-  | 'PUBLISHED'
-  | 'EXPIRED';
+  | "DRAFT"
+  | "IN_REVIEW"
+  | "APPROVED"
+  | "REJECTED"
+  | "PUBLISHED"
+  | "EXPIRED";
 
 export type PreviewReleaseResponse = {
   sessionId: string;
@@ -78,19 +78,19 @@ export type RollbackReleasePayload = { toReleaseId?: string };
 export type RollbackReleaseResponse = { currentReleaseId: string };
 
 export type BaseReleaseMismatchError = {
-  code: 'BASE_RELEASE_MISMATCH';
+  code: "BASE_RELEASE_MISMATCH";
   currentReleaseId: string;
   baseReleaseId: string;
 };
 
 export type ReleaseSessionLockedError = {
-  code: 'RELEASE_SESSION_LOCKED';
+  code: "RELEASE_SESSION_LOCKED";
   sessionId: string;
   status: ReleaseSessionStatus;
 };
 
 export type ValidationFailedError = {
-  code: 'VALIDATION_FAILED';
+  code: "VALIDATION_FAILED";
   ok: false;
   errors: ReleaseValidationError[];
 };

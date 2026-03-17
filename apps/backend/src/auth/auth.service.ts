@@ -3,6 +3,15 @@ import { PrismaService } from '../prisma.service';
 import { JwtService } from '@nestjs/jwt';
 import { EnterpriseService } from '../enterprise/enterprise.service';
 
+interface UserInfo {
+  externalId: string;
+  provider: string;
+  name?: string;
+  email?: string;
+  avatar?: string;
+  mobile?: string;
+}
+
 @Injectable()
 export class AuthService {
   constructor(
@@ -11,23 +20,49 @@ export class AuthService {
     private readonly enterpriseService: EnterpriseService,
   ) {}
 
-  async validateUser(externalId: string, provider: string, enterpriseInfo?: {
-    name: string;
-    externalId: string;
-    domain?: string;
-  }) {
+  async validateUser(
+    userInfo: UserInfo,
+    enterpriseInfo?: {
+      name: string;
+      externalId: string;
+      domain?: string;
+    },
+  ) {
+    const { externalId, provider, name, email, avatar, mobile } = userInfo;
+
     try {
       let user = await this.prisma.user.findUnique({
         where: { externalId },
       });
 
+      // 生成 username：优先使用 name，否则使用 provider_externalId 格式
+      const username = name || `${provider}_${externalId}`;
+
       if (!user) {
         // Create new user if not exists
         user = await this.prisma.user.create({
           data: {
-            username: `${provider}_${externalId}`,
+            username,
+            name,
+            email,
+            avatar,
+            mobile,
             externalId,
+            provider,
             role: 'EDITOR', // Default role
+          },
+        });
+      } else {
+        // Update user info if exists (to sync latest info from provider)
+        user = await this.prisma.user.update({
+          where: { id: user.id },
+          data: {
+            username,
+            name: name || user.name,
+            email: email || user.email,
+            avatar: avatar || user.avatar,
+            mobile: mobile || user.mobile,
+            provider,
           },
         });
       }
@@ -42,7 +77,8 @@ export class AuthService {
         );
 
         // Check if this is the first user for the enterprise (should be admin)
-        const existingMembers = await this.enterpriseService.getEnterpriseMembers(enterprise.id);
+        const existingMembers =
+          await this.enterpriseService.getEnterpriseMembers(enterprise.id);
         const role = existingMembers.length === 0 ? 'admin' : 'member';
 
         // Associate user with enterprise
@@ -60,11 +96,17 @@ export class AuthService {
     }
   }
 
-  async login(user: { id: string; username: string; role: string }) {
+  async login(user: {
+    id: string;
+    username: string;
+    name?: string;
+    role: string;
+  }) {
     try {
       const payload = {
         sub: user.id,
         username: user.username,
+        name: user.name,
         role: user.role,
       };
 
@@ -73,6 +115,7 @@ export class AuthService {
         user: {
           id: user.id,
           username: user.username,
+          name: user.name,
           role: user.role,
         },
       };

@@ -66,12 +66,13 @@ describe('AuthController', () => {
     it('should redirect to Feishu authorization page', async () => {
       // Set up environment variables
       process.env.FEISHU_CLIENT_ID = 'test-client-id';
-      process.env.FEISHU_CALLBACK_URL = 'http://localhost:3001/api/v1/auth/feishu/callback';
+      process.env.FEISHU_CALLBACK_URL =
+        'http://localhost:3001/api/v1/auth/feishu/callback';
 
       await authController.feishuLogin(mockResponse);
 
       expect(mockResponse.redirect).toHaveBeenCalledWith(
-        'https://open.feishu.cn/open-apis/authen/v1/index?client_id=test-client-id&redirect_uri=http%3A%2F%2Flocalhost%3A3001%2Fapi%2Fv1%2Fauth%2Ffeishu%2Fcallback&scope=user_info&response_type=code'
+        'https://open.feishu.cn/open-apis/authen/v1/index?client_id=test-client-id&redirect_uri=http%3A%2F%2Flocalhost%3A3001%2Fapi%2Fv1%2Fauth%2Ffeishu%2Fcallback&scope=user_info&response_type=code',
       );
     });
   });
@@ -83,12 +84,16 @@ describe('AuthController', () => {
       await authController.feishuCallback(mockRequest, mockResponse);
 
       expect(mockResponse.status).toHaveBeenCalledWith(400);
-      expect(mockResponse.send).toHaveBeenCalledWith('Missing authorization code');
+      expect(mockResponse.send).toHaveBeenCalledWith(
+        'Missing authorization code',
+      );
     });
 
     it('should return 401 if Feishu API returns error', async () => {
-      const mockRequest = { query: { code: 'test-code' } } as unknown as Request;
-      
+      const mockRequest = {
+        query: { code: 'test-code' },
+      } as unknown as Request;
+
       // Mock axios to return Feishu API error
       mockAxios.post.mockResolvedValueOnce({
         status: 200,
@@ -105,12 +110,16 @@ describe('AuthController', () => {
       await authController.feishuCallback(mockRequest, mockResponse);
 
       expect(mockResponse.status).toHaveBeenCalledWith(401);
-      expect(mockResponse.send).toHaveBeenCalledWith('Feishu authentication error: code is invalid');
+      expect(mockResponse.send).toHaveBeenCalledWith(
+        'Feishu authentication error: code is invalid',
+      );
     });
 
     it('should return 401 if no open_id is returned', async () => {
-      const mockRequest = { query: { code: 'test-code' } } as unknown as Request;
-      
+      const mockRequest = {
+        query: { code: 'test-code' },
+      } as unknown as Request;
+
       // Mock axios to return success but no open_id
       mockAxios.post.mockResolvedValueOnce({
         status: 200,
@@ -128,25 +137,38 @@ describe('AuthController', () => {
       await authController.feishuCallback(mockRequest, mockResponse);
 
       expect(mockResponse.status).toHaveBeenCalledWith(401);
-      expect(mockResponse.send).toHaveBeenCalledWith('Failed to get user information from Feishu');
+      expect(mockResponse.send).toHaveBeenCalledWith(
+        'Failed to get user information from Feishu',
+      );
     });
 
     it('should redirect to frontend with token on success', async () => {
-      const mockRequest = { query: { code: 'test-code' } } as unknown as Request;
+      const mockRequest = {
+        query: { code: 'test-code' },
+      } as unknown as Request;
       const mockUser = {
         id: '123',
         username: 'feishu_user',
+        name: 'Test User',
         role: 'EDITOR' as any,
         email: null,
         externalId: 'test-open-id',
+        avatar: null,
+        mobile: null,
+        provider: 'feishu',
         createdAt: new Date(),
         updatedAt: new Date(),
       };
       const mockLoginResult = {
         access_token: 'test-token',
-        user: mockUser,
+        user: {
+          id: mockUser.id,
+          username: mockUser.username,
+          name: mockUser.name,
+          role: mockUser.role,
+        },
       };
-      
+
       // Mock axios to return success
       mockAxios.post.mockResolvedValueOnce({
         status: 200,
@@ -170,16 +192,21 @@ describe('AuthController', () => {
 
       await authController.feishuCallback(mockRequest, mockResponse);
 
-      expect(authService.validateUser).toHaveBeenCalledWith('test-open-id', 'feishu');
+      expect(authService.validateUser).toHaveBeenCalledWith(
+        'test-open-id',
+        'feishu',
+      );
       expect(authService.login).toHaveBeenCalledWith(mockUser);
       expect(mockResponse.redirect).toHaveBeenCalledWith(
-        `/login#token=test-token&user=${JSON.stringify(mockUser)}`
+        `/login#token=test-token&user=${JSON.stringify(mockUser)}`,
       );
     });
 
     it('should return 500 on internal error', async () => {
-      const mockRequest = { query: { code: 'test-code' } } as unknown as Request;
-      
+      const mockRequest = {
+        query: { code: 'test-code' },
+      } as unknown as Request;
+
       // Mock axios to throw error
       mockAxios.post.mockRejectedValueOnce(new Error('Network error'));
 

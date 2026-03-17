@@ -1,7 +1,6 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { EnterpriseService } from './enterprise.service';
 import { PrismaService } from '../prisma.service';
-import { PrismaClient } from '@prisma/client';
 
 const mockPrismaService = {
   enterprise: {
@@ -19,7 +18,6 @@ const mockPrismaService = {
 
 describe('EnterpriseService', () => {
   let service: EnterpriseService;
-  let prismaService: PrismaService;
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
@@ -33,7 +31,6 @@ describe('EnterpriseService', () => {
     }).compile();
 
     service = module.get<EnterpriseService>(EnterpriseService);
-    prismaService = module.get<PrismaService>(PrismaService);
   });
 
   afterEach(() => {
@@ -84,7 +81,9 @@ describe('EnterpriseService', () => {
         updatedAt: new Date(),
       };
 
-      mockPrismaService.enterprise.findFirst.mockResolvedValue(existingEnterprise);
+      mockPrismaService.enterprise.findFirst.mockResolvedValue(
+        existingEnterprise,
+      );
 
       const result = await service.createOrGetEnterprise(
         'New Name',
@@ -117,11 +116,17 @@ describe('EnterpriseService', () => {
         updatedAt: new Date(),
       });
 
-      const result = await service.associateUserWithEnterprise(userId, enterpriseId, role);
+      const result = await service.associateUserWithEnterprise(
+        userId,
+        enterpriseId,
+        role,
+      );
 
-      expect(mockPrismaService.enterpriseMember.findFirst).toHaveBeenCalledWith({
-        where: { userId, enterpriseId },
-      });
+      expect(mockPrismaService.enterpriseMember.findFirst).toHaveBeenCalledWith(
+        {
+          where: { userId, enterpriseId },
+        },
+      );
       expect(mockPrismaService.enterpriseMember.create).toHaveBeenCalledWith({
         data: { userId, enterpriseId, role },
       });
@@ -140,7 +145,9 @@ describe('EnterpriseService', () => {
 
       const newRole = 'admin';
 
-      mockPrismaService.enterpriseMember.findFirst.mockResolvedValue(existingMember);
+      mockPrismaService.enterpriseMember.findFirst.mockResolvedValue(
+        existingMember,
+      );
       mockPrismaService.enterpriseMember.update.mockResolvedValue({
         ...existingMember,
         role: newRole,
@@ -183,7 +190,9 @@ describe('EnterpriseService', () => {
         },
       ];
 
-      mockPrismaService.enterpriseMember.findMany.mockResolvedValue(expectedEnterprises);
+      mockPrismaService.enterpriseMember.findMany.mockResolvedValue(
+        expectedEnterprises,
+      );
 
       const result = await service.getUserEnterprises(userId);
 
@@ -208,7 +217,9 @@ describe('EnterpriseService', () => {
         updatedAt: new Date(),
       };
 
-      mockPrismaService.enterprise.findUnique.mockResolvedValue(expectedEnterprise);
+      mockPrismaService.enterprise.findUnique.mockResolvedValue(
+        expectedEnterprise,
+      );
 
       const result = await service.getEnterpriseById(enterpriseId);
 
@@ -250,7 +261,9 @@ describe('EnterpriseService', () => {
         },
       ];
 
-      mockPrismaService.enterpriseMember.findMany.mockResolvedValue(expectedMembers);
+      mockPrismaService.enterpriseMember.findMany.mockResolvedValue(
+        expectedMembers,
+      );
 
       const result = await service.getEnterpriseMembers(enterpriseId);
 

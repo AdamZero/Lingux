@@ -1,11 +1,11 @@
-import axios from 'axios';
-import { message } from 'antd';
-import { useAppStore } from '@/store/useAppStore';
+import axios from "axios";
+import { message } from "antd";
+import { useAppStore } from "@/store/useAppStore";
 
 const apiClient = axios.create({
-  baseURL: '/api/v1',
+  baseURL: "/api/v1",
   headers: {
-    'Content-Type': 'application/json',
+    "Content-Type": "application/json",
   },
 });
 
@@ -20,24 +20,24 @@ apiClient.interceptors.request.use(
   },
   (error) => {
     return Promise.reject(error);
-  }
+  },
 );
 
 // Response interceptor for error handling
 apiClient.interceptors.response.use(
   (response) => response.data,
   (error) => {
-    const msg = error.response?.data?.message || 'Network Error';
+    const msg = error.response?.data?.message || "Network Error";
     message.error(msg);
-    
+
     // Handle 401 errors (unauthorized)
     if (error.response?.status === 401) {
       useAppStore.getState().logout();
-      window.location.href = '/login';
+      window.location.href = "/login";
     }
-    
+
     return Promise.reject(error);
-  }
+  },
 );
 
 export default apiClient;

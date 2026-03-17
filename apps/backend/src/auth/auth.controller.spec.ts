@@ -85,7 +85,9 @@ describe('AuthController', () => {
         },
       );
       expect(mockAuthService.login).toHaveBeenCalledWith(user);
-      expect(res.redirect).toHaveBeenCalledWith('http://localhost:5173/login?token=test_token');
+      expect(res.redirect).toHaveBeenCalledWith(
+        'http://localhost:5173/login?token=test_token',
+      );
     });
   });
 
@@ -131,7 +133,9 @@ describe('AuthController', () => {
         },
       );
       expect(mockAuthService.login).toHaveBeenCalledWith(user);
-      expect(res.redirect).toHaveBeenCalledWith('http://localhost:5173/login?token=test_token');
+      expect(res.redirect).toHaveBeenCalledWith(
+        'http://localhost:5173/login?token=test_token',
+      );
     });
   });
 
@@ -177,7 +181,9 @@ describe('AuthController', () => {
         },
       );
       expect(mockAuthService.login).toHaveBeenCalledWith(user);
-      expect(res.redirect).toHaveBeenCalledWith('http://localhost:5173/login?token=test_token');
+      expect(res.redirect).toHaveBeenCalledWith(
+        'http://localhost:5173/login?token=test_token',
+      );
     });
   });
 });

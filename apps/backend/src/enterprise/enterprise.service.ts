@@ -116,7 +116,9 @@ export class EnterpriseService {
     });
 
     if (!enterprise) {
-      throw new NotFoundException(`Enterprise with ID ${enterpriseId} not found`);
+      throw new NotFoundException(
+        `Enterprise with ID ${enterpriseId} not found`,
+      );
     }
 
     return enterprise;
