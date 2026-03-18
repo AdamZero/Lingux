@@ -1,4 +1,9 @@
 import { defineConfig, devices } from "@playwright/test";
+import path from "path";
+import { fileURLToPath } from "url";
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 export default defineConfig({
   testDir: "./e2e",
@@ -36,8 +41,8 @@ export default defineConfig({
     },
   ],
   outputDir: "e2e/test-results/",
-  globalSetup: require.resolve("./e2e/global-setup"),
-  globalTeardown: require.resolve("./e2e/global-teardown"),
+  globalSetup: path.join(__dirname, "e2e", "global-setup.ts"),
+  globalTeardown: path.join(__dirname, "e2e", "global-teardown.ts"),
   webServer: {
     command: "npm run dev",
     url: "http://localhost:8080",

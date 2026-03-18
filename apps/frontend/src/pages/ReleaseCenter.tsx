@@ -89,8 +89,6 @@ const ReleaseCenter: React.FC = () => {
 
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [statusFilter, setStatusFilter] = useState<ReleaseStatus | null>(null);
-  const [selectedRelease, setSelectedRelease] = useState<Release | null>(null);
-  const [isDetailDrawerOpen, setIsDetailDrawerOpen] = useState(false);
 
   const [createForm] = Form.useForm();
 

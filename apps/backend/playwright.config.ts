@@ -7,10 +7,7 @@ export default defineConfig({
     url: 'http://localhost:3001',
     reuseExistingServer: !process.env.CI,
   },
-  reporter: [
-    ['list'],
-    ['json', { outputFile: 'test-results/results.json' }]
-  ],
+  reporter: [['list'], ['json', { outputFile: 'test-results/results.json' }]],
   use: {
     baseURL: 'http://localhost:3001',
     trace: 'on-first-retry',

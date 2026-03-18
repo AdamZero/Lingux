@@ -2,7 +2,7 @@
 
 **文档版本**: v1.0  
 **最后更新**: 2026-03-17  
-**文档状态**: 草稿  
+**文档状态**: 草稿
 
 ---
 
@@ -31,6 +31,7 @@
 ### 1.1 编写目的
 
 本文档是 Lingux 多语言翻译中台的**唯一权威规格文档**，旨在：
+
 - 统一团队对产品愿景、架构和实现路径的认知
 - 作为设计、开发、测试、验收的基准依据
 - 指导产品从 MVP 到企业级的演进过程
@@ -45,16 +46,16 @@
 
 ### 1.3 术语表
 
-| 术语 | 定义 |
-|------|------|
-| Key | 文案唯一标识，如 `common.button.submit` |
-| Translation | 某 Key 在某 Locale 的翻译条目 |
-| Namespace | 功能或模块维度的逻辑分组 |
-| Locale | 语言及区域变体，如 `zh-CN`、`en-US` |
-| ICU | ICU MessageFormat（复数、性别、选择等格式）|
-| TM | Translation Memory，翻译记忆库 |
-| Release | 一次发布的版本，包含特定范围的翻译 |
-| ReleaseSession | 发布审批会话，管理发布流程 |
+| 术语           | 定义                                        |
+| -------------- | ------------------------------------------- |
+| Key            | 文案唯一标识，如 `common.button.submit`     |
+| Translation    | 某 Key 在某 Locale 的翻译条目               |
+| Namespace      | 功能或模块维度的逻辑分组                    |
+| Locale         | 语言及区域变体，如 `zh-CN`、`en-US`         |
+| ICU            | ICU MessageFormat（复数、性别、选择等格式） |
+| TM             | Translation Memory，翻译记忆库              |
+| Release        | 一次发布的版本，包含特定范围的翻译          |
+| ReleaseSession | 发布审批会话，管理发布流程                  |
 
 ---
 
@@ -66,21 +67,21 @@
 
 ### 2.2 核心价值主张
 
-| 价值维度 | 具体价值 |
-|----------|----------|
+| 价值维度     | 具体价值                                 |
+| ------------ | ---------------------------------------- |
 | **效率提升** | LLM 初译覆盖 70%+，人工处理时长下降 30%+ |
-| **质量保障** | 门禁拦截率 99%+，翻译覆盖率 95%+ |
-| **协作顺畅** | 深度集成企业协作平台（飞书/钉钉/企微）|
-| **可追溯** | 完整审计日志，支持一键回滚 |
-| **成本可控** | 翻译成本可视化，预算预警 |
+| **质量保障** | 门禁拦截率 99%+，翻译覆盖率 95%+         |
+| **协作顺畅** | 深度集成企业协作平台（飞书/钉钉/企微）   |
+| **可追溯**   | 完整审计日志，支持一键回滚               |
+| **成本可控** | 翻译成本可视化，预算预警                 |
 
 ### 2.3 目标用户画像
 
-| 用户类型 | 角色 | 核心痛点 | 核心需求 |
-|----------|------|----------|----------|
-| 个人开发者 | Owner | 手动维护翻译文件易出错 | 简单高效的翻译管理 |
-| 中小企业 | PM/Dev | 多语言版本同步困难 | 协作翻译和自动发布 |
-| 大型企业 | 本地化团队 | 质量难以统一，成本高 | 质量门禁、成本管控、合规审计 |
+| 用户类型   | 角色       | 核心痛点               | 核心需求                     |
+| ---------- | ---------- | ---------------------- | ---------------------------- |
+| 个人开发者 | Owner      | 手动维护翻译文件易出错 | 简单高效的翻译管理           |
+| 中小企业   | PM/Dev     | 多语言版本同步困难     | 协作翻译和自动发布           |
+| 大型企业   | 本地化团队 | 质量难以统一，成本高   | 质量门禁、成本管控、合规审计 |
 
 ---
 
@@ -158,16 +159,16 @@
 
 ### 3.2 技术栈选型
 
-| 层级 | 技术选型 | 选型理由 |
-|------|----------|----------|
-| **后端框架** | NestJS + TypeScript | 模块化架构，企业级支持，生态丰富 |
-| **ORM** | Prisma | 类型安全，迁移方便，性能优秀 |
-| **数据库** | PostgreSQL | 关系型数据，JSON支持，稳定可靠 |
-| **缓存** | Redis | 会话存储，缓存，消息队列 |
-| **前端框架** | React 18 + Vite | 现代前端，快速构建，生态丰富 |
-| **UI 组件** | Ant Design 6.x | 企业级组件，国际化支持 |
-| **状态管理** | Zustand + React Query | 轻量状态管理，服务端状态同步 |
-| **包管理** | pnpm + Turbo | Monorepo 支持，构建优化 |
+| 层级         | 技术选型              | 选型理由                         |
+| ------------ | --------------------- | -------------------------------- |
+| **后端框架** | NestJS + TypeScript   | 模块化架构，企业级支持，生态丰富 |
+| **ORM**      | Prisma                | 类型安全，迁移方便，性能优秀     |
+| **数据库**   | PostgreSQL            | 关系型数据，JSON支持，稳定可靠   |
+| **缓存**     | Redis                 | 会话存储，缓存，消息队列         |
+| **前端框架** | React 18 + Vite       | 现代前端，快速构建，生态丰富     |
+| **UI 组件**  | Ant Design 6.x        | 企业级组件，国际化支持           |
+| **状态管理** | Zustand + React Query | 轻量状态管理，服务端状态同步     |
+| **包管理**   | pnpm + Turbo          | Monorepo 支持，构建优化          |
 
 ---
 
@@ -175,49 +176,49 @@
 
 ### 4.1 已完成模块 (✅)
 
-| 模块 | 功能点 | 后端 | 前端 | 完成度 |
-|------|--------|------|------|--------|
-| 用户认证 | OAuth2 (飞书/钉钉/企微) | ✅ | ✅ | 100% |
-| 用户认证 | JWT + RBAC | ✅ | ✅ | 100% |
-| 项目管理 | 项目 CRUD | ✅ | ✅ | 100% |
-| 项目管理 | 语言环境管理 | ✅ | ✅ | 100% |
-| 命名空间 | Namespace CRUD | ✅ | ✅ | 100% |
-| 词条管理 | Key CRUD | ✅ | ✅ | 100% |
-| 词条管理 | 静态资源 Key (ASSET) | ✅ | ✅ | 100% |
-| 翻译工作流 | 状态流转 (PENDING→REVIEWING→APPROVED→PUBLISHED) | ✅ | ✅ | 100% |
-| 翻译工作流 | 审核 (通过/退回) | ✅ | ✅ | 100% |
-| 导入/导出 | JSON/YAML 格式 | ✅ | ✅ | 100% |
-| 发布系统 | Release 数据模型 | ✅ | ✅ | 100% |
-| 发布系统 | ReleaseArtifact 存储 | ✅ | ✅ | 100% |
-| 发布系统 | 一键回滚 | ✅ | ✅ | 100% |
-| 企业模块 | Enterprise/Member 模型 | ✅ | ✅ | 100% |
-| 审计日志 | AuditLog 模型 | ✅ | ✅ | 100% |
+| 模块       | 功能点                                          | 后端 | 前端 | 完成度 |
+| ---------- | ----------------------------------------------- | ---- | ---- | ------ |
+| 用户认证   | OAuth2 (飞书/钉钉/企微)                         | ✅   | ✅   | 100%   |
+| 用户认证   | JWT + RBAC                                      | ✅   | ✅   | 100%   |
+| 项目管理   | 项目 CRUD                                       | ✅   | ✅   | 100%   |
+| 项目管理   | 语言环境管理                                    | ✅   | ✅   | 100%   |
+| 命名空间   | Namespace CRUD                                  | ✅   | ✅   | 100%   |
+| 词条管理   | Key CRUD                                        | ✅   | ✅   | 100%   |
+| 词条管理   | 静态资源 Key (ASSET)                            | ✅   | ✅   | 100%   |
+| 翻译工作流 | 状态流转 (PENDING→REVIEWING→APPROVED→PUBLISHED) | ✅   | ✅   | 100%   |
+| 翻译工作流 | 审核 (通过/退回)                                | ✅   | ✅   | 100%   |
+| 导入/导出  | JSON/YAML 格式                                  | ✅   | ✅   | 100%   |
+| 发布系统   | Release 数据模型                                | ✅   | ✅   | 100%   |
+| 发布系统   | ReleaseArtifact 存储                            | ✅   | ✅   | 100%   |
+| 发布系统   | 一键回滚                                        | ✅   | ✅   | 100%   |
+| 企业模块   | Enterprise/Member 模型                          | ✅   | ✅   | 100%   |
+| 审计日志   | AuditLog 模型                                   | ✅   | ✅   | 100%   |
 
 ### 4.2 进行中模块 (🔄)
 
-| 模块 | 功能点 | 后端 | 前端 | 备注 |
-|------|--------|------|------|------|
-| 发布系统 | ReleaseSession 审批流程 | ✅ | 🔄 | 前端待完善 |
-| 发布系统 | 页面维度发布 | ✅ | 🔄 | scope 已支持 |
-| 搜索筛选 | 词条搜索 | ✅ | 🔄 | 前端待完善 |
-| 质量门禁 | 基础校验 | ✅ | 🔄 | 需完善规则 |
+| 模块     | 功能点                  | 后端 | 前端 | 备注         |
+| -------- | ----------------------- | ---- | ---- | ------------ |
+| 发布系统 | ReleaseSession 审批流程 | ✅   | 🔄   | 前端待完善   |
+| 发布系统 | 页面维度发布            | ✅   | 🔄   | scope 已支持 |
+| 搜索筛选 | 词条搜索                | ✅   | 🔄   | 前端待完善   |
+| 质量门禁 | 基础校验                | ✅   | 🔄   | 需完善规则   |
 
 ### 4.3 待办模块 (⏳)
 
-| 优先级 | 模块 | 功能点 | 预估工期 |
-|--------|------|--------|----------|
-| P0 | 质量门禁 | ICU/占位符/敏感词校验 | 1-2周 |
-| P0 | 发布系统 | 发布报告 | 3-5天 |
-| P1 | LLM翻译 | 机器初译接口 | 1-2周 |
-| P1 | LLM翻译 | 异步任务队列 | 1周 |
-| P1 | 批量操作 | 批量编辑/审核 | 1周 |
-| P1 | 导入/导出 | Excel/CSV 支持 | 3-5天 |
-| P2 | 审核分配 | 任务分配机制 | 1-2周 |
-| P2 | 企业协作 | 审批卡片通知 | 2-3周 |
-| P2 | 术语库 | 术语管理 | 2周 |
-| P2 | 翻译记忆 | TM 匹配 | 2-3周 |
-| P3 | 成本统计 | LLM 成本统计 | 1周 |
-| P3 | 监控报表 | 质量指标报表 | 1-2周 |
+| 优先级 | 模块      | 功能点                | 预估工期 |
+| ------ | --------- | --------------------- | -------- |
+| P0     | 质量门禁  | ICU/占位符/敏感词校验 | 1-2周    |
+| P0     | 发布系统  | 发布报告              | 3-5天    |
+| P1     | LLM翻译   | 机器初译接口          | 1-2周    |
+| P1     | LLM翻译   | 异步任务队列          | 1周      |
+| P1     | 批量操作  | 批量编辑/审核         | 1周      |
+| P1     | 导入/导出 | Excel/CSV 支持        | 3-5天    |
+| P2     | 审核分配  | 任务分配机制          | 1-2周    |
+| P2     | 企业协作  | 审批卡片通知          | 2-3周    |
+| P2     | 术语库    | 术语管理              | 2周      |
+| P2     | 翻译记忆  | TM 匹配               | 2-3周    |
+| P3     | 成本统计  | LLM 成本统计          | 1周      |
+| P3     | 监控报表  | 质量指标报表          | 1-2周    |
 
 ---
 
@@ -238,6 +239,7 @@
 ```
 
 **关键体验点**:
+
 - 官网清晰传达价值主张
 - OAuth 一键登录，无密码负担
 - 项目创建向导，降低决策成本
@@ -250,6 +252,7 @@
 ```
 
 **关键体验点**:
+
 - 任务列表清晰，优先级明确
 - 编辑器智能提示（TM/术语/ICU）
 - 一键提交，状态实时同步
@@ -262,6 +265,7 @@
 ```
 
 **关键体验点**:
+
 - 多渠道通知（站内/企业微信/钉钉）
 - 源文译文对比视图
 - 批量审核支持
@@ -274,6 +278,7 @@
 ```
 
 **关键体验点**:
+
 - 发布预览，变更一目了然
 - 门禁报告，问题清晰定位
 - 一键回滚，故障快速恢复
@@ -370,6 +375,7 @@ Lingux 功能架构
 ##### 6.2.1.1 认证体系
 
 **FR-AUTH-001**: OAuth2 登录
+
 - **功能描述**: 支持飞书、钉钉、企业微信 OAuth2 授权登录
 - **详细规则**:
   - 首次登录自动创建用户账号，username 使用平台提供的唯一标识
@@ -381,6 +387,7 @@ Lingux 功能架构
   - 企业未授权应用：提示联系管理员开通
 
 **FR-AUTH-002**: JWT 认证
+
 - **功能描述**: 基于 JWT 的无状态认证
 - **详细规则**:
   - Token 包含：userId, role, enterpriseId, exp
@@ -393,6 +400,7 @@ Lingux 功能架构
 ##### 6.2.1.2 权限体系
 
 **FR-AUTH-003**: RBAC 权限控制
+
 - **角色定义**:
   | 角色 | 权限范围 |
   |------|----------|
@@ -415,6 +423,7 @@ Lingux 功能架构
   ```
 
 **FR-AUTH-004**: 企业组织架构
+
 - **功能描述**: 同步企业组织架构，实现基于部门的权限控制
 - **详细规则**:
   - 支持 SCIM 2.0 协议同步
@@ -473,7 +482,8 @@ Lingux 功能架构
 | PUBLISHED | 已发布 | 重新编辑（创建新版本） |
 
 **FR-TRANS-002**: 状态流转规则
-- **PENDING → REVIEWING**: 
+
+- **PENDING → REVIEWING**:
   - 条件：内容非空，内容有变更
   - 操作人：EDITOR 及以上
   - 副作用：记录提交时间，通知审核人
@@ -498,26 +508,34 @@ Lingux 功能架构
 **FR-TRANS-003**: 审核任务分配机制
 
 **分配策略**:
+
 1. **按语言分配**: 每个语言指定固定审核人
 2. **按命名空间分配**: 每个命名空间指定审核人
 3. **自动轮询**: 在审核人池中轮询分配
 4. **指定分配**: 提交时指定具体审核人
 
 **分配优先级**:
+
 ```
 指定审核人 > 命名空间审核人 > 语言审核人 > 轮询分配
 ```
 
 **负载均衡算法**:
+
 ```typescript
 // 轮询分配逻辑
-function assignReviewer(candidates: User[], pendingCounts: Map<string, number>): User {
+function assignReviewer(
+  candidates: User[],
+  pendingCounts: Map<string, number>,
+): User {
   // 1. 过滤在线且未满负荷的审核人
-  const available = candidates.filter(u => u.isOnline && pendingCounts.get(u.id) < u.maxWorkload);
-  
+  const available = candidates.filter(
+    (u) => u.isOnline && pendingCounts.get(u.id) < u.maxWorkload,
+  );
+
   // 2. 按当前待审任务数升序排序
   available.sort((a, b) => pendingCounts.get(a.id) - pendingCounts.get(b.id));
-  
+
   // 3. 返回任务数最少的审核人
   return available[0];
 }
@@ -535,6 +553,7 @@ function assignReviewer(candidates: User[], pendingCounts: Map<string, number>):
 | 邮件 | 30分钟未处理 | 邮件提醒 |
 
 **通知卡片内容**:
+
 ```
 【翻译审核提醒】
 项目：{projectName}
@@ -558,6 +577,7 @@ function assignReviewer(candidates: User[], pendingCounts: Map<string, number>):
 | 通义千问 | Qwen | 性价比高 | 批量翻译 |
 
 **翻译流程**:
+
 ```
 1. 用户触发翻译
    ↓
@@ -579,6 +599,7 @@ function assignReviewer(candidates: User[], pendingCounts: Map<string, number>):
 ```
 
 **Prompt 模板**:
+
 ```
 你是一位专业的本地化翻译专家。请将以下文本从{sourceLang}翻译为{targetLang}。
 
@@ -605,23 +626,29 @@ Key: {keyName}
 ```
 
 **成本计算**:
+
 ```typescript
 // 成本 = 输入token数 × 输入单价 + 输出token数 × 输出单价
-function calculateCost(provider: string, inputTokens: number, outputTokens: number): number {
+function calculateCost(
+  provider: string,
+  inputTokens: number,
+  outputTokens: number,
+): number {
   const pricing = {
-    'openai-gpt4': { input: 0.03, output: 0.06 }, // $/1K tokens
-    'openai-gpt35': { input: 0.0015, output: 0.002 },
-    'claude-3': { input: 0.008, output: 0.024 },
-    'wenxin': { input: 0.0012, output: 0.0012 }, // ¥/1K tokens
-    'qwen': { input: 0.0006, output: 0.0006 },
+    "openai-gpt4": { input: 0.03, output: 0.06 }, // $/1K tokens
+    "openai-gpt35": { input: 0.0015, output: 0.002 },
+    "claude-3": { input: 0.008, output: 0.024 },
+    wenxin: { input: 0.0012, output: 0.0012 }, // ¥/1K tokens
+    qwen: { input: 0.0006, output: 0.0006 },
   };
-  
+
   const rate = pricing[provider];
   return (inputTokens * rate.input + outputTokens * rate.output) / 1000;
 }
 ```
 
 **降级策略**:
+
 1. 主供应商失败 → 自动切换到备用供应商
 2. 所有供应商失败 → 标记为 PENDING，人工处理
 3. 成本超限 → 暂停自动翻译，通知管理员
@@ -634,24 +661,25 @@ function calculateCost(provider: string, inputTokens: number, outputTokens: numb
 
 **FR-QUALITY-001**: 质量门禁规则
 
-| 规则ID | 规则名称 | 描述 | 阻断级别 | 自动修复 |
-|--------|----------|------|----------|----------|
-| Q001 | ICU_INVALID | ICU MessageFormat 语法错误 | 阻断 | 否 |
-| Q002 | PLACEHOLDER_MISMATCH | 源文和译文占位符不一致 | 阻断 | 否 |
-| Q003 | MISSING_TRANSLATION | 翻译内容为空 | 阻断 | 否 |
-| Q004 | EMPTY_CONTENT | 翻译内容只有空白字符 | 阻断 | 否 |
-| Q005 | TERM_VIOLATION | 违反术语库规定 | 警告 | 建议 |
-| Q006 | SENSITIVE_WORD | 包含敏感词 | 阻断 | 建议替换 |
-| Q007 | LENGTH_EXCEEDED | 超出长度限制 | 警告 | 否 |
-| Q008 | ICU_PLURAL_MISSING | 复数形式不完整 | 警告 | 否 |
-| Q009 | LEADING_TRAILING_SPACE | 首尾空格不一致 | 警告 | 是 |
-| Q010 | MULTIPLE_SPACES | 连续多个空格 | 警告 | 是 |
+| 规则ID | 规则名称               | 描述                       | 阻断级别 | 自动修复 |
+| ------ | ---------------------- | -------------------------- | -------- | -------- |
+| Q001   | ICU_INVALID            | ICU MessageFormat 语法错误 | 阻断     | 否       |
+| Q002   | PLACEHOLDER_MISMATCH   | 源文和译文占位符不一致     | 阻断     | 否       |
+| Q003   | MISSING_TRANSLATION    | 翻译内容为空               | 阻断     | 否       |
+| Q004   | EMPTY_CONTENT          | 翻译内容只有空白字符       | 阻断     | 否       |
+| Q005   | TERM_VIOLATION         | 违反术语库规定             | 警告     | 建议     |
+| Q006   | SENSITIVE_WORD         | 包含敏感词                 | 阻断     | 建议替换 |
+| Q007   | LENGTH_EXCEEDED        | 超出长度限制               | 警告     | 否       |
+| Q008   | ICU_PLURAL_MISSING     | 复数形式不完整             | 警告     | 否       |
+| Q009   | LEADING_TRAILING_SPACE | 首尾空格不一致             | 警告     | 是       |
+| Q010   | MULTIPLE_SPACES        | 连续多个空格               | 警告     | 是       |
 
 ##### 6.2.3.2 ICU 语法校验
 
 **FR-QUALITY-002**: ICU MessageFormat 校验
 
 **支持的 ICU 类型**:
+
 ```
 {variable}                    // 简单变量
 {variable, number}            // 数字
@@ -662,13 +690,15 @@ function calculateCost(provider: string, inputTokens: number, outputTokens: numb
 ```
 
 **校验规则**:
+
 1. 花括号必须成对出现
 2. 嵌套深度不超过 5 层
 3. plural/select 必须有 other 分支
-4. 变量名必须符合 [a-zA-Z_][a-zA-Z0-9_]*
+4. 变量名必须符合 [a-zA-Z\_][a-zA-Z0-9_]\*
 5. 不支持 ICU 类型必须报错
 
 **校验示例**:
+
 ```
 ✓ 合法: "Hello {name}, you have {count, plural, one {# message} other {# messages}}"
 ✗ 非法: "Hello {name"                    // 未闭合
@@ -690,14 +720,22 @@ function calculateCost(provider: string, inputTokens: number, outputTokens: numb
 | 自定义 | `{{name}}`, `%name%` | 项目自定义 |
 
 **校验逻辑**:
+
 ```typescript
-function validatePlaceholders(source: string, target: string): ValidationResult {
+function validatePlaceholders(
+  source: string,
+  target: string,
+): ValidationResult {
   const sourcePlaceholders = extractPlaceholders(source);
   const targetPlaceholders = extractPlaceholders(target);
-  
-  const missing = sourcePlaceholders.filter(p => !targetPlaceholders.includes(p));
-  const extra = targetPlaceholders.filter(p => !sourcePlaceholders.includes(p));
-  
+
+  const missing = sourcePlaceholders.filter(
+    (p) => !targetPlaceholders.includes(p),
+  );
+  const extra = targetPlaceholders.filter(
+    (p) => !sourcePlaceholders.includes(p),
+  );
+
   return {
     valid: missing.length === 0 && extra.length === 0,
     missing,
@@ -719,15 +757,16 @@ function validatePlaceholders(source: string, target: string): ValidationResult 
 | 品牌保护 | 竞品名称 | 警告 |
 
 **检测算法**:
+
 ```typescript
 // Aho-Corasick 算法实现多模式匹配
 class SensitiveWordDetector {
   private trie: ACTrie;
-  
+
   constructor(words: string[]) {
     this.trie = buildACTrie(words);
   }
-  
+
   detect(text: string): DetectionResult[] {
     return this.trie.search(text);
   }
@@ -735,6 +774,7 @@ class SensitiveWordDetector {
 ```
 
 **替换建议**:
+
 - 提供同义词推荐
 - 支持自定义替换词库
 - 记录替换历史
@@ -773,6 +813,7 @@ class SensitiveWordDetector {
 | 页面级发布 | 按页面路径筛选发布 | 页面级灰度 |
 
 **范围选择界面**:
+
 ```
 发布范围
 ├── ○ 全量发布
@@ -787,6 +828,7 @@ class SensitiveWordDetector {
 **FR-RELEASE-003**: 发布审批流程
 
 **审批节点**:
+
 1. **提交发布申请** (ADMIN/PM)
    - 选择发布范围
    - 填写发布说明
@@ -817,6 +859,7 @@ class SensitiveWordDetector {
 | 部分回滚 | 仅回滚指定范围 | 2-5分钟 |
 
 **回滚流程**:
+
 ```
 1. 检测到问题 / 人工触发
    ↓
@@ -834,6 +877,7 @@ class SensitiveWordDetector {
 **FR-RELEASE-005**: 发布报告
 
 **报告内容**:
+
 ```
 发布报告 #v12
 ================
@@ -843,7 +887,7 @@ class SensitiveWordDetector {
 
 变更摘要:
 - 新增: 23 条
-- 更新: 156 条  
+- 更新: 156 条
 - 删除: 5 条
 - 涉及语言: zh-CN, en-US, ja-JP
 
@@ -878,21 +922,21 @@ class SensitiveWordDetector {
 interface GlossaryTerm {
   id: string;
   projectId: string;
-  sourceTerm: string;           // 源语言术语
-  sourceLocale: string;         // 源语言代码
+  sourceTerm: string; // 源语言术语
+  sourceLocale: string; // 源语言代码
   translations: {
     [localeCode: string]: {
-      term: string;             // 目标语言术语
-      status: 'draft' | 'approved' | 'deprecated';
+      term: string; // 目标语言术语
+      status: "draft" | "approved" | "deprecated";
       approvedBy?: string;
       approvedAt?: Date;
-    }
+    };
   };
-  partOfSpeech: 'noun' | 'verb' | 'adj' | 'adv' | 'phrase';
-  definition: string;           // 定义说明
-  context: string;              // 使用场景
-  forbidden: boolean;           // 是否禁用词
-  caseSensitive: boolean;       // 是否区分大小写
+  partOfSpeech: "noun" | "verb" | "adj" | "adv" | "phrase";
+  definition: string; // 定义说明
+  context: string; // 使用场景
+  forbidden: boolean; // 是否禁用词
+  caseSensitive: boolean; // 是否区分大小写
   createdAt: Date;
   updatedAt: Date;
 }
@@ -924,11 +968,13 @@ interface GlossaryTerm {
 **FR-GLOSSARY-003**: 术语实时提示
 
 **提示时机**:
+
 - 翻译编辑时实时检测
 - 检测到术语时高亮显示
 - 鼠标悬停显示术语定义
 
 **提示样式**:
+
 ```
 翻译编辑器
 ┌─────────────────────────────────────┐
@@ -944,6 +990,7 @@ interface GlossaryTerm {
 **FR-GLOSSARY-004**: 术语一致性检查
 
 **检查规则**:
+
 1. 术语必须使用已批准的译法
 2. 禁用词必须完全避免
 3. 大小写敏感术语必须严格匹配
@@ -967,7 +1014,7 @@ interface GlossaryTerm {
 ```typescript
 interface TranslationMemory {
   id: string;
-  projectId?: string;           // null 表示全局 TM
+  projectId?: string; // null 表示全局 TM
   sourceText: string;
   sourceLocale: string;
   targetText: string;
@@ -977,8 +1024,8 @@ interface TranslationMemory {
     namespace?: string;
     pagePath?: string;
   };
-  quality: number;              // 质量评分 0-100
-  usageCount: number;           // 被使用次数
+  quality: number; // 质量评分 0-100
+  usageCount: number; // 被使用次数
   lastUsedAt?: Date;
   createdAt: Date;
 }
@@ -996,24 +1043,25 @@ interface TranslationMemory {
 | < 75% | 低匹配 | 灰色 | 忽略 |
 
 **匹配算法**:
+
 ```typescript
 function calculateSimilarity(source: string, tmSource: string): number {
   // 1. 标准化处理（去除多余空格、统一大小写）
   const normalized1 = normalize(source);
   const normalized2 = normalize(tmSource);
-  
+
   // 2. 完全匹配检查
   if (normalized1 === normalized2) return 100;
-  
+
   // 3. 编辑距离计算 (Levenshtein Distance)
   const distance = levenshteinDistance(normalized1, normalized2);
   const maxLength = Math.max(normalized1.length, normalized2.length);
   const similarity = (1 - distance / maxLength) * 100;
-  
+
   // 4. 占位符差异惩罚
   const placeholderDiff = comparePlaceholders(source, tmSource);
   const adjustedSimilarity = similarity * (1 - placeholderDiff * 0.1);
-  
+
   return Math.round(adjustedSimilarity);
 }
 ```
@@ -1055,26 +1103,26 @@ function calculateSimilarity(source: string, tmSource: string): number {
 interface TranslationCost {
   id: string;
   projectId: string;
-  provider: string;             // openai, claude, wenxin, qwen
-  model: string;                // gpt-4, claude-3, etc.
-  operationType: 'translate' | 'review' | 'suggest';
-  
+  provider: string; // openai, claude, wenxin, qwen
+  model: string; // gpt-4, claude-3, etc.
+  operationType: "translate" | "review" | "suggest";
+
   // 用量统计
   inputTokens: number;
   outputTokens: number;
   characterCount: number;
-  
+
   // 成本计算
-  inputCost: number;            // 输入成本
-  outputCost: number;           // 输出成本
-  totalCost: number;            // 总成本
-  currency: 'USD' | 'CNY';
-  
+  inputCost: number; // 输入成本
+  outputCost: number; // 输出成本
+  totalCost: number; // 总成本
+  currency: "USD" | "CNY";
+
   // 关联信息
   translationId?: string;
   keyId?: string;
   userId: string;
-  
+
   createdAt: Date;
 }
 ```
@@ -1091,6 +1139,7 @@ interface TranslationCost {
 | 按时间 | 日/周/月趋势 | 预算规划 |
 
 **成本报表示例**:
+
 ```
 2026年3月 LLM 翻译成本报告
 ============================
@@ -1144,21 +1193,22 @@ interface TranslationCost {
 **FR-COST-004**: 配额管理
 
 **配额类型**:
+
 ```typescript
 interface QuotaConfig {
   // 字符数配额
   maxCharactersPerMonth: number;
   maxCharactersPerDay: number;
-  
+
   // 调用次数配额
   maxCallsPerMonth: number;
   maxCallsPerDay: number;
   maxCallsPerHour: number;
-  
+
   // 成本配额
   maxCostPerMonth: number;
   maxCostPerDay: number;
-  
+
   // 速率限制
   rateLimitPerMinute: number;
   rateLimitPerSecond: number;
@@ -1171,21 +1221,21 @@ interface QuotaConfig {
 
 ### 7.1 性能需求
 
-| 指标 | 目标值 | 说明 |
-|------|--------|------|
-| 页面首屏加载 | < 2s | 3G 网络环境下 |
-| API 响应时间 | < 200ms | P95 响应时间 |
-| 并发用户数 | 1000+ | 同时在线 |
-| 发布生成时间 | < 30s | 10000 条翻译 |
+| 指标         | 目标值  | 说明          |
+| ------------ | ------- | ------------- |
+| 页面首屏加载 | < 2s    | 3G 网络环境下 |
+| API 响应时间 | < 200ms | P95 响应时间  |
+| 并发用户数   | 1000+   | 同时在线      |
+| 发布生成时间 | < 30s   | 10000 条翻译  |
 
 ### 7.2 可用性需求
 
-| 指标 | 目标值 | 说明 |
-|------|--------|------|
-| 系统可用性 | 99.9% | 年度停机时间 < 8.76h |
-| 数据持久性 | 99.999% | 数据备份策略 |
-| 故障恢复时间 | < 30min | RTO |
-| 数据恢复点 | < 5min | RPO |
+| 指标         | 目标值  | 说明                 |
+| ------------ | ------- | -------------------- |
+| 系统可用性   | 99.9%   | 年度停机时间 < 8.76h |
+| 数据持久性   | 99.999% | 数据备份策略         |
+| 故障恢复时间 | < 30min | RTO                  |
+| 数据恢复点   | < 5min  | RPO                  |
 
 ### 7.3 安全需求
 
@@ -1272,20 +1322,20 @@ interface QuotaConfig {
 
 ### 9.3 主要 API 列表
 
-| 方法 | 路径 | 描述 |
-|------|------|------|
-| GET | /api/v1/projects | 项目列表 |
-| POST | /api/v1/projects | 创建项目 |
-| GET | /api/v1/projects/:id/keys | 项目词条列表 |
-| POST | /api/v1/projects/:id/keys | 创建词条 |
-| GET | /api/v1/keys/:id/translations | 翻译列表 |
-| PATCH | /api/v1/keys/:id/translations/:locale | 更新翻译 |
-| POST | /api/v1/keys/:id/submit | 提交审核 |
-| POST | /api/v1/keys/:id/approve | 通过审核 |
-| POST | /api/v1/keys/:id/reject | 退回审核 |
-| POST | /api/v1/projects/:id/releases/preview | 发布预览 |
-| POST | /api/v1/projects/:id/releases | 创建发布 |
-| POST | /api/v1/releases/:id/rollback | 回滚发布 |
+| 方法  | 路径                                  | 描述         |
+| ----- | ------------------------------------- | ------------ |
+| GET   | /api/v1/projects                      | 项目列表     |
+| POST  | /api/v1/projects                      | 创建项目     |
+| GET   | /api/v1/projects/:id/keys             | 项目词条列表 |
+| POST  | /api/v1/projects/:id/keys             | 创建词条     |
+| GET   | /api/v1/keys/:id/translations         | 翻译列表     |
+| PATCH | /api/v1/keys/:id/translations/:locale | 更新翻译     |
+| POST  | /api/v1/keys/:id/submit               | 提交审核     |
+| POST  | /api/v1/keys/:id/approve              | 通过审核     |
+| POST  | /api/v1/keys/:id/reject               | 退回审核     |
+| POST  | /api/v1/projects/:id/releases/preview | 发布预览     |
+| POST  | /api/v1/projects/:id/releases         | 创建发布     |
+| POST  | /api/v1/releases/:id/rollback         | 回滚发布     |
 
 ---
 
@@ -1328,28 +1378,31 @@ frontend/src/
 
 ### 11.1 阶段划分
 
-| 阶段 | 周期 | 目标 | 关键交付 |
-|------|------|------|----------|
-| **阶段 1** | 已完成 | MVP 核心闭环 | 项目/词条/翻译/发布基础功能 |
-| **阶段 2** | 4-6周 | 效率提升 | LLM翻译、批量操作、Excel导入 |
-| **阶段 3** | 4-6周 | 协作体验 | 审核分配、企业通知、评论功能 |
-| **阶段 4** | 6-8周 | 企业级功能 | 术语库、TM、成本统计、SCIM |
-| **阶段 5** | 持续 | 生态建设 | SDK、CLI、插件市场 |
+| 阶段       | 周期   | 目标         | 关键交付                     |
+| ---------- | ------ | ------------ | ---------------------------- |
+| **阶段 1** | 已完成 | MVP 核心闭环 | 项目/词条/翻译/发布基础功能  |
+| **阶段 2** | 4-6周  | 效率提升     | LLM翻译、批量操作、Excel导入 |
+| **阶段 3** | 4-6周  | 协作体验     | 审核分配、企业通知、评论功能 |
+| **阶段 4** | 6-8周  | 企业级功能   | 术语库、TM、成本统计、SCIM   |
+| **阶段 5** | 持续   | 生态建设     | SDK、CLI、插件市场           |
 
 ### 11.2 近期迭代计划 (接下来 4 周)
 
 **Week 1-2: 质量门禁完善**
+
 - ICU 语法校验增强
 - 占位符匹配校验
 - 敏感词库集成
 - 发布前自动门禁
 
 **Week 3: 发布体验优化**
+
 - 发布报告生成
 - 发布历史优化
 - 回滚体验优化
 
 **Week 4: LLM 翻译 MVP**
+
 - OpenAI 翻译接口
 - 异步任务队列
 - 成本记录
@@ -1360,12 +1413,12 @@ frontend/src/
 
 ### 12.1 测试策略
 
-| 测试类型 | 工具 | 覆盖率目标 |
-|----------|------|------------|
-| 单元测试 | Jest/Vitest | 80%+ |
-| 集成测试 | Jest + Supertest | 核心流程 |
-| E2E 测试 | Playwright | 关键路径 |
-| 性能测试 | k6 | 基准测试 |
+| 测试类型 | 工具             | 覆盖率目标 |
+| -------- | ---------------- | ---------- |
+| 单元测试 | Jest/Vitest      | 80%+       |
+| 集成测试 | Jest + Supertest | 核心流程   |
+| E2E 测试 | Playwright       | 关键路径   |
+| 性能测试 | k6               | 基准测试   |
 
 ### 12.2 代码质量
 
@@ -1378,12 +1431,12 @@ frontend/src/
 
 ## 13. 风险评估与应对
 
-| 风险 | 影响 | 概率 | 应对策略 |
-|------|------|------|----------|
-| LLM 服务质量波动 | 高 | 中 | 多供应商备份，人工兜底 |
-| 平台接口变更 | 中 | 中 | 抽象适配层，灰度测试 |
-| 数据量增长性能下降 | 高 | 低 | 分库分表，缓存优化 |
-| 安全漏洞 | 高 | 低 | 安全审计，及时补丁 |
+| 风险               | 影响 | 概率 | 应对策略               |
+| ------------------ | ---- | ---- | ---------------------- |
+| LLM 服务质量波动   | 高   | 中   | 多供应商备份，人工兜底 |
+| 平台接口变更       | 中   | 中   | 抽象适配层，灰度测试   |
+| 数据量增长性能下降 | 高   | 低   | 分库分表，缓存优化     |
+| 安全漏洞           | 高   | 低   | 安全审计，及时补丁     |
 
 ---
 

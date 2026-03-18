@@ -1,6 +1,5 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma.service';
-import { TranslationStatus } from '@prisma/client';
 
 export interface ReviewTask {
   id: string;
@@ -121,7 +120,12 @@ export class ReviewsService {
     });
   }
 
-  async rejectReview(id: string, userId: string, reason: string, suggestion?: string) {
+  async rejectReview(
+    id: string,
+    userId: string,
+    reason: string,
+    _suggestion?: string,
+  ) {
     const translation = await this.prisma.translation.findUnique({
       where: { id },
     });

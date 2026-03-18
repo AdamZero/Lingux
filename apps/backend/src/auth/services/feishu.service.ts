@@ -113,7 +113,11 @@ export class FeishuService {
   /**
    * Build Feishu authorization URL
    */
-  buildAuthUrl(clientId: string, redirectUri: string, scope = 'user_info'): string {
+  buildAuthUrl(
+    clientId: string,
+    redirectUri: string,
+    scope = 'user_info',
+  ): string {
     return `https://open.feishu.cn/open-apis/authen/v1/index?client_id=${clientId}&redirect_uri=${encodeURIComponent(redirectUri)}&scope=${scope}&response_type=code`;
   }
 }

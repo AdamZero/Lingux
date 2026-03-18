@@ -4,7 +4,7 @@
 **模块名称**: 术语库  
 **版本**: v1.0  
 **最后更新**: 2026-03-17  
-**迭代计划**: 第 3 迭代  
+**迭代计划**: 第 3 迭代
 
 ---
 
@@ -15,6 +15,7 @@
 术语库用于统一管理项目中的专业术语，确保翻译一致性。
 
 **功能**：
+
 - 术语定义与管理
 - 多语言术语映射
 - 术语审批工作流
@@ -36,21 +37,21 @@
 interface GlossaryTerm {
   id: string;
   projectId: string;
-  sourceTerm: string;           // 源语言术语
-  sourceLocale: string;         // 源语言代码
+  sourceTerm: string; // 源语言术语
+  sourceLocale: string; // 源语言代码
   translations: {
     [localeCode: string]: {
-      term: string;             // 目标语言术语
-      status: 'draft' | 'approved' | 'deprecated';
+      term: string; // 目标语言术语
+      status: "draft" | "approved" | "deprecated";
       approvedBy?: string;
       approvedAt?: Date;
-    }
+    };
   };
-  partOfSpeech: 'noun' | 'verb' | 'adj' | 'adv' | 'phrase';
-  definition: string;           // 定义说明
-  context: string;              // 使用场景
-  forbidden: boolean;           // 是否禁用词
-  caseSensitive: boolean;       // 是否区分大小写
+  partOfSpeech: "noun" | "verb" | "adj" | "adv" | "phrase";
+  definition: string; // 定义说明
+  context: string; // 使用场景
+  forbidden: boolean; // 是否禁用词
+  caseSensitive: boolean; // 是否区分大小写
   createdAt: Date;
   updatedAt: Date;
 }
@@ -82,11 +83,13 @@ interface GlossaryTerm {
 ### 2.3 术语实时提示
 
 **提示时机**：
+
 - 翻译编辑时实时检测
 - 检测到术语时高亮显示
 - 鼠标悬停显示术语定义
 
 **提示样式**：
+
 ```
 翻译编辑器
 ┌─────────────────────────────────────┐
@@ -102,6 +105,7 @@ interface GlossaryTerm {
 ### 2.4 术语一致性检查
 
 **检查规则**：
+
 1. 术语必须使用已批准的译法
 2. 禁用词必须完全避免
 3. 大小写敏感术语必须严格匹配
@@ -122,23 +126,23 @@ model GlossaryTerm {
   id          String   @id @default(cuid())
   projectId   String
   project     Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  
+
   sourceTerm  String
   sourceLocale String
   translations Json    // { localeCode: { term, status, approvedBy, approvedAt } }
-  
+
   partOfSpeech String  // noun, verb, adj, adv, phrase
   definition   String?
   context      String?
   forbidden    Boolean @default(false)
   caseSensitive Boolean @default(false)
-  
+
   status      String   @default("draft") // draft, pending, approved, deprecated
-  
+
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
   createdBy   String
-  
+
   @@unique([projectId, sourceTerm])
 }
 ```
@@ -159,6 +163,7 @@ model GlossaryTerm {
 **功能**: 创建术语  
 **权限**: EDITOR 及以上  
 **请求体**:
+
 ```json
 {
   "sourceTerm": "platform",

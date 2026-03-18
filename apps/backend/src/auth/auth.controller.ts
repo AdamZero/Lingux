@@ -11,14 +11,7 @@ import { AuthGuard } from '@nestjs/passport';
 import { AuthService } from './auth.service';
 import { FeishuService } from './services/feishu.service';
 import type { Request, Response } from 'express';
-
-// Define user type
-interface User {
-  id: string;
-  username: string;
-  name?: string;
-  role: string;
-}
+import { AuthUser } from './types/auth.types';
 
 @Controller('auth')
 export class AuthController {
@@ -105,7 +98,7 @@ export class AuthController {
   @Get('qixin/callback')
   @UseGuards(AuthGuard('qixin'))
   async qixinCallback(@Req() req: Request, @Res() res: Response) {
-    const user = req.user as User;
+    const user = req.user as AuthUser;
     if (!user) {
       return res.status(401).send('Authentication failed');
     }
@@ -127,7 +120,7 @@ export class AuthController {
   @Get('dingtalk/callback')
   @UseGuards(AuthGuard('dingtalk'))
   async dingTalkCallback(@Req() req: Request, @Res() res: Response) {
-    const user = req.user as User;
+    const user = req.user as AuthUser;
     if (!user) {
       return res.status(401).send('Authentication failed');
     }
@@ -143,7 +136,7 @@ export class AuthController {
   @Get('me')
   @UseGuards(AuthGuard('jwt'))
   async getProfile(@Req() req: Request) {
-    return req.user as User;
+    return req.user as AuthUser;
   }
 
   @Post('feishu/log')
@@ -155,39 +148,6 @@ export class AuthController {
     } catch (error) {
       this.logger.error('Feishu log error:', error);
       return { status: 'error', message: 'Failed to log request' };
-    }
-  }
-
-  // Development only: Test login endpoint
-  @Get('dev-login')
-  async devLogin(@Res() res: Response) {
-    if (process.env.NODE_ENV === 'production') {
-      return res.status(403).send('Not available in production');
-    }
-
-    try {
-      // Find or create a test user
-      const testUser = await this.authService.validateUser({
-        externalId: 'dev-test-user',
-        provider: 'dev',
-        name: 'Test User',
-        email: 'test@example.com',
-      });
-
-      const loginResult = await this.authService.login({
-        ...testUser,
-        name: testUser?.name ?? undefined,
-      });
-
-      // Redirect to frontend with token
-      // Support multiple possible frontend URLs
-      const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:8080';
-      res.redirect(
-        `${frontendUrl}/login#token=${loginResult.access_token}&user=${JSON.stringify(loginResult.user)}`,
-      );
-    } catch (error) {
-      this.logger.error('Dev login error:', error);
-      return res.status(500).send('Login failed');
     }
   }
 }

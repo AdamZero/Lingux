@@ -3,7 +3,7 @@
 **模块编号**: 03-key  
 **模块名称**: 词条管理  
 **版本**: v1.0  
-**最后更新**: 2026-03-17  
+**最后更新**: 2026-03-17
 
 ---
 
@@ -12,6 +12,7 @@
 ### 1.1 功能范围
 
 本模块负责词条（Key）的管理，包括：
+
 - Key 的 CRUD 操作
 - Key 类型支持（TEXT/RICH_TEXT/ASSET）
 - 标签和元数据管理
@@ -21,11 +22,11 @@
 
 ### 1.2 关联模块
 
-| 模块 | 关系 | 说明 |
-|------|------|------|
-| 02-project | 依赖 | Key 属于某个项目 |
-| 04-translation | 被依赖 | Key 包含多个翻译 |
-| 06-release | 依赖 | 发布时选择 Key 范围 |
+| 模块           | 关系   | 说明                |
+| -------------- | ------ | ------------------- |
+| 02-project     | 依赖   | Key 属于某个项目    |
+| 04-translation | 被依赖 | Key 包含多个翻译    |
+| 06-release     | 依赖   | 发布时选择 Key 范围 |
 
 ---
 
@@ -43,18 +44,19 @@
 #### 详细规则
 
 1. **Key 属性**
+
    ```typescript
    interface Key {
      id: string;
-     name: string;           // Key 名称，如 "common.button.submit"
-     type: KeyType;          // 类型：TEXT/RICH_TEXT/ASSET
-     description?: string;   // 描述说明
-     namespaceId: string;    // 所属命名空间
-     projectId: string;      // 所属项目
-     tags: string[];         // 标签
+     name: string; // Key 名称，如 "common.button.submit"
+     type: KeyType; // 类型：TEXT/RICH_TEXT/ASSET
+     description?: string; // 描述说明
+     namespaceId: string; // 所属命名空间
+     projectId: string; // 所属项目
+     tags: string[]; // 标签
      metadata: Record<string, any>; // 元数据
-     pagePath?: string;      // 关联页面路径
-     screenshotId?: string;  // 关联截图
+     pagePath?: string; // 关联页面路径
+     screenshotId?: string; // 关联截图
      createdAt: Date;
      updatedAt: Date;
    }
@@ -186,11 +188,12 @@
    - 统计：计算页面翻译覆盖率
 
 3. **路径解析**
+
    ```typescript
    // 示例：匹配 /products/123
-   const patterns = ['/products/*', '/products/{id}'];
-   const path = '/products/123';
-   
+   const patterns = ["/products/*", "/products/{id}"];
+   const path = "/products/123";
+
    // 匹配结果：['/products/*']
    ```
 
@@ -206,24 +209,25 @@
 #### 详细规则
 
 1. **截图属性**
+
    ```typescript
    interface Screenshot {
      id: string;
      keyId: string;
-     url: string;           // 图片 URL
-     thumbnailUrl: string;  // 缩略图 URL
+     url: string; // 图片 URL
+     thumbnailUrl: string; // 缩略图 URL
      width: number;
      height: number;
      annotations: Annotation[]; // 标注信息
      createdAt: Date;
    }
-   
+
    interface Annotation {
-     x: number;      // 标注位置 X
-     y: number;      // 标注位置 Y
-     width: number;  // 标注宽度
+     x: number; // 标注位置 X
+     y: number; // 标注位置 Y
+     width: number; // 标注宽度
      height: number; // 标注高度
-     text: string;   // 标注文字
+     text: string; // 标注文字
    }
    ```
 
@@ -264,6 +268,7 @@
    | XLIFF | ✅ | ✅ | 行业标准格式 |
 
 2. **JSON 格式示例**
+
    ```json
    {
      "common": {
@@ -315,31 +320,31 @@ model Key {
   name        String   // 如：common.button.submit
   type        KeyType  @default(TEXT)
   description String?
-  
+
   // 关联
   projectId   String
   project     Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
   namespaceId String
   namespace   Namespace @relation(fields: [namespaceId], references: [id], onDelete: Cascade)
-  
+
   // 翻译
   translations Translation[]
-  
+
   // 标签（多对多）
   tags        Tag[]
-  
+
   // 元数据
   metadata    Json?     // { pagePath: '/home', priority: 1 }
   pagePath    String?   // 页面路径，冗余存储便于查询
-  
+
   // 截图
   screenshots Screenshot[]
-  
+
   // 审计
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
   createdBy   String   // 创建者 userId
-  
+
   @@unique([namespaceId, name])
 }
 
@@ -347,14 +352,14 @@ model Tag {
   id        String @id @default(cuid())
   projectId String
   project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  
+
   name      String
   color     String @default("#1890ff")
-  
+
   keys      Key[]
-  
+
   createdAt DateTime @default(now())
-  
+
   @@unique([projectId, name])
 }
 
@@ -362,13 +367,13 @@ model Screenshot {
   id            String @id @default(cuid())
   keyId         String
   key           Key    @relation(fields: [keyId], references: [id], onDelete: Cascade)
-  
+
   url           String
   thumbnailUrl  String
   width         Int
   height        Int
   annotations   Json?  // [{ x, y, width, height, text }]
-  
+
   createdAt     DateTime @default(now())
   createdBy     String
 }
@@ -385,6 +390,7 @@ model Screenshot {
 **功能**: 获取 Key 列表  
 **权限**: 项目成员  
 **查询参数**:
+
 - `page`: 页码
 - `limit`: 每页数量
 - `search`: Key 名称搜索
@@ -395,6 +401,7 @@ model Screenshot {
 - `status`: 翻译状态筛选
 
 **响应**:
+
 ```json
 {
   "code": 200,
@@ -427,6 +434,7 @@ model Screenshot {
 **功能**: 创建 Key  
 **权限**: EDITOR 及以上  
 **请求体**:
+
 ```json
 {
   "name": "common.button.submit",
@@ -464,6 +472,7 @@ model Screenshot {
 
 **功能**: 创建标签  
 **请求体**:
+
 ```json
 {
   "name": "v1.0",
@@ -475,6 +484,7 @@ model Screenshot {
 
 **功能**: 为 Key 添加标签  
 **请求体**:
+
 ```json
 {
   "tagIds": ["cuid1", "cuid2"]
@@ -488,6 +498,7 @@ model Screenshot {
 **功能**: 上传截图  
 **Content-Type**: `multipart/form-data`  
 **请求参数**:
+
 - `file`: 图片文件
 - `annotations`: JSON 字符串，标注信息
 
@@ -506,12 +517,14 @@ model Screenshot {
 **功能**: 导入数据  
 **Content-Type**: `multipart/form-data`  
 **请求参数**:
+
 - `file`: 导入文件
 - `format`: 格式（json/yaml/excel/csv/xliff）
 - `strategy`: 导入策略（create/update/skip/ask）
 - `namespaceId`: 指定命名空间
 
 **响应**:
+
 ```json
 {
   "code": 200,
@@ -532,6 +545,7 @@ model Screenshot {
 
 **功能**: 导出数据  
 **请求体**:
+
 ```json
 {
   "format": "json",

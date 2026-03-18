@@ -1,12 +1,21 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma.service';
-import { WorkspaceStatsDto, WorkspaceTaskDto, TaskType, TaskPriority, TaskStatus } from './dto/workspace.dto';
+import {
+  WorkspaceStatsDto,
+  WorkspaceTaskDto,
+  TaskType,
+  TaskPriority,
+  TaskStatus,
+} from './dto/workspace.dto';
 
 @Injectable()
 export class WorkspaceService {
   constructor(private prisma: PrismaService) {}
 
-  async getStats(projectId: string, userId: string): Promise<WorkspaceStatsDto> {
+  async getStats(
+    projectId: string,
+    userId: string,
+  ): Promise<WorkspaceStatsDto> {
     // 获取用户有 EDIT 权限的命名空间
     const userProject = await this.prisma.project.findFirst({
       where: {
@@ -62,7 +71,7 @@ export class WorkspaceService {
     // 统计 approved 数量（当前用户本月提交的）
     const now = new Date();
     const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-    
+
     const approvedCount = await this.prisma.translation.count({
       where: {
         status: 'APPROVED',
@@ -85,7 +94,12 @@ export class WorkspaceService {
     };
   }
 
-  async getTasks(projectId: string, userId: string, page: number = 1, pageSize: number = 20) {
+  async getTasks(
+    projectId: string,
+    userId: string,
+    page: number = 1,
+    pageSize: number = 20,
+  ) {
     const user = await this.prisma.user.findUnique({
       where: { id: userId },
     });
@@ -95,10 +109,10 @@ export class WorkspaceService {
     }
 
     const skip = (page - 1) * pageSize;
-    
+
     // 根据用户角色确定任务类型
     const isReviewer = user.role === 'REVIEWER' || user.role === 'ADMIN';
-    
+
     // 查询任务
     const whereCondition: any = {
       key: {
@@ -128,10 +142,7 @@ export class WorkspaceService {
           locale: true,
           submitter: true,
         },
-        orderBy: [
-          { priority: 'desc' },
-          { updatedAt: 'desc' },
-        ],
+        orderBy: [{ priority: 'desc' }, { updatedAt: 'desc' }],
         skip,
         take: pageSize,
       }),
@@ -142,12 +153,18 @@ export class WorkspaceService {
 
     const tasks: WorkspaceTaskDto[] = translations.map((translation) => {
       const type = isReviewer ? TaskType.REVIEW : TaskType.TRANSLATION;
-      const status = translation.status === 'REVIEWING' ? TaskStatus.REVIEWING : TaskStatus.PENDING;
-      
+      const status =
+        translation.status === 'REVIEWING'
+          ? TaskStatus.REVIEWING
+          : TaskStatus.PENDING;
+
       // 计算优先级
       let priority = TaskPriority.MEDIUM;
       if (translation.dueDate) {
-        const daysUntilDue = Math.ceil((new Date(translation.dueDate).getTime() - Date.now()) / (1000 * 60 * 60 * 24));
+        const daysUntilDue = Math.ceil(
+          (new Date(translation.dueDate).getTime() - Date.now()) /
+            (1000 * 60 * 60 * 24),
+        );
         if (daysUntilDue < 3) {
           priority = TaskPriority.HIGH;
         } else if (daysUntilDue > 7) {

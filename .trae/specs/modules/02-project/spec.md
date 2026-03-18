@@ -3,7 +3,7 @@
 **模块编号**: 02-project  
 **模块名称**: 项目管理  
 **版本**: v1.0  
-**最后更新**: 2026-03-17  
+**最后更新**: 2026-03-17
 
 ---
 
@@ -12,6 +12,7 @@
 ### 1.1 功能范围
 
 本模块负责项目的创建、配置和管理，包括：
+
 - 项目 CRUD 操作
 - 语言环境管理
 - 命名空间管理
@@ -19,11 +20,11 @@
 
 ### 1.2 关联模块
 
-| 模块 | 关系 | 说明 |
-|------|------|------|
-| 01-auth | 依赖 | 需要用户认证后才能操作项目 |
-| 03-key | 被依赖 | 项目包含多个 Key |
-| 04-translation | 被依赖 | 项目下的翻译工作流 |
+| 模块           | 关系   | 说明                       |
+| -------------- | ------ | -------------------------- |
+| 01-auth        | 依赖   | 需要用户认证后才能操作项目 |
+| 03-key         | 被依赖 | 项目包含多个 Key           |
+| 04-translation | 被依赖 | 项目下的翻译工作流         |
 
 ---
 
@@ -62,11 +63,11 @@
 
 #### 异常处理
 
-| 异常场景 | 处理方式 |
-|----------|----------|
-| 项目名称已存在 | 返回错误，提示更换名称 |
+| 异常场景       | 处理方式                       |
+| -------------- | ------------------------------ |
+| 项目名称已存在 | 返回错误，提示更换名称         |
 | 未选择目标语言 | 表单校验失败，提示至少选择一种 |
-| 创建失败 | 记录日志，返回友好错误信息 |
+| 创建失败       | 记录日志，返回友好错误信息     |
 
 **功能 ID**: PROJ-002  
 **功能名称**: 项目列表与详情
@@ -84,6 +85,7 @@
    - 显示项目进度（翻译覆盖率）
 
 2. **项目卡片信息**
+
    ```
    - 项目名称
    - 项目描述（摘要）
@@ -137,11 +139,12 @@
 #### 详细规则
 
 1. **语言属性**
+
    ```typescript
    interface ProjectLocale {
-     localeId: string;      // 关联 Locale
-     isSource: boolean;     // 是否为源语言
-     isEnabled: boolean;    // 是否启用
+     localeId: string; // 关联 Locale
+     isSource: boolean; // 是否为源语言
+     isEnabled: boolean; // 是否启用
      fallbackOrder: number; // 回退优先级
    }
    ```
@@ -162,20 +165,20 @@
 
 **支持的语言列表**:
 
-| 语言代码 | 语言名称 | 常用程度 |
-|----------|----------|----------|
-| zh-CN | 简体中文 | ⭐⭐⭐ |
-| zh-TW | 繁体中文 | ⭐⭐⭐ |
-| en-US | 英语（美国）| ⭐⭐⭐ |
-| ja-JP | 日语 | ⭐⭐⭐ |
-| ko-KR | 韩语 | ⭐⭐ |
-| fr-FR | 法语 | ⭐⭐ |
-| de-DE | 德语 | ⭐⭐ |
-| es-ES | 西班牙语 | ⭐⭐ |
-| ru-RU | 俄语 | ⭐ |
-| pt-BR | 葡萄牙语（巴西）| ⭐ |
-| it-IT | 意大利语 | ⭐ |
-| ... | 更多语言 | |
+| 语言代码 | 语言名称         | 常用程度 |
+| -------- | ---------------- | -------- |
+| zh-CN    | 简体中文         | ⭐⭐⭐   |
+| zh-TW    | 繁体中文         | ⭐⭐⭐   |
+| en-US    | 英语（美国）     | ⭐⭐⭐   |
+| ja-JP    | 日语             | ⭐⭐⭐   |
+| ko-KR    | 韩语             | ⭐⭐     |
+| fr-FR    | 法语             | ⭐⭐     |
+| de-DE    | 德语             | ⭐⭐     |
+| es-ES    | 西班牙语         | ⭐⭐     |
+| ru-RU    | 俄语             | ⭐       |
+| pt-BR    | 葡萄牙语（巴西） | ⭐       |
+| it-IT    | 意大利语         | ⭐       |
+| ...      | 更多语言         |          |
 
 ### 2.3 命名空间管理
 
@@ -189,13 +192,14 @@
 #### 详细规则
 
 1. **命名空间属性**
+
    ```typescript
    interface Namespace {
      id: string;
      projectId: string;
-     name: string;           // 命名空间名称（唯一）
-     description?: string;   // 描述
-     priority: number;       // 排序优先级
+     name: string; // 命名空间名称（唯一）
+     description?: string; // 描述
+     priority: number; // 排序优先级
      createdAt: Date;
      updatedAt: Date;
    }
@@ -278,19 +282,19 @@ model Project {
   slug        String   // URL 友好的标识
   description String?
   icon        String?  // 图标 URL
-  
+
   // 关联
   users       User[]   @relation("ProjectUsers")
   locales     ProjectLocale[]
   namespaces  Namespace[]
   keys        Key[]
   releases    Release[]
-  
+
   // 审计
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
   createdBy   String   // 创建者 userId
-  
+
   @@unique([slug])
 }
 
@@ -298,14 +302,14 @@ model ProjectLocale {
   id       String @id @default(cuid())
   projectId String
   project  Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  
+
   localeId String
   locale   Locale  @relation(fields: [localeId], references: [id])
-  
+
   isSource      Boolean @default(false)
   isEnabled     Boolean @default(true)
   fallbackOrder Int     @default(0)
-  
+
   @@unique([projectId, localeId])
 }
 
@@ -314,7 +318,7 @@ model Locale {
   code     String @unique // zh-CN, en-US, etc.
   name     String // 简体中文, English, etc.
   nativeName String // 中文, English, etc.
-  
+
   projects ProjectLocale[]
 }
 ```
@@ -326,16 +330,16 @@ model Namespace {
   id          String @id @default(cuid())
   projectId   String
   project     Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  
+
   name        String
   description String?
   priority    Int    @default(0)
-  
+
   keys        Key[]
-  
+
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
-  
+
   @@unique([projectId, name])
 }
 ```
@@ -349,15 +353,15 @@ model ProjectMember {
   project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
   userId    String
   user      User    @relation(fields: [userId], references: [id], onDelete: Cascade)
-  
+
   role      ProjectRole @default(EDITOR)
-  
+
   // 细粒度权限（可选）
   namespacePermissions Json? // { namespaceId: { canEdit: boolean } }
   localePermissions    Json? // { localeCode: { canEdit: boolean } }
-  
+
   joinedAt  DateTime @default(now())
-  
+
   @@unique([projectId, userId])
 }
 
@@ -380,6 +384,7 @@ enum ProjectRole {
 **功能**: 获取项目列表  
 **权限**: 登录用户  
 **查询参数**:
+
 - `page`: 页码，默认 1
 - `limit`: 每页数量，默认 20
 - `search`: 搜索关键词（项目名称）
@@ -387,6 +392,7 @@ enum ProjectRole {
 - `order`: 排序方向（asc/desc）
 
 **响应**:
+
 ```json
 {
   "code": 200,
@@ -423,6 +429,7 @@ enum ProjectRole {
 **功能**: 创建项目  
 **权限**: 登录用户  
 **请求体**:
+
 ```json
 {
   "name": "My Project",
@@ -440,6 +447,7 @@ enum ProjectRole {
 **功能**: 获取项目详情  
 **权限**: 项目成员  
 **响应**:
+
 ```json
 {
   "code": 200,
@@ -470,6 +478,7 @@ enum ProjectRole {
 **功能**: 更新项目  
 **权限**: ADMIN  
 **请求体**:
+
 ```json
 {
   "name": "New Name",
@@ -491,6 +500,7 @@ enum ProjectRole {
 **功能**: 获取命名空间列表  
 **权限**: 项目成员  
 **响应**:
+
 ```json
 {
   "code": 200,
@@ -511,6 +521,7 @@ enum ProjectRole {
 **功能**: 创建命名空间  
 **权限**: EDITOR 及以上  
 **请求体**:
+
 ```json
 {
   "name": "auth",
@@ -541,6 +552,7 @@ enum ProjectRole {
 **功能**: 邀请成员  
 **权限**: ADMIN  
 **请求体**:
+
 ```json
 {
   "userId": "cuid",

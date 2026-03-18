@@ -4,6 +4,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { WinstonLoggerService } from '../logger/logger.service';
 import { AsyncContextService } from '../context/async-context.service';
 import { maskSensitiveData } from '../logger/utils/mask.util';
+import '../../auth/types/auth.types'; // 引入类型扩展
 
 @Injectable()
 export class RequestLogMiddleware implements NestMiddleware {
@@ -17,7 +18,7 @@ export class RequestLogMiddleware implements NestMiddleware {
     const startTime = Date.now();
 
     // 提取用户ID（如果已认证）
-    const userId = (req.user as { id?: string })?.id;
+    const userId = req.user?.id;
 
     // 创建请求上下文
     const context = {
@@ -47,21 +48,33 @@ export class RequestLogMiddleware implements NestMiddleware {
         const duration = Date.now() - startTime;
         const statusCode = res.statusCode;
 
-        const logData = {
-          requestId,
-          userId,
-          method: req.method,
-          path: req.path,
-          statusCode,
-          duration: `${duration}ms`,
-        };
-
         if (statusCode >= 500) {
-          this.logger.error('Request failed', undefined, logData);
+          this.logger.error('Request failed', {
+            requestId,
+            userId,
+            method: req.method,
+            path: req.path,
+            statusCode,
+            duration: `${duration}ms`,
+          });
         } else if (statusCode >= 400) {
-          this.logger.warn('Request client error', logData);
+          this.logger.warn('Request client error', {
+            requestId,
+            userId,
+            method: req.method,
+            path: req.path,
+            statusCode,
+            duration: `${duration}ms`,
+          });
         } else {
-          this.logger.log('Request completed', logData);
+          this.logger.log('Request completed', {
+            requestId,
+            userId,
+            method: req.method,
+            path: req.path,
+            statusCode,
+            duration: `${duration}ms`,
+          });
         }
       });
 

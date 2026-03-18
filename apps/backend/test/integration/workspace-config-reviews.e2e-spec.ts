@@ -4,13 +4,12 @@ import request from 'supertest';
 import { AppModule } from '../src/app.module';
 import { PrismaService } from '../src/prisma.service';
 import { JwtService } from '@nestjs/jwt';
-import { ConfigModule, ConfigService } from '@nestjs/config';
+import { ConfigService } from '@nestjs/config';
 
 describe('Workspace, Config, and Reviews API Integration Tests', () => {
   let app: INestApplication;
   let prisma: PrismaService;
   let jwtService: JwtService;
-  let configService: ConfigService;
 
   // Mock user data for testing
   const mockUser = {
@@ -29,7 +28,7 @@ describe('Workspace, Config, and Reviews API Integration Tests', () => {
     }).compile();
 
     app = moduleRef.createNestApplication();
-    
+
     prisma = moduleRef.get<PrismaService>(PrismaService);
     jwtService = moduleRef.get<JwtService>(JwtService);
     configService = moduleRef.get<ConfigService>(ConfigService);
@@ -143,7 +142,7 @@ describe('Workspace, Config, and Reviews API Integration Tests', () => {
         .get(`/workspace/stats?projectId=${projectId}`)
         .set('Authorization', `Bearer ${token}`)
         .expect(200)
-        .then(response => {
+        .then((response) => {
           expect(response.body).toHaveProperty('code', 0);
           expect(response.body).toHaveProperty('message', 'success');
           expect(response.body.data).toHaveProperty('pending');
@@ -181,7 +180,7 @@ describe('Workspace, Config, and Reviews API Integration Tests', () => {
         .get(`/workspace/tasks?projectId=${projectId}&page=1&pageSize=10`)
         .set('Authorization', `Bearer ${token}`)
         .expect(200)
-        .then(response => {
+        .then((response) => {
           expect(response.body).toHaveProperty('code', 0);
           expect(response.body).toHaveProperty('message', 'success');
           expect(response.body.data).toHaveProperty('items');
@@ -205,7 +204,7 @@ describe('Workspace, Config, and Reviews API Integration Tests', () => {
         .get('/config/features')
         .set('Authorization', `Bearer ${token}`)
         .expect(200)
-        .then(response => {
+        .then((response) => {
           expect(response.body).toHaveProperty('code', 0);
           expect(response.body).toHaveProperty('message', 'success');
           expect(Array.isArray(response.body.data)).toBe(true);
@@ -229,7 +228,7 @@ describe('Workspace, Config, and Reviews API Integration Tests', () => {
         .set('Authorization', `Bearer ${token}`)
         .send({ enabled: true })
         .expect(201)
-        .then(response => {
+        .then((response) => {
           expect(response.body).toHaveProperty('code', 0);
           expect(response.body).toHaveProperty('message', 'success');
           expect(response.body.data).toHaveProperty('key', 'test-integration');
@@ -339,7 +338,7 @@ describe('Workspace, Config, and Reviews API Integration Tests', () => {
         .get(`/reviews?projectId=${projectId}`)
         .set('Authorization', `Bearer ${token}`)
         .expect(200)
-        .then(response => {
+        .then((response) => {
           expect(response.body).toHaveProperty('code', 0);
           expect(response.body).toHaveProperty('message', 'success');
           expect(response.body.data).toHaveProperty('items');
@@ -362,7 +361,7 @@ describe('Workspace, Config, and Reviews API Integration Tests', () => {
         .set('Authorization', `Bearer ${token}`)
         .send({})
         .expect(201)
-        .then(response => {
+        .then((response) => {
           expect(response.body).toHaveProperty('code', 0);
           expect(response.body).toHaveProperty('message', 'success');
           expect(response.body.data).toHaveProperty('status', 'APPROVED');
@@ -381,11 +380,14 @@ describe('Workspace, Config, and Reviews API Integration Tests', () => {
         .set('Authorization', `Bearer ${token}`)
         .send({ reason: 'Quality issue', suggestion: 'Fix grammar' })
         .expect(201)
-        .then(response => {
+        .then((response) => {
           expect(response.body).toHaveProperty('code', 0);
           expect(response.body).toHaveProperty('message', 'success');
           expect(response.body.data).toHaveProperty('status', 'PENDING');
-          expect(response.body.data).toHaveProperty('reviewComment', 'Quality issue');
+          expect(response.body.data).toHaveProperty(
+            'reviewComment',
+            'Quality issue',
+          );
         });
     });
   });

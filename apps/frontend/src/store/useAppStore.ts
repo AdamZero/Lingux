@@ -21,6 +21,13 @@ interface AppState {
   setHasHydrated: (hasHydrated: boolean) => void;
 }
 
+// 同步主题到 document 的 data-theme 属性
+const syncThemeToDocument = (theme: "light" | "dark") => {
+  if (typeof document !== "undefined") {
+    document.documentElement.setAttribute("data-theme", theme);
+  }
+};
+
 export const useAppStore = create<AppState>()(
   persist(
     (set) => ({
@@ -30,7 +37,11 @@ export const useAppStore = create<AppState>()(
       user: null,
       _hasHydrated: false,
       toggleTheme: () =>
-        set((state) => ({ theme: state.theme === "light" ? "dark" : "light" })),
+        set((state) => {
+          const newTheme = state.theme === "light" ? "dark" : "light";
+          syncThemeToDocument(newTheme);
+          return { theme: newTheme };
+        }),
       setSidebarCollapsed: (collapsed) => set({ sidebarCollapsed: collapsed }),
       setToken: (token) => set({ token }),
       setUser: (user) => set({ user }),
@@ -42,6 +53,10 @@ export const useAppStore = create<AppState>()(
       storage: createJSONStorage(() => localStorage),
       onRehydrateStorage: () => (state) => {
         state?.setHasHydrated(true);
+        // 恢复时同步主题
+        if (state?.theme) {
+          syncThemeToDocument(state.theme);
+        }
       },
     },
   ),

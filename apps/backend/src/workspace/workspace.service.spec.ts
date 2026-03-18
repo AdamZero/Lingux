@@ -1,7 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { WorkspaceService } from './workspace.service';
 import { PrismaService } from '../prisma.service';
-import { TaskPriority, TaskStatus, TaskType } from './dto/workspace.dto';
+import { TaskPriority } from './dto/workspace.dto';
 
 describe('WorkspaceService', () => {
   let service: WorkspaceService;
@@ -53,9 +53,7 @@ describe('WorkspaceService', () => {
             keys: [
               {
                 id: 'key-1',
-                translations: [
-                  { id: 't1', status: 'PENDING' },
-                ],
+                translations: [{ id: 't1', status: 'PENDING' }],
               },
             ],
           },
@@ -127,7 +125,6 @@ describe('WorkspaceService', () => {
 
       const now = new Date();
       const tomorrow = new Date(now.getTime() + 24 * 60 * 60 * 1000);
-      const nextWeek = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
 
       const mockTranslations = [
         {
@@ -185,7 +182,10 @@ describe('WorkspaceService', () => {
 
       const mockUser = { id: userId, role: 'TRANSLATOR' };
       mockPrisma.user.findUnique.mockResolvedValue(mockUser);
-      (mockPrisma.$transaction as jest.Mock).mockResolvedValue([mockTranslations, mockCount]);
+      (mockPrisma.$transaction as jest.Mock).mockResolvedValue([
+        mockTranslations,
+        mockCount,
+      ]);
 
       const result = await service.getTasks(projectId, userId, page, pageSize);
 
@@ -204,7 +204,10 @@ describe('WorkspaceService', () => {
       const projectId = 'test-project-id';
       const userId = 'test-user-id';
 
-      mockPrisma.user.findUnique.mockResolvedValue({ id: userId, role: 'TRANSLATOR' });
+      mockPrisma.user.findUnique.mockResolvedValue({
+        id: userId,
+        role: 'TRANSLATOR',
+      });
       (mockPrisma.$transaction as jest.Mock).mockResolvedValue([[], 0]);
 
       const result = await service.getTasks(projectId, userId, 1, 20);

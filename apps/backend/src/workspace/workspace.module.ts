@@ -6,6 +6,6 @@ import { PrismaModule } from '../prisma.module';
 @Module({
   imports: [PrismaModule],
   controllers: [WorkspaceController],
-  providers: [WorkspaceService]
+  providers: [WorkspaceService],
 })
 export class WorkspaceModule {}

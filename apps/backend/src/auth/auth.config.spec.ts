@@ -1,5 +1,4 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { JwtModule } from '@nestjs/jwt';
 import { AuthModule } from './auth.module';
 
 describe('AuthModule Configuration', () => {
@@ -42,11 +41,12 @@ describe('AuthModule Configuration', () => {
   it('should fail token verification when secrets mismatch', async () => {
     // This test documents the issue: if JWT_SECRET env var is not loaded
     // before AuthModule imports, token verification will fail
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
     const jwt = require('jsonwebtoken');
-    
+
     // Token signed with one secret
     const token = jwt.sign({ sub: 'test-user' }, 'secret-a');
-    
+
     // Verification with different secret should fail
     expect(() => {
       jwt.verify(token, 'secret-b');

@@ -63,9 +63,19 @@ describe('WorkspaceController', () => {
       mockWorkspaceService.getTasks.mockResolvedValue(mockTasks);
 
       const mockReq = { user: { userId } };
-      const result = await controller.getTasks(projectId, page, pageSize, mockReq as any);
+      const result = await controller.getTasks(
+        projectId,
+        page,
+        pageSize,
+        mockReq as any,
+      );
 
-      expect(service.getTasks).toHaveBeenCalledWith(projectId, userId, page, pageSize);
+      expect(service.getTasks).toHaveBeenCalledWith(
+        projectId,
+        userId,
+        page,
+        pageSize,
+      );
       expect(result).toEqual(mockTasks);
     });
   });

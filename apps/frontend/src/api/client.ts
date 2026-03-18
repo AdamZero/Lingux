@@ -31,7 +31,10 @@ apiClient.interceptors.response.use(
         return res.data;
       }
       message.error(res.message || "请求失败");
-      const error = new Error(res.message || "请求失败") as Error & { code?: number; response?: any };
+      const error = new Error(res.message || "请求失败") as Error & {
+        code?: number;
+        response?: unknown;
+      };
       error.code = res.code;
       error.response = res;
       return Promise.reject(error);

@@ -5,7 +5,7 @@
 **版本**: v1.0\
 **最后更新**: 2026-03-17
 
-***
+---
 
 ## 1. 状态机设计
 
@@ -46,13 +46,13 @@
 
 ### 1.2 状态说明
 
-| 状态          | 说明       | 可执行操作        | 操作人      |
-| ----------- | -------- | ------------ | -------- |
-| PENDING     | 待翻译或待修改  | 编辑、提交审核、机器翻译 | EDITOR   |
-| TRANSLATING | 机器翻译进行中  | 取消、等待完成      | SYSTEM   |
-| REVIEWING   | 等待审核     | 通过、退回        | REVIEWER |
-| APPROVED    | 审核通过，待发布 | 发布、重新编辑      | ADMIN    |
-| PUBLISHED   | 已发布      | 重新编辑（创建新版本）  | EDITOR   |
+| 状态        | 说明             | 可执行操作               | 操作人   |
+| ----------- | ---------------- | ------------------------ | -------- |
+| PENDING     | 待翻译或待修改   | 编辑、提交审核、机器翻译 | EDITOR   |
+| TRANSLATING | 机器翻译进行中   | 取消、等待完成           | SYSTEM   |
+| REVIEWING   | 等待审核         | 通过、退回               | REVIEWER |
+| APPROVED    | 审核通过，待发布 | 发布、重新编辑           | ADMIN    |
+| PUBLISHED   | 已发布           | 重新编辑（创建新版本）   | EDITOR   |
 
 ### 1.3 状态流转规则
 
@@ -127,7 +127,7 @@
 - 创建新的翻译版本
 - 需要重新走审核流程
 
-***
+---
 
 ## 2. 翻译编辑
 
@@ -220,7 +220,7 @@
 └─────────────────────────────────────────────────────────────────┘
 ```
 
-***
+---
 
 ## 3. 审核流程
 
@@ -253,15 +253,18 @@
 #### 负载均衡算法
 
 ```typescript
-function assignReviewer(candidates: User[], pendingCounts: Map<string, number>): User {
+function assignReviewer(
+  candidates: User[],
+  pendingCounts: Map<string, number>,
+): User {
   // 1. 过滤在线且未满负荷的审核人
-  const available = candidates.filter(u => 
-    u.isOnline && pendingCounts.get(u.id) < u.maxWorkload
+  const available = candidates.filter(
+    (u) => u.isOnline && pendingCounts.get(u.id) < u.maxWorkload,
   );
-  
+
   // 2. 按当前待审任务数升序排序
   available.sort((a, b) => pendingCounts.get(a.id) - pendingCounts.get(b.id));
-  
+
   // 3. 返回任务数最少的审核人
   return available[0];
 }
@@ -274,13 +277,13 @@ function assignReviewer(candidates: User[], pendingCounts: Map<string, number>):
 
 #### 通知渠道
 
-| 渠道   | 触发条件    | 延迟    | 内容     |
-| ---- | ------- | ----- | ------ |
-| 站内消息 | 实时      | 0s    | 待审任务提醒 |
-| 企业微信 | 5分钟未处理  | 5min  | 卡片通知   |
-| 飞书   | 5分钟未处理  | 5min  | 卡片通知   |
-| 钉钉   | 5分钟未处理  | 5min  | 卡片通知   |
-| 邮件   | 30分钟未处理 | 30min | 邮件提醒   |
+| 渠道     | 触发条件     | 延迟  | 内容         |
+| -------- | ------------ | ----- | ------------ |
+| 站内消息 | 实时         | 0s    | 待审任务提醒 |
+| 企业微信 | 5分钟未处理  | 5min  | 卡片通知     |
+| 飞书     | 5分钟未处理  | 5min  | 卡片通知     |
+| 钉钉     | 5分钟未处理  | 5min  | 卡片通知     |
+| 邮件     | 30分钟未处理 | 30min | 邮件提醒     |
 
 #### 通知卡片内容
 
@@ -337,7 +340,7 @@ function assignReviewer(candidates: User[], pendingCounts: Map<string, number>):
 └─────────────────────────────────────────────────────────────────┘
 ```
 
-***
+---
 
 ## 4. 数据模型
 
@@ -358,15 +361,15 @@ model Translation {
   status         TranslationStatus @default(PENDING)
   isLlmTranslated Boolean           @default(false)
   reviewComment  String?           // 退回原因
-  
+
   keyId     String
   key       Key      @relation(fields: [keyId], references: [id])
   localeId  String
   locale    Locale   @relation(fields: [localeId], references: [id])
-  
+
   reviewerId String?
   reviewer   User?    @relation("Reviewer", fields: [reviewerId], references: [id])
-  
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -381,20 +384,20 @@ model ReviewTask {
   id              String   @id @default(cuid())
   translationId   String
   translation     Translation @relation(fields: [translationId], references: [id])
-  
+
   assigneeId      String?  // 分配的审核人
   assignee        User?    @relation(fields: [assigneeId], references: [id])
-  
+
   status          String   @default("pending") // pending, completed, expired
   assignedAt      DateTime @default(now())
   completedAt     DateTime?
-  
+
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 }
 ```
 
-***
+---
 
 ## 5. 接口定义
 
@@ -461,7 +464,7 @@ model ReviewTask {
 }
 ```
 
-***
+---
 
 ## 6. 验收标准
 
@@ -473,4 +476,3 @@ model ReviewTask {
 - [ ] 审核通知多渠道发送
 - [ ] 批量编辑功能
 - [ ] 审核工作台界面
-

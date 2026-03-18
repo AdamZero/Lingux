@@ -19,19 +19,26 @@ export const test = base.extend<Fixtures>({
       const loginResult = await apiClient.devLogin(email);
 
       await page.goto("/");
-      await page.evaluate(
-        (data) => {
-          localStorage.setItem("token", data.token);
-          localStorage.setItem("user", data.user);
-        },
-        {
+
+      // 使用 zustand persist 格式设置存储
+      const storageData = {
+        state: {
           token: loginResult.access_token,
-          user: JSON.stringify(loginResult.user),
+          user: loginResult.user,
+          theme: "light",
+          sidebarCollapsed: false,
+          _hasHydrated: true,
         },
-      );
+        version: 0,
+      };
+
+      await page.evaluate((data) => {
+        localStorage.setItem("lingux-app-storage", JSON.stringify(data));
+      }, storageData);
 
       await page.reload();
-      await page.waitForURL("/workspace");
+      // 等待页面加载完成
+      await page.waitForLoadState("networkidle");
     };
 
     await use(loginFunction);
@@ -40,8 +47,7 @@ export const test = base.extend<Fixtures>({
   logout: async ({ page }, use) => {
     const logoutFunction = async () => {
       await page.evaluate(() => {
-        localStorage.removeItem("token");
-        localStorage.removeItem("user");
+        localStorage.removeItem("lingux-app-storage");
       });
       await page.goto("/login");
     };

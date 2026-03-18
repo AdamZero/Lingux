@@ -3,7 +3,7 @@
 **模块编号**: 10-developer-experience  
 **模块名称**: 开发者体验（内容消费）  
 **版本**: v1.0  
-**最后更新**: 2026-03-17  
+**最后更新**: 2026-03-17
 
 ---
 
@@ -12,6 +12,7 @@
 ### 1.1 功能范围
 
 本模块负责将翻译内容交付给开发者使用，提供简单直接的消费方式：
+
 - JSON 文件下载
 - CDN 托管访问
 - Webhook 通知
@@ -19,6 +20,7 @@
 ### 1.2 设计理念
 
 **简单优先**：
+
 - 不需要复杂的 SDK
 - 不需要认证（CDN 链接）
 - 开发者只需一个 URL 或文件
@@ -39,6 +41,7 @@
 #### 详细规则
 
 1. **文件格式**
+
    ```json
    {
      "zh-CN": {
@@ -90,6 +93,7 @@
 #### 详细规则
 
 1. **CDN URL 格式**
+
    ```
    https://cdn.lingux.io/{projectSlug}/{version}/translations.json
    https://cdn.lingux.io/{projectSlug}/latest/translations.json
@@ -124,23 +128,25 @@
 #### 详细规则
 
 1. **Webhook 配置**
+
    ```typescript
    interface WebhookConfig {
      id: string;
      projectId: string;
-     url: string;              // 接收通知的 URL
-     secret: string;           // 签名密钥
-     events: WebhookEvent[];   // 订阅的事件
+     url: string; // 接收通知的 URL
+     secret: string; // 签名密钥
+     events: WebhookEvent[]; // 订阅的事件
      isActive: boolean;
    }
-   
+
    enum WebhookEvent {
-     RELEASE_PUBLISHED = 'release.published',
-     RELEASE_ROLLED_BACK = 'release.rolled_back'
+     RELEASE_PUBLISHED = "release.published",
+     RELEASE_ROLLED_BACK = "release.rolled_back",
    }
    ```
 
-2. **Webhook  Payload**
+2. **Webhook Payload**
+
    ```json
    {
      "event": "release.published",
@@ -159,6 +165,7 @@
    ```
 
 3. **签名验证**
+
    ```
    X-Lingux-Signature: sha256={hmac_sha256(payload, secret)}
    ```
@@ -180,18 +187,18 @@
 
 ```javascript
 // React 项目
-import { useEffect, useState } from 'react';
+import { useEffect, useState } from "react";
 
 function useTranslations() {
   const [translations, setTranslations] = useState(null);
-  
+
   useEffect(() => {
     // 使用固定版本，确保稳定性
-    fetch('https://cdn.lingux.io/my-project/v12/translations.json')
-      .then(res => res.json())
-      .then(data => setTranslations(data));
+    fetch("https://cdn.lingux.io/my-project/v12/translations.json")
+      .then((res) => res.json())
+      .then((data) => setTranslations(data));
   }, []);
-  
+
   return translations;
 }
 ```
@@ -201,7 +208,7 @@ function useTranslations() {
 ```javascript
 // Next.js 项目
 // 构建时下载翻译文件
-const translations = require('./translations.json');
+const translations = require("./translations.json");
 
 // 或使用环境变量指定版本
 const CDN_URL = process.env.TRANSLATIONS_CDN_URL;
@@ -211,17 +218,17 @@ const CDN_URL = process.env.TRANSLATIONS_CDN_URL;
 
 ```javascript
 // 服务端接收 Webhook
-app.post('/webhook/lingux', (req, res) => {
+app.post("/webhook/lingux", (req, res) => {
   const { event, release } = req.body;
-  
-  if (event === 'release.published') {
+
+  if (event === "release.published") {
     // 1. 下载新版本的翻译文件
-    download(release.cdnUrl, './translations.json');
-    
+    download(release.cdnUrl, "./translations.json");
+
     // 2. 触发重新部署
     triggerRedeploy();
   }
-  
+
   res.sendStatus(200);
 });
 ```
@@ -235,17 +242,17 @@ model Webhook {
   id        String   @id @default(cuid())
   projectId String
   project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  
+
   url       String
   secret    String
   events    String[] // ['release.published', 'release.rolled_back']
   isActive  Boolean  @default(true)
-  
+
   // 统计
   lastTriggeredAt DateTime?
   lastStatus      String?   // success, failed
   failCount       Int       @default(0)
-  
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
   createdBy String
@@ -255,12 +262,12 @@ model WebhookDelivery {
   id        String   @id @default(cuid())
   webhookId String
   webhook   Webhook  @relation(fields: [webhookId], references: [id], onDelete: Cascade)
-  
+
   event     String
   payload   Json
   responseStatus Int?
   responseBody   String?
-  
+
   createdAt DateTime @default(now())
 }
 ```
@@ -276,6 +283,7 @@ model WebhookDelivery {
 **功能**: 下载翻译文件  
 **权限**: 项目成员  
 **查询参数**:
+
 - `version`: 指定版本，默认最新
 - `format`: 格式（json/yaml），默认 json
 - `namespaces`: 指定命名空间，逗号分隔
@@ -294,6 +302,7 @@ model WebhookDelivery {
 **功能**: 创建 Webhook  
 **权限**: ADMIN  
 **请求体**:
+
 ```json
 {
   "url": "https://example.com/webhook",

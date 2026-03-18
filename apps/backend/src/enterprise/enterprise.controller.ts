@@ -2,6 +2,7 @@ import { Controller, Get, UseGuards, Req } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
 import { EnterpriseService } from './enterprise.service';
 import type { Request } from 'express';
+import '../auth/types/auth.types'; // 引入类型扩展
 
 @Controller('api/enterprises')
 export class EnterpriseController {
@@ -13,7 +14,7 @@ export class EnterpriseController {
   @Get('me')
   @UseGuards(AuthGuard('jwt'))
   async getUserEnterprises(@Req() req: Request) {
-    const userId = (req.user as any)['sub'];
+    const userId = req.user!.id;
     return this.enterpriseService.getUserEnterprises(userId);
   }
 
