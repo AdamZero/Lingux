@@ -2,7 +2,7 @@ import { reactConfig } from "eslint-config-custom";
 import reactRefresh from "eslint-plugin-react-refresh";
 
 export default [
-  { ignores: ["dist", "node_modules", "coverage"] },
+  { ignores: ["dist", "node_modules", "coverage", "e2e"] },
   ...reactConfig,
   {
     plugins: {

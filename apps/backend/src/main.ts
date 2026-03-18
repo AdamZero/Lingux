@@ -1,14 +1,13 @@
+// 在加载其他模块之前先加载环境变量
+import * as dotenv from 'dotenv';
+dotenv.config();
+
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
 import { ValidationPipe } from '@nestjs/common';
-import * as dotenv from 'dotenv';
-import * as path from 'path';
 import { TransformInterceptor } from './common/interceptors/transform.interceptor';
 
 async function bootstrap() {
-  const envPath = path.join(__dirname, '../../.env');
-  dotenv.config({ path: envPath });
-
   const app = await NestFactory.create(AppModule);
 
   app.enableCors();

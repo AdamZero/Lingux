@@ -49,10 +49,9 @@ export const useWorkspaceTasks = (params: UseWorkspaceTasksParams) => {
   return useQuery<TasksResponse>({
     queryKey: ["workspace", "tasks", projectId, status, limit],
     queryFn: async () => {
-      const response = await apiClient.get("/workspace/tasks", {
+      return await apiClient.get("/workspace/tasks", {
         params: { projectId, status, limit },
       });
-      return response.data;
     },
     enabled: !!projectId,
     placeholderData: {

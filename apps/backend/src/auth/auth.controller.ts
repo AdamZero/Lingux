@@ -86,7 +86,7 @@ export class AuthController {
       this.logger.log('Login result:', loginResult);
 
       // Redirect to frontend with token (using hash fragment for better security)
-      const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
+      const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:8080';
       res.redirect(
         `${frontendUrl}/login#token=${loginResult.access_token}&user=${JSON.stringify(loginResult.user)}`,
       );
@@ -112,7 +112,7 @@ export class AuthController {
     const loginResult = await this.authService.login(user);
 
     // Redirect to frontend with token (using hash fragment for better security)
-    const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
+    const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:8080';
     res.redirect(
       `${frontendUrl}/login#token=${loginResult.access_token}&user=${JSON.stringify(loginResult.user)}`,
     );
@@ -134,7 +134,7 @@ export class AuthController {
     const loginResult = await this.authService.login(user);
 
     // Redirect to frontend with token (using hash fragment for better security)
-    const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
+    const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:8080';
     res.redirect(
       `${frontendUrl}/login#token=${loginResult.access_token}&user=${JSON.stringify(loginResult.user)}`,
     );
@@ -181,7 +181,7 @@ export class AuthController {
 
       // Redirect to frontend with token
       // Support multiple possible frontend URLs
-      const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5175';
+      const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:8080';
       res.redirect(
         `${frontendUrl}/login#token=${loginResult.access_token}&user=${JSON.stringify(loginResult.user)}`,
       );

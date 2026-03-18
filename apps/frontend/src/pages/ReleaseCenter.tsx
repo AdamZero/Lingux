@@ -9,7 +9,6 @@ import {
   Form,
   Input,
   Select,
-  DatePicker,
   App as AntdApp,
   Tooltip,
   Typography,
@@ -28,6 +27,7 @@ import {
   SyncOutlined,
 } from "@ant-design/icons";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import dayjs from "dayjs";
 import apiClient from "@/api/client";
 import { PageHeader } from "@/components/common/PageHeader";
 import { EmptyState } from "@/components/common/EmptyState";
@@ -35,7 +35,6 @@ import { usePermission } from "@/hooks/usePermission";
 
 const { Text } = Typography;
 const { Option } = Select;
-const { RangePicker } = DatePicker;
 
 type ReleaseStatus =
   | "DRAFT"
@@ -90,6 +89,8 @@ const ReleaseCenter: React.FC = () => {
 
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [statusFilter, setStatusFilter] = useState<ReleaseStatus | null>(null);
+  const [selectedRelease, setSelectedRelease] = useState<Release | null>(null);
+  const [isDetailDrawerOpen, setIsDetailDrawerOpen] = useState(false);
 
   const [createForm] = Form.useForm();
 

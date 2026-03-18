@@ -20,3 +20,4 @@ pnpm-debug.log*
 /apps/backend/prisma/dev.db
 /apps/backend/prisma/dev.db-journal
 screenshots
+test-results

@@ -1,14 +1,18 @@
 import React from "react";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { ConfigProvider, App as AntdApp, theme as antdTheme } from "antd";
+import { ConfigProvider, App as AntdApp, theme as antdTheme, Spin } from "antd";
 import MainLayout from "@/layout/MainLayout";
 import ProjectPage from "@/pages/ProjectPage";
 import KeysPage from "@/pages/KeysPage";
 import LoginPage from "@/pages/LoginPage";
 import DashboardPage from "@/pages/DashboardPage";
 import ReleaseCenter from "@/pages/ReleaseCenter";
-import { useAppStore, selectIsAuthenticated } from "@/store/useAppStore";
+import {
+  useAppStore,
+  selectIsAuthenticated,
+  selectHasHydrated,
+} from "@/store/useAppStore";
 import { usePermission } from "@/hooks/usePermission";
 
 const queryClient = new QueryClient({
@@ -24,6 +28,24 @@ const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({
   children,
 }) => {
   const isAuthenticated = useAppStore(selectIsAuthenticated);
+  const hasHydrated = useAppStore(selectHasHydrated);
+
+  // Wait for hydration to complete before making auth decisions
+  if (!hasHydrated) {
+    return (
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "center",
+          alignItems: "center",
+          height: "100vh",
+        }}
+      >
+        <Spin size="large" />
+      </div>
+    );
+  }
+
   if (!isAuthenticated) {
     return <Navigate to="/login" replace />;
   }

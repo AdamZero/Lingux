@@ -11,10 +11,9 @@ export const useWorkspaceStats = (projectId: string) => {
   return useQuery<WorkspaceStats>({
     queryKey: ["workspace", "stats", projectId],
     queryFn: async () => {
-      const response = await apiClient.get("/workspace/stats", {
+      return await apiClient.get("/workspace/stats", {
         params: { projectId },
       });
-      return response.data;
     },
     enabled: !!projectId,
     placeholderData: {
