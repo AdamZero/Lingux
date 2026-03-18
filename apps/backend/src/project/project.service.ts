@@ -6,6 +6,8 @@ import {
 import { CreateProjectDto } from './dto/create-project.dto';
 import { UpdateProjectDto } from './dto/update-project.dto';
 import { PrismaService } from '../prisma.service';
+import * as yaml from 'js-yaml';
+import { TranslationStatus } from '@prisma/client';
 
 @Injectable()
 export class ProjectService {
@@ -378,5 +380,204 @@ export class ProjectService {
         ? { before: last.createdAt.toISOString(), beforeId: last.id }
         : null,
     };
+  }
+
+  async previewImport(
+    projectId: string,
+    fileContent: string,
+    format: 'json' | 'yaml',
+  ) {
+    // Verify project exists
+    const project = await this.prisma.project.findUnique({
+      where: { id: projectId },
+      select: { id: true },
+    });
+    if (!project) {
+      throw new NotFoundException(`Project with ID ${projectId} not found`);
+    }
+
+    // Parse file content
+    let importData: Record<string, Record<string, Record<string, string>>>;
+    try {
+      if (format === 'yaml') {
+        importData = yaml.load(fileContent) as Record<
+          string,
+          Record<string, Record<string, string>>
+        >;
+      } else {
+        importData = JSON.parse(fileContent) as Record<
+          string,
+          Record<string, Record<string, string>>
+        >;
+      }
+    } catch (error) {
+      throw new BadRequestException(`Invalid ${format} file: ${error.message}`);
+    }
+
+    if (!importData || typeof importData !== 'object') {
+      throw new BadRequestException('Invalid import data format');
+    }
+
+    // Get existing namespaces
+    const existingNamespaces = await this.prisma.namespace.findMany({
+      where: { projectId },
+      select: { name: true },
+    });
+    const existingNamespaceNames = new Set(
+      existingNamespaces.map((n) => n.name),
+    );
+
+    // Build preview
+    const namespaces = Object.entries(importData).map(([name, keys]) => ({
+      name,
+      keyCount: Object.keys(keys).length,
+      exists: existingNamespaceNames.has(name),
+    }));
+
+    return {
+      namespaces,
+      totalNamespaces: namespaces.length,
+      totalKeys: namespaces.reduce((sum, ns) => sum + ns.keyCount, 0),
+    };
+  }
+
+  async importMultiple(
+    projectId: string,
+    fileContent: string,
+    format: 'json' | 'yaml',
+    mode: 'fillMissing' | 'overwrite',
+    selectedNamespaces?: string[],
+  ) {
+    // Verify project exists
+    const project = await this.prisma.project.findUnique({
+      where: { id: projectId },
+      select: { id: true },
+    });
+    if (!project) {
+      throw new NotFoundException(`Project with ID ${projectId} not found`);
+    }
+
+    // Parse file content
+    let importData: Record<string, Record<string, Record<string, string>>>;
+    try {
+      if (format === 'yaml') {
+        importData = yaml.load(fileContent) as Record<
+          string,
+          Record<string, Record<string, string>>
+        >;
+      } else {
+        importData = JSON.parse(fileContent) as Record<
+          string,
+          Record<string, Record<string, string>>
+        >;
+      }
+    } catch (error) {
+      throw new BadRequestException(`Invalid ${format} file: ${error.message}`);
+    }
+
+    if (!importData || typeof importData !== 'object') {
+      throw new BadRequestException('Invalid import data format');
+    }
+
+    // Filter namespaces if specified
+    let namespacesToImport = Object.entries(importData);
+    if (selectedNamespaces && selectedNamespaces.length > 0) {
+      namespacesToImport = namespacesToImport.filter(([name]) =>
+        selectedNamespaces.includes(name),
+      );
+    }
+
+    const result = {
+      createdNamespaces: 0,
+      updatedNamespaces: 0,
+      createdKeys: 0,
+      updatedKeys: 0,
+      skippedKeys: 0,
+    };
+
+    await this.prisma.$transaction(async (tx) => {
+      for (const [namespaceName, keys] of namespacesToImport) {
+        // Find or create namespace
+        let namespace = await tx.namespace.findUnique({
+          where: {
+            projectId_name: { projectId, name: namespaceName },
+          },
+        });
+
+        if (!namespace) {
+          namespace = await tx.namespace.create({
+            data: {
+              name: namespaceName,
+              projectId,
+            },
+          });
+          result.createdNamespaces++;
+        } else {
+          result.updatedNamespaces++;
+        }
+
+        // Process keys
+        for (const [keyName, translations] of Object.entries(keys)) {
+          let key = await tx.key.findFirst({
+            where: {
+              namespaceId: namespace.id,
+              name: keyName,
+            },
+          });
+
+          if (!key) {
+            key = await tx.key.create({
+              data: {
+                name: keyName,
+                namespaceId: namespace.id,
+                type: 'TEXT',
+              },
+            });
+            result.createdKeys++;
+          } else {
+            result.updatedKeys++;
+          }
+
+          // Process translations
+          for (const [localeCode, content] of Object.entries(translations)) {
+            const locale = await tx.locale.findUnique({
+              where: { code: localeCode },
+            });
+            if (!locale) continue;
+
+            const existingTranslation = await tx.translation.findUnique({
+              where: {
+                keyId_localeId: { keyId: key.id, localeId: locale.id },
+              },
+            });
+
+            if (!existingTranslation) {
+              await tx.translation.create({
+                data: {
+                  keyId: key.id,
+                  localeId: locale.id,
+                  content,
+                  status: TranslationStatus.PENDING,
+                },
+              });
+            } else if (mode === 'overwrite') {
+              await tx.translation.update({
+                where: {
+                  keyId_localeId: { keyId: key.id, localeId: locale.id },
+                },
+                data: {
+                  content,
+                  status: TranslationStatus.PENDING,
+                },
+              });
+            } else {
+              result.skippedKeys++;
+            }
+          }
+        }
+      }
+    });
+
+    return result;
   }
 }

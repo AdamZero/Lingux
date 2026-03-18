@@ -1,6 +1,19 @@
 import React from "react";
-import { Menu, Button, Empty, Typography, Skeleton } from "antd";
-import { PlusOutlined, FolderOutlined } from "@ant-design/icons";
+import {
+  Menu,
+  Button,
+  Empty,
+  Typography,
+  Skeleton,
+  Space,
+  Dropdown,
+} from "antd";
+import {
+  PlusOutlined,
+  FolderOutlined,
+  MoreOutlined,
+  DownloadOutlined,
+} from "@ant-design/icons";
 
 const { Text } = Typography;
 
@@ -16,6 +29,7 @@ interface NamespaceSidebarProps {
   isLoading: boolean;
   onSelect: (id: string) => void;
   onCreate: () => void;
+  onBatchExport?: () => void;
 }
 
 export const NamespaceSidebar: React.FC<NamespaceSidebarProps> = ({
@@ -24,6 +38,7 @@ export const NamespaceSidebar: React.FC<NamespaceSidebarProps> = ({
   isLoading,
   onSelect,
   onCreate,
+  onBatchExport,
 }) => {
   if (isLoading) {
     return (
@@ -32,6 +47,15 @@ export const NamespaceSidebar: React.FC<NamespaceSidebarProps> = ({
       </div>
     );
   }
+
+  const batchMenuItems = [
+    {
+      key: "export",
+      label: "批量导出",
+      icon: <DownloadOutlined />,
+      onClick: onBatchExport,
+    },
+  ];
 
   return (
     <div style={{ padding: "0 16px 16px 0" }}>
@@ -44,12 +68,19 @@ export const NamespaceSidebar: React.FC<NamespaceSidebarProps> = ({
         }}
       >
         <Text strong>命名空间</Text>
-        <Button
-          type="text"
-          size="small"
-          icon={<PlusOutlined />}
-          onClick={onCreate}
-        />
+        <Space>
+          {namespaces.length > 0 && onBatchExport && (
+            <Dropdown menu={{ items: batchMenuItems }} placement="bottomRight">
+              <Button type="text" size="small" icon={<MoreOutlined />} />
+            </Dropdown>
+          )}
+          <Button
+            type="text"
+            size="small"
+            icon={<PlusOutlined />}
+            onClick={onCreate}
+          />
+        </Space>
       </div>
 
       <Menu

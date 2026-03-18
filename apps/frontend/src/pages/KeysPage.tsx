@@ -11,6 +11,8 @@ import {
   Input,
   Select,
   App as AntdApp,
+  Checkbox,
+  List,
 } from "antd";
 import {
   PlusOutlined,
@@ -74,16 +76,13 @@ const KeysPage: React.FC = () => {
   );
   const [deletingKeyId, setDeletingKeyId] = useState<string | null>(null);
 
-  // Modals state
   const [isNamespaceModalOpen, setIsNamespaceModalOpen] = useState(false);
   const [isKeyModalOpen, setIsKeyModalOpen] = useState(false);
   const [isPublishOpen, setIsPublishOpen] = useState(false);
 
-  // Edit Translation Drawer State
   const [editingKey, setEditingKey] = useState<Key | null>(null);
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
 
-  // Import/Export State
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
   const [importFormat, setImportFormat] = useState<"json" | "yaml">("json");
   const [importMode, setImportMode] = useState<"fillMissing" | "overwrite">(
@@ -91,7 +90,24 @@ const KeysPage: React.FC = () => {
   );
   const [importFile, setImportFile] = useState<File | null>(null);
 
-  // Search and Filter State
+  const [isBatchExportModalOpen, setIsBatchExportModalOpen] = useState(false);
+  const [selectedExportIds, setSelectedExportIds] = useState<string[]>([]);
+  const [batchExportFormat, setBatchExportFormat] = useState<
+    "json" | "yaml" | "xlsx"
+  >("json");
+
+  const [isImportPreviewModalOpen, setIsImportPreviewModalOpen] =
+    useState(false);
+  const [importPreviewData, setImportPreviewData] = useState<{
+    namespaces: { name: string; keyCount: number; exists: boolean }[];
+    totalNamespaces: number;
+    totalKeys: number;
+  } | null>(null);
+  const [selectedImportNamespaces, setSelectedImportNamespaces] = useState<
+    string[]
+  >([]);
+  const [pendingImportFile, setPendingImportFile] = useState<File | null>(null);
+
   const [searchKeyword, setSearchKeyword] = useState("");
   const [statusFilter, setStatusFilter] = useState<TranslationStatus | null>(
     null,
@@ -104,7 +120,6 @@ const KeysPage: React.FC = () => {
   const isRecord = (value: unknown): value is Record<string, unknown> =>
     typeof value === "object" && value !== null;
 
-  // Fetch Project (for locales)
   const { data: project } = useQuery<Project>({
     queryKey: ["project", projectId],
     queryFn: async () => {
@@ -113,7 +128,6 @@ const KeysPage: React.FC = () => {
     enabled: !!projectId,
   });
 
-  // Fetch Namespaces
   const { data: namespaces = [], isLoading: isNamespacesLoading } = useQuery<
     Namespace[]
   >({
@@ -124,14 +138,12 @@ const KeysPage: React.FC = () => {
     enabled: !!projectId,
   });
 
-  // Auto-select first namespace
   useEffect(() => {
     if (!selectedNamespaceId && namespaces.length > 0) {
       setSelectedNamespaceId(namespaces[0].id);
     }
   }, [namespaces, selectedNamespaceId]);
 
-  // Fetch Keys
   const { data: keys = [], isLoading: isKeysLoading } = useQuery<Key[]>({
     queryKey: [
       "keys",
@@ -156,7 +168,6 @@ const KeysPage: React.FC = () => {
     enabled: !!projectId && !!selectedNamespaceId,
   });
 
-  // Mutations
   const createNamespaceMutation = useMutation({
     mutationFn: (values: { name: string; description?: string }) =>
       apiClient.post(`/projects/${projectId}/namespaces`, values),
@@ -251,13 +262,6 @@ const KeysPage: React.FC = () => {
     },
   });
 
-  const fetchKeyById = async (keyId: string) => {
-    return (await apiClient.get(
-      `/projects/${projectId}/namespaces/${selectedNamespaceId}/keys/${keyId}`,
-    )) as Key;
-  };
-
-  // Save Translations
   const saveTranslationsMutation = useMutation({
     mutationFn: (values: Record<string, string>) => {
       const promises = Object.entries(values).map(([localeCode, content]) =>
@@ -284,82 +288,6 @@ const KeysPage: React.FC = () => {
     },
   });
 
-  const handleSubmitReview = async (keyId: string, localeCode: string) => {
-    try {
-      await apiClient.post(
-        `/projects/${projectId}/namespaces/${selectedNamespaceId}/keys/${keyId}/translations/${localeCode}/submit-review`,
-      );
-      message.success("已提交审核");
-      queryClient.invalidateQueries({
-        queryKey: ["keys", projectId, selectedNamespaceId],
-      });
-      if (editingKey?.id === keyId) {
-        const updatedKey = await fetchKeyById(keyId);
-        setEditingKey(updatedKey);
-      }
-    } catch {
-      message.error("提交失败");
-    }
-  };
-
-  const handleApprove = async (keyId: string, localeCode: string) => {
-    try {
-      await apiClient.post(
-        `/projects/${projectId}/namespaces/${selectedNamespaceId}/keys/${keyId}/translations/${localeCode}/approve`,
-      );
-      message.success("已通过");
-      queryClient.invalidateQueries({
-        queryKey: ["keys", projectId, selectedNamespaceId],
-      });
-      if (editingKey?.id === keyId) {
-        const updatedKey = await fetchKeyById(keyId);
-        setEditingKey(updatedKey);
-      }
-    } catch {
-      message.error("操作失败");
-    }
-  };
-
-  const handleReject = async (keyId: string, localeCode: string) => {
-    const reason = prompt("请输入驳回原因:");
-    if (!reason) return;
-
-    try {
-      await apiClient.post(
-        `/projects/${projectId}/namespaces/${selectedNamespaceId}/keys/${keyId}/translations/${localeCode}/reject`,
-        { reason },
-      );
-      message.success("已驳回");
-      queryClient.invalidateQueries({
-        queryKey: ["keys", projectId, selectedNamespaceId],
-      });
-      if (editingKey?.id === keyId) {
-        const updatedKey = await fetchKeyById(keyId);
-        setEditingKey(updatedKey);
-      }
-    } catch {
-      message.error("操作失败");
-    }
-  };
-
-  const handlePublish = async (keyId: string, localeCode: string) => {
-    try {
-      await apiClient.post(
-        `/projects/${projectId}/namespaces/${selectedNamespaceId}/keys/${keyId}/translations/${localeCode}/publish`,
-      );
-      message.success("已发布");
-      queryClient.invalidateQueries({
-        queryKey: ["keys", projectId, selectedNamespaceId],
-      });
-      if (editingKey?.id === keyId) {
-        const updatedKey = await fetchKeyById(keyId);
-        setEditingKey(updatedKey);
-      }
-    } catch {
-      message.error("发布失败");
-    }
-  };
-
   const handleExport = async () => {
     try {
       const response = await apiClient.get(
@@ -383,6 +311,83 @@ const KeysPage: React.FC = () => {
     } catch {
       message.error("导出失败");
     }
+  };
+
+  const handleBatchExport = async () => {
+    if (selectedExportIds.length === 0) {
+      message.error("请至少选择一个命名空间");
+      return;
+    }
+
+    try {
+      // For Excel format, request as blob
+      if (batchExportFormat === "xlsx") {
+        const response = await apiClient.get(
+          `/projects/${projectId}/namespaces/export`,
+          {
+            params: {
+              namespaceIds: selectedExportIds.join(","),
+              format: batchExportFormat,
+            },
+            responseType: "blob",
+          },
+        );
+
+        const blob = new Blob([response], {
+          type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = `translations-${new Date().toISOString().slice(0, 19).replace(/:/g, "")}.xlsx`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+
+        message.success("批量导出成功");
+        setIsBatchExportModalOpen(false);
+        setSelectedExportIds([]);
+        return;
+      }
+
+      const response = await apiClient.get(
+        `/projects/${projectId}/namespaces/export`,
+        {
+          params: {
+            namespaceIds: selectedExportIds.join(","),
+            format: batchExportFormat,
+          },
+        },
+      );
+
+      const blob = new Blob([response.content], {
+        type:
+          batchExportFormat === "json"
+            ? "application/json"
+            : "application/yaml",
+      });
+
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = response.fileName;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+
+      message.success("批量导出成功");
+      setIsBatchExportModalOpen(false);
+      setSelectedExportIds([]);
+    } catch {
+      message.error("批量导出失败");
+    }
+  };
+
+  const openBatchExportModal = () => {
+    setSelectedExportIds(namespaces.map((n) => n.id));
+    setIsBatchExportModalOpen(true);
   };
 
   const handleImport = async () => {
@@ -421,15 +426,107 @@ const KeysPage: React.FC = () => {
     }
   };
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
-      setImportFile(e.target.files[0]);
+      const file = e.target.files[0];
+      setImportFile(file);
+
+      // Detect format from file extension
+      const fileName = file.name.toLowerCase();
+      let detectedFormat: "json" | "yaml" = "json";
+      if (fileName.endsWith(".yaml") || fileName.endsWith(".yml")) {
+        detectedFormat = "yaml";
+      }
+      setImportFormat(detectedFormat);
+
+      // Preview import for multi-namespace detection
+      try {
+        const formData = new FormData();
+        formData.append("file", file);
+        formData.append("format", detectedFormat);
+
+        const preview = await apiClient.post(
+          `/projects/${projectId}/import-preview`,
+          formData,
+          {
+            headers: {
+              "Content-Type": "multipart/form-data",
+            },
+          },
+        );
+
+        // If multiple namespaces detected, show preview modal
+        if (preview.namespaces.length > 1) {
+          setImportPreviewData(preview);
+          setSelectedImportNamespaces(
+            preview.namespaces.map((n: { name: string }) => n.name),
+          );
+          setPendingImportFile(file);
+          setIsImportPreviewModalOpen(true);
+        }
+      } catch {
+        // Preview failed, continue with normal import flow
+      }
+    }
+  };
+
+  const handleMultiNamespaceImport = async () => {
+    if (!pendingImportFile || selectedImportNamespaces.length === 0) {
+      message.error("请选择要导入的命名空间");
+      return;
+    }
+
+    try {
+      const formData = new FormData();
+      formData.append("file", pendingImportFile);
+      formData.append("format", importFormat);
+      formData.append("mode", importMode);
+      formData.append("namespaceNames", selectedImportNamespaces.join(","));
+
+      const response = await apiClient.post(
+        `/projects/${projectId}/import`,
+        formData,
+        {
+          headers: {
+            "Content-Type": "multipart/form-data",
+          },
+        },
+      );
+
+      message.success(
+        `导入成功: ${response.createdNamespaces} 个命名空间新建, ${response.createdKeys} 个词条新建`,
+      );
+      setIsImportPreviewModalOpen(false);
+      setIsImportModalOpen(false);
+      setPendingImportFile(null);
+      setImportPreviewData(null);
+      setSelectedImportNamespaces([]);
+      setImportFile(null);
+      importForm.resetFields();
+      queryClient.invalidateQueries({
+        queryKey: ["namespaces", projectId],
+      });
+      queryClient.invalidateQueries({
+        queryKey: ["keys", projectId],
+      });
+    } catch {
+      message.error("导入失败");
     }
   };
 
   const openEditDrawer = (key: Key) => {
     setEditingKey(key);
     setIsDrawerOpen(true);
+  };
+
+  const handleEditKeyByName = (keyName: string) => {
+    // 在所有命名空间中查找 key
+    const foundKey = keys.find((k) => k.name === keyName);
+    if (foundKey) {
+      openEditDrawer(foundKey);
+    } else {
+      message.error(`未找到词条: ${keyName}`);
+    }
   };
 
   const handleDeleteKey = async (key: Key) => {
@@ -444,8 +541,12 @@ const KeysPage: React.FC = () => {
   return (
     <Layout style={{ background: "transparent", height: "100%" }}>
       <Sider
-        width={250}
-        style={{ background: "transparent", borderRight: "1px solid #f0f0f0" }}
+        width={220}
+        style={{
+          background: "transparent",
+          borderRight: "1px solid var(--color-border)",
+          marginRight: 16,
+        }}
       >
         <NamespaceSidebar
           namespaces={namespaces}
@@ -453,16 +554,18 @@ const KeysPage: React.FC = () => {
           isLoading={isNamespacesLoading}
           onSelect={setSelectedNamespaceId}
           onCreate={() => setIsNamespaceModalOpen(true)}
+          onBatchExport={openBatchExportModal}
         />
       </Sider>
 
-      <Content style={{ padding: "0 24px", minHeight: 280 }}>
+      <Content style={{ padding: 0, minHeight: 280 }}>
         <PageHeader
           title={selectedNamespace?.name || "词条管理"}
           description={selectedNamespace?.description}
           extra={
-            <Space>
+            <Space size="small">
               <Button
+                size="small"
                 icon={<UploadOutlined />}
                 disabled={!projectId || namespaces.length === 0}
                 onClick={() => setIsPublishOpen(true)}
@@ -470,6 +573,7 @@ const KeysPage: React.FC = () => {
                 发布
               </Button>
               <Button
+                size="small"
                 icon={<DownloadOutlined />}
                 disabled={!selectedNamespaceId}
                 onClick={handleExport}
@@ -477,6 +581,7 @@ const KeysPage: React.FC = () => {
                 导出
               </Button>
               <Button
+                size="small"
                 icon={<InboxOutlined />}
                 disabled={!selectedNamespaceId}
                 onClick={() => setIsImportModalOpen(true)}
@@ -485,6 +590,7 @@ const KeysPage: React.FC = () => {
               </Button>
               <Button
                 type="primary"
+                size="small"
                 icon={<PlusOutlined />}
                 disabled={!selectedNamespaceId}
                 onClick={() => setIsKeyModalOpen(true)}
@@ -517,7 +623,6 @@ const KeysPage: React.FC = () => {
         )}
       </Content>
 
-      {/* Translation Drawer */}
       <TranslationDrawer
         open={isDrawerOpen}
         editingKey={editingKey}
@@ -528,13 +633,8 @@ const KeysPage: React.FC = () => {
           setEditingKey(null);
         }}
         onSave={(values) => saveTranslationsMutation.mutate(values)}
-        onSubmitReview={handleSubmitReview}
-        onApprove={handleApprove}
-        onReject={handleReject}
-        onPublish={handlePublish}
       />
 
-      {/* Create Namespace Modal */}
       <Modal
         title="创建命名空间"
         open={isNamespaceModalOpen}
@@ -562,7 +662,6 @@ const KeysPage: React.FC = () => {
         </Form>
       </Modal>
 
-      {/* Create Key Modal */}
       <Modal
         title="新建词条"
         open={isKeyModalOpen}
@@ -603,7 +702,6 @@ const KeysPage: React.FC = () => {
         </Form>
       </Modal>
 
-      {/* Import Modal */}
       <Modal
         title="导入翻译"
         open={isImportModalOpen}
@@ -660,8 +758,158 @@ const KeysPage: React.FC = () => {
               ? `命名空间: ${selectedNamespace?.name ?? selectedNamespaceId}`
               : "全部"
           }
+          onEditKey={handleEditKeyByName}
         />
       ) : null}
+
+      <Modal
+        title="批量导出"
+        open={isBatchExportModalOpen}
+        onOk={handleBatchExport}
+        onCancel={() => {
+          setIsBatchExportModalOpen(false);
+          setSelectedExportIds([]);
+        }}
+        okText="导出"
+        cancelText="取消"
+        okButtonProps={{ disabled: selectedExportIds.length === 0 }}
+      >
+        <div style={{ marginBottom: 16 }}>
+          <div style={{ marginBottom: 8 }}>
+            <Checkbox
+              checked={selectedExportIds.length === namespaces.length}
+              indeterminate={
+                selectedExportIds.length > 0 &&
+                selectedExportIds.length < namespaces.length
+              }
+              onChange={(e) => {
+                if (e.target.checked) {
+                  setSelectedExportIds(namespaces.map((n) => n.id));
+                } else {
+                  setSelectedExportIds([]);
+                }
+              }}
+            >
+              全选
+            </Checkbox>
+          </div>
+          <List
+            size="small"
+            bordered
+            dataSource={namespaces}
+            renderItem={(ns) => (
+              <List.Item>
+                <Checkbox
+                  checked={selectedExportIds.includes(ns.id)}
+                  onChange={(e) => {
+                    if (e.target.checked) {
+                      setSelectedExportIds([...selectedExportIds, ns.id]);
+                    } else {
+                      setSelectedExportIds(
+                        selectedExportIds.filter((id) => id !== ns.id),
+                      );
+                    }
+                  }}
+                >
+                  {ns.name}
+                </Checkbox>
+              </List.Item>
+            )}
+            style={{ maxHeight: 300, overflow: "auto" }}
+          />
+        </div>
+        <div>
+          <span>导出格式: </span>
+          <Select
+            value={batchExportFormat}
+            onChange={(value) => setBatchExportFormat(value)}
+            style={{ width: 120 }}
+          >
+            <Option value="json">JSON</Option>
+            <Option value="yaml">YAML</Option>
+            <Option value="xlsx">Excel</Option>
+          </Select>
+        </div>
+      </Modal>
+
+      <Modal
+        title="导入预览"
+        open={isImportPreviewModalOpen}
+        onOk={handleMultiNamespaceImport}
+        onCancel={() => {
+          setIsImportPreviewModalOpen(false);
+          setImportPreviewData(null);
+          setSelectedImportNamespaces([]);
+          setPendingImportFile(null);
+        }}
+        okText="导入"
+        cancelText="取消"
+        okButtonProps={{ disabled: selectedImportNamespaces.length === 0 }}
+      >
+        {importPreviewData && (
+          <div>
+            <div style={{ marginBottom: 16 }}>
+              <div>
+                共 {importPreviewData.totalNamespaces} 个命名空间,{" "}
+                {importPreviewData.totalKeys} 个词条
+              </div>
+            </div>
+            <div style={{ marginBottom: 8 }}>
+              <Checkbox
+                checked={
+                  selectedImportNamespaces.length ===
+                  importPreviewData.namespaces.length
+                }
+                indeterminate={
+                  selectedImportNamespaces.length > 0 &&
+                  selectedImportNamespaces.length <
+                    importPreviewData.namespaces.length
+                }
+                onChange={(e) => {
+                  if (e.target.checked) {
+                    setSelectedImportNamespaces(
+                      importPreviewData.namespaces.map((n) => n.name),
+                    );
+                  } else {
+                    setSelectedImportNamespaces([]);
+                  }
+                }}
+              >
+                全选
+              </Checkbox>
+            </div>
+            <List
+              size="small"
+              bordered
+              dataSource={importPreviewData.namespaces}
+              renderItem={(ns) => (
+                <List.Item>
+                  <Checkbox
+                    checked={selectedImportNamespaces.includes(ns.name)}
+                    onChange={(e) => {
+                      if (e.target.checked) {
+                        setSelectedImportNamespaces([
+                          ...selectedImportNamespaces,
+                          ns.name,
+                        ]);
+                      } else {
+                        setSelectedImportNamespaces(
+                          selectedImportNamespaces.filter(
+                            (name) => name !== ns.name,
+                          ),
+                        );
+                      }
+                    }}
+                  >
+                    {ns.name} ({ns.keyCount} keys)
+                  </Checkbox>
+                </List.Item>
+              )}
+              style={{ maxHeight: 300, overflow: "auto" }}
+            />
+          </div>
+        )}
+      </Modal>
     </Layout>
   );
 };

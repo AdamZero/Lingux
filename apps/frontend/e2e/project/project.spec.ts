@@ -28,7 +28,11 @@ test.describe("Project Management Module", () => {
     await page.getByLabel(/project name/i).fill(projectData.name);
     await page.getByLabel(/description/i).fill(projectData.description);
 
-    await page.getByRole("button", { name: /ok|confirm|create/i }).click();
+    // 在模态框中点击 OK 按钮
+    await page
+      .getByRole("dialog")
+      .getByRole("button", { name: /^OK$/i })
+      .click();
 
     await expect(page.getByText(projectData.name)).toBeVisible();
   });
@@ -38,9 +42,13 @@ test.describe("Project Management Module", () => {
 
     await page.getByLabel(/project name/i).fill("");
 
-    await page.getByRole("button", { name: /ok|confirm|create/i }).click();
+    // 在模态框中点击 OK 按钮
+    await page
+      .getByRole("dialog")
+      .getByRole("button", { name: /^OK$/i })
+      .click();
 
-    const errorMessage = page.getByText(/required|必填/i);
+    const errorMessage = page.getByText(/required|必填|请输入/i);
     await expect(errorMessage).toBeVisible();
   });
 
@@ -85,7 +93,11 @@ test.describe("Project Management Module", () => {
 
     await page.getByRole("button", { name: /create project/i }).click();
     await page.getByLabel(/project name/i).fill(projectData.name);
-    await page.getByRole("button", { name: /ok|confirm|create/i }).click();
+    // 在模态框中点击 OK 按钮
+    await page
+      .getByRole("dialog")
+      .getByRole("button", { name: /^OK$/i })
+      .click();
 
     await expect(page.getByText(projectData.name)).toBeVisible({
       timeout: 5000,

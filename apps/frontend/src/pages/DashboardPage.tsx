@@ -36,7 +36,6 @@ const DashboardPage: React.FC = () => {
   const { features } = usePermission();
   const [importModalOpen, setImportModalOpen] = useState(false);
 
-  // TODO: 从上下文或路由获取当前项目ID
   const currentProjectId = "temp-project-id";
 
   const { data: stats, isLoading: statsLoading } =
@@ -92,51 +91,60 @@ const DashboardPage: React.FC = () => {
       />
 
       {/* 统计卡片 */}
-      <Row gutter={16} style={{ marginBottom: 24 }}>
+      <Row gutter={[12, 12]} style={{ marginBottom: 16 }}>
         <Col xs={24} sm={8}>
           <Card
+            size="small"
             hoverable
             onClick={() => navigate("/translations?status=PENDING")}
+            bodyStyle={{ padding: 16 }}
           >
             {statsLoading ? (
               <Skeleton active paragraph={{ rows: 1 }} />
             ) : (
               <Statistic
-                title="待翻译"
+                title={<Text style={{ fontSize: 13 }}>待翻译</Text>}
                 value={stats?.pending || 0}
-                prefix={<ClockCircleOutlined />}
-                valueStyle={{ color: "#cf1322" }}
-              />
-            )}
-          </Card>
-        </Col>
-        <Col xs={24} sm={8}>
-          <Card hoverable onClick={() => navigate("/reviews")}>
-            {statsLoading ? (
-              <Skeleton active paragraph={{ rows: 1 }} />
-            ) : (
-              <Statistic
-                title="审核中"
-                value={stats?.reviewing || 0}
-                prefix={<FileTextOutlined />}
-                valueStyle={{ color: "#faad14" }}
+                prefix={<ClockCircleOutlined style={{ fontSize: 16 }} />}
+                valueStyle={{ color: "#cf1322", fontSize: 24 }}
               />
             )}
           </Card>
         </Col>
         <Col xs={24} sm={8}>
           <Card
+            size="small"
             hoverable
-            onClick={() => navigate("/translations?status=APPROVED")}
+            onClick={() => navigate("/reviews")}
+            bodyStyle={{ padding: 16 }}
           >
             {statsLoading ? (
               <Skeleton active paragraph={{ rows: 1 }} />
             ) : (
               <Statistic
-                title="本月已完成"
+                title={<Text style={{ fontSize: 13 }}>审核中</Text>}
+                value={stats?.reviewing || 0}
+                prefix={<FileTextOutlined style={{ fontSize: 16 }} />}
+                valueStyle={{ color: "#faad14", fontSize: 24 }}
+              />
+            )}
+          </Card>
+        </Col>
+        <Col xs={24} sm={8}>
+          <Card
+            size="small"
+            hoverable
+            onClick={() => navigate("/translations?status=APPROVED")}
+            bodyStyle={{ padding: 16 }}
+          >
+            {statsLoading ? (
+              <Skeleton active paragraph={{ rows: 1 }} />
+            ) : (
+              <Statistic
+                title={<Text style={{ fontSize: 13 }}>本月已完成</Text>}
                 value={stats?.approved || 0}
-                prefix={<CheckCircleOutlined />}
-                valueStyle={{ color: "#3f8600" }}
+                prefix={<CheckCircleOutlined style={{ fontSize: 16 }} />}
+                valueStyle={{ color: "#3f8600", fontSize: 24 }}
               />
             )}
           </Card>
@@ -144,26 +152,25 @@ const DashboardPage: React.FC = () => {
       </Row>
 
       {/* 快捷操作 */}
-      <Card title="快捷操作" style={{ marginBottom: 24 }}>
-        <Space size="middle">
+      <Card
+        size="small"
+        title="快捷操作"
+        style={{ marginBottom: 16 }}
+        bodyStyle={{ padding: 12 }}
+      >
+        <Space size="small">
           <Button
             type="primary"
             icon={<PlusOutlined />}
-            size="large"
             onClick={() => navigate("/translations")}
           >
             新建翻译
           </Button>
-          <Button
-            icon={<ImportOutlined />}
-            size="large"
-            onClick={handleImportClick}
-          >
+          <Button icon={<ImportOutlined />} onClick={handleImportClick}>
             导入词条
           </Button>
           <Button
             icon={<RocketOutlined />}
-            size="large"
             onClick={() => navigate("/releases")}
           >
             创建发布
@@ -173,18 +180,24 @@ const DashboardPage: React.FC = () => {
 
       {/* 我的待办 */}
       <Card
+        size="small"
         title="我的待办"
         extra={
-          <Button type="link" onClick={() => navigate("/translations")}>
+          <Button
+            type="link"
+            size="small"
+            onClick={() => navigate("/translations")}
+          >
             查看全部
           </Button>
         }
-        style={{ marginBottom: 24 }}
+        style={{ marginBottom: 16 }}
       >
         {tasksLoading ? (
           <Skeleton active paragraph={{ rows: 3 }} />
         ) : tasksData?.items && tasksData.items.length > 0 ? (
           <List
+            size="small"
             dataSource={tasksData.items}
             renderItem={(task) => (
               <List.Item
@@ -192,25 +205,34 @@ const DashboardPage: React.FC = () => {
                   <Button
                     key="action"
                     type="link"
+                    size="small"
                     onClick={() => handleTaskClick(task.id)}
                   >
                     去处理
                   </Button>,
                 ]}
+                style={{ padding: "8px 0" }}
               >
                 <List.Item.Meta
                   title={
-                    <Space>
-                      <Text strong>{task.title}</Text>
-                      <Tag color={getPriorityColor(task.priority)}>
-                        {getPriorityText(task.priority)}优先级
+                    <Space size={4}>
+                      <Text strong style={{ fontSize: 13 }}>
+                        {task.title}
+                      </Text>
+                      <Tag
+                        color={getPriorityColor(task.priority)}
+                        style={{ fontSize: 11, padding: "0 4px" }}
+                      >
+                        {getPriorityText(task.priority)}
                       </Tag>
                     </Space>
                   }
                   description={
                     <Space direction="vertical" size={0}>
-                      <Text type="secondary">{task.description}</Text>
                       <Text type="secondary" style={{ fontSize: 12 }}>
+                        {task.description}
+                      </Text>
+                      <Text type="secondary" style={{ fontSize: 11 }}>
                         {task.key.namespace} / {task.key.name}
                       </Text>
                     </Space>
@@ -224,8 +246,8 @@ const DashboardPage: React.FC = () => {
         )}
       </Card>
 
-      {/* 最近动态 - 预留 */}
-      <Card title="最近动态">
+      {/* 最近动态 */}
+      <Card size="small" title="最近动态">
         <EmptyState
           type="construction"
           title="功能开发中"

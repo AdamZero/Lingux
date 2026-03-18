@@ -117,5 +117,153 @@ describe('NamespaceService', () => {
     });
   });
 
-  // ... similar tests for update and remove
+  describe('exportMultiple', () => {
+    const projectId = 'proj-1';
+
+    it('should export namespaces as JSON', async () => {
+      const namespaceIds = ['ns-1'];
+      const mockNamespaces = [
+        {
+          id: 'ns-1',
+          name: 'common',
+          projectId,
+          keys: [
+            {
+              id: 'key-1',
+              name: 'hello',
+              translations: [
+                { locale: { code: 'zh-CN' }, content: '你好' },
+                { locale: { code: 'en' }, content: 'Hello' },
+              ],
+            },
+          ],
+        },
+      ];
+      prisma.namespace.findMany.mockResolvedValue(mockNamespaces);
+
+      const result = await service.exportMultiple(
+        projectId,
+        namespaceIds,
+        'json',
+      );
+
+      expect(typeof result).toBe('string');
+      const parsed = JSON.parse(result as string);
+      expect(parsed).toHaveProperty('common');
+      expect(parsed.common).toHaveProperty('hello');
+      expect(parsed.common.hello).toEqual({
+        'zh-CN': '你好',
+        en: 'Hello',
+      });
+    });
+
+    it('should export namespaces as YAML', async () => {
+      const namespaceIds = ['ns-1'];
+      const mockNamespaces = [
+        {
+          id: 'ns-1',
+          name: 'common',
+          projectId,
+          keys: [
+            {
+              id: 'key-1',
+              name: 'hello',
+              translations: [{ locale: { code: 'zh-CN' }, content: '你好' }],
+            },
+          ],
+        },
+      ];
+      prisma.namespace.findMany.mockResolvedValue(mockNamespaces);
+
+      const result = await service.exportMultiple(
+        projectId,
+        namespaceIds,
+        'yaml',
+      );
+
+      expect(typeof result).toBe('string');
+      expect(result).toContain('common:');
+      expect(result).toContain('hello:');
+      expect(result).toContain('zh-CN: 你好');
+    });
+
+    it('should export namespaces as Excel buffer', async () => {
+      const namespaceIds = ['ns-1'];
+      const mockNamespaces = [
+        {
+          id: 'ns-1',
+          name: 'common',
+          projectId,
+          keys: [
+            {
+              id: 'key-1',
+              name: 'hello',
+              translations: [
+                { locale: { code: 'zh-CN' }, content: '你好' },
+                { locale: { code: 'en' }, content: 'Hello' },
+              ],
+            },
+          ],
+        },
+      ];
+      prisma.namespace.findMany.mockResolvedValue(mockNamespaces);
+
+      const result = await service.exportMultiple(
+        projectId,
+        namespaceIds,
+        'xlsx',
+      );
+
+      expect(Buffer.isBuffer(result)).toBe(true);
+      expect((result as Buffer).length).toBeGreaterThan(0);
+    });
+
+    it('should throw NotFoundException if some namespaces not found', async () => {
+      const namespaceIds = ['ns-1', 'ns-2'];
+      prisma.namespace.findMany.mockResolvedValue([
+        { id: 'ns-1', name: 'common', projectId, keys: [] },
+      ]);
+
+      await expect(
+        service.exportMultiple(projectId, namespaceIds, 'json'),
+      ).rejects.toThrow(NotFoundException);
+    });
+
+    it('should handle empty namespaces', async () => {
+      prisma.namespace.findMany.mockResolvedValue([
+        {
+          id: 'ns-1',
+          name: 'common',
+          projectId,
+          keys: [],
+        },
+      ]);
+
+      const result = await service.exportMultiple(projectId, ['ns-1'], 'json');
+      const parsed = JSON.parse(result as string);
+      expect(parsed).toEqual({ common: {} });
+    });
+
+    it('should handle namespace with long name for Excel (truncate to 31 chars)', async () => {
+      const longName = 'a'.repeat(50);
+      const mockNamespaces = [
+        {
+          id: 'ns-1',
+          name: longName,
+          projectId,
+          keys: [
+            {
+              id: 'key-1',
+              name: 'hello',
+              translations: [{ locale: { code: 'zh-CN' }, content: '你好' }],
+            },
+          ],
+        },
+      ];
+      prisma.namespace.findMany.mockResolvedValue(mockNamespaces);
+
+      const result = await service.exportMultiple(projectId, ['ns-1'], 'xlsx');
+      expect(Buffer.isBuffer(result)).toBe(true);
+    });
+  });
 });

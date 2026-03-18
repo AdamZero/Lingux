@@ -25,6 +25,11 @@ apiClient.interceptors.request.use(
 
 apiClient.interceptors.response.use(
   (response) => {
+    // For blob responses, return directly without processing
+    if (response.config.responseType === "blob") {
+      return response.data;
+    }
+
     const res = response.data;
     if (res && typeof res === "object" && "code" in res) {
       if (res.code === 200 || res.code === 0) {

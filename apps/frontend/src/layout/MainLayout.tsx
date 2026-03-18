@@ -21,8 +21,8 @@ import apiClient from "@/api/client";
 const { Header, Sider, Content } = Layout;
 
 // 响应式断点
-const BREAKPOINT_MD = 768; // 平板/手机断点
-const BREAKPOINT_LG = 1024; // 小桌面断点
+const BREAKPOINT_MD = 768;
+const BREAKPOINT_LG = 1024;
 
 const MainLayout: React.FC = () => {
   const navigate = useNavigate();
@@ -37,17 +37,14 @@ const MainLayout: React.FC = () => {
   const { canReview, features } = usePermission();
   const [projectName, setProjectName] = useState("");
 
-  // 响应式状态
   const [isMobile, setIsMobile] = useState(false);
   const [mobileDrawerOpen, setMobileDrawerOpen] = useState(false);
 
-  // 监听窗口大小变化
   useEffect(() => {
     const handleResize = () => {
       const width = window.innerWidth;
       setIsMobile(width < BREAKPOINT_MD);
 
-      // 自动折叠/展开侧边栏
       if (width < BREAKPOINT_MD) {
         setSidebarCollapsed(true);
       } else if (width >= BREAKPOINT_LG) {
@@ -55,7 +52,7 @@ const MainLayout: React.FC = () => {
       }
     };
 
-    handleResize(); // 初始检测
+    handleResize();
     window.addEventListener("resize", handleResize);
     return () => window.removeEventListener("resize", handleResize);
   }, [setSidebarCollapsed]);
@@ -86,7 +83,6 @@ const MainLayout: React.FC = () => {
   } = theme.useToken();
 
   const menuItems = useMemo(() => {
-    // 始终显示全局菜单
     const items = [
       {
         key: "/workspace",
@@ -100,7 +96,6 @@ const MainLayout: React.FC = () => {
       },
     ];
 
-    // 审核工作台（需要权限且功能开关开启）
     if (canReview && features?.review) {
       items.push({
         key: "/reviews",
@@ -109,14 +104,12 @@ const MainLayout: React.FC = () => {
       });
     }
 
-    //{/* 发布中心 */}
     items.push({
       key: "/releases",
       icon: <RocketOutlined />,
       label: "发布中心",
     });
 
-    // 配置中心
     items.push({
       key: "/settings",
       icon: <SettingOutlined />,
@@ -126,10 +119,8 @@ const MainLayout: React.FC = () => {
     return items;
   }, [canReview, features]);
 
-  // 计算侧边栏宽度
-  const siderWidth = isMobile ? 0 : sidebarCollapsed ? 80 : 200;
+  const siderWidth = isMobile ? 0 : sidebarCollapsed ? 64 : 180;
 
-  // 移动端菜单点击处理
   const handleMenuClick = (info: { key: string }) => {
     if (info.key !== "back") {
       navigate(info.key);
@@ -141,33 +132,33 @@ const MainLayout: React.FC = () => {
     }
   };
 
-  // 侧边栏内容渲染
   const renderSiderContent = () => (
     <>
       <div
         onClick={() => navigate("/projects")}
         style={{
-          height: 48,
-          margin: 16,
+          height: 40,
+          margin: "12px 8px",
           display: "flex",
           alignItems: "center",
           justifyContent:
             sidebarCollapsed && !isMobile ? "center" : "flex-start",
-          paddingInline: sidebarCollapsed && !isMobile ? 0 : 12,
-          borderRadius: 8,
+          paddingInline: sidebarCollapsed && !isMobile ? 0 : 10,
+          borderRadius: 6,
           background:
             appTheme === "dark"
-              ? "rgba(255, 255, 255, 0.12)"
-              : "rgba(0, 0, 0, 0.06)",
+              ? "rgba(255, 255, 255, 0.08)"
+              : "rgba(0, 0, 0, 0.04)",
           cursor: "pointer",
           userSelect: "none",
+          transition: "all 0.2s ease",
         }}
       >
         <div
           style={{
-            width: 28,
-            height: 28,
-            borderRadius: 8,
+            width: 24,
+            height: 24,
+            borderRadius: 6,
             background:
               appTheme === "dark" ? "rgba(255, 255, 255, 0.85)" : "#1677ff",
             color: appTheme === "dark" ? "#111" : "#fff",
@@ -175,7 +166,7 @@ const MainLayout: React.FC = () => {
             alignItems: "center",
             justifyContent: "center",
             fontWeight: 800,
-            fontSize: 14,
+            fontSize: 12,
             flex: "0 0 auto",
           }}
         >
@@ -184,26 +175,25 @@ const MainLayout: React.FC = () => {
         {(!sidebarCollapsed || isMobile) && (
           <div
             style={{
-              marginLeft: 10,
+              marginLeft: 8,
               color:
                 appTheme === "dark"
                   ? "rgba(255, 255, 255, 0.92)"
                   : "rgba(0, 0, 0, 0.88)",
-              fontWeight: 700,
-              fontSize: 16,
-              lineHeight: 1,
+              fontWeight: 600,
+              fontSize: 14,
+              lineHeight: 1.2,
             }}
           >
             Lingux
             <div
               style={{
-                marginTop: 2,
                 color:
                   appTheme === "dark"
-                    ? "rgba(255, 255, 255, 0.65)"
+                    ? "rgba(255, 255, 255, 0.55)"
                     : "rgba(0, 0, 0, 0.45)",
-                fontWeight: 500,
-                fontSize: 12,
+                fontWeight: 400,
+                fontSize: 11,
               }}
             >
               Translation
@@ -217,6 +207,10 @@ const MainLayout: React.FC = () => {
         selectedKeys={[location.pathname]}
         items={menuItems}
         onClick={handleMenuClick}
+        style={{
+          borderRight: "none",
+          fontSize: 13,
+        }}
       />
     </>
   );
@@ -225,12 +219,13 @@ const MainLayout: React.FC = () => {
     <Layout
       style={{ height: "100vh", background: colorBgLayout, overflow: "hidden" }}
     >
-      {/* 桌面端侧边栏 */}
       {!isMobile && (
         <Sider
           trigger={null}
           collapsible
           collapsed={sidebarCollapsed}
+          collapsedWidth={64}
+          width={180}
           theme={appTheme}
           style={{
             height: "100vh",
@@ -245,13 +240,12 @@ const MainLayout: React.FC = () => {
         </Sider>
       )}
 
-      {/* 移动端抽屉菜单 */}
       <Drawer
         placement="left"
         closable={false}
         onClose={() => setMobileDrawerOpen(false)}
         open={mobileDrawerOpen}
-        width={200}
+        width={180}
         bodyStyle={{ padding: 0 }}
         headerStyle={{ display: "none" }}
         style={{
@@ -281,10 +275,13 @@ const MainLayout: React.FC = () => {
         <Header
           style={{
             padding: isMobile ? "0 12px" : "0 16px",
+            height: 48,
+            lineHeight: "48px",
             background: colorBgContainer,
             display: "flex",
             alignItems: "center",
             flexShrink: 0,
+            borderBottom: "1px solid var(--color-border)",
           }}
         >
           <Button
@@ -308,16 +305,19 @@ const MainLayout: React.FC = () => {
                   : () => setSidebarCollapsed(!sidebarCollapsed)
             }
             style={{
-              fontSize: "16px",
-              width: isMobile ? 48 : 64,
-              height: isMobile ? 48 : 64,
-              marginRight: isMobile ? 8 : 16,
+              fontSize: 14,
+              width: 32,
+              height: 32,
+              marginRight: 12,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
             }}
           />
           <h2
             style={{
               margin: 0,
-              fontSize: isMobile ? "16px" : "18px",
+              fontSize: isMobile ? 14 : 15,
               fontWeight: 600,
               flex: 1,
               overflow: "hidden",
@@ -336,13 +336,19 @@ const MainLayout: React.FC = () => {
             type="text"
             icon={appTheme === "dark" ? <SunOutlined /> : <MoonOutlined />}
             onClick={toggleTheme}
-            style={{ marginRight: isMobile ? 8 : 16 }}
+            style={{
+              width: 32,
+              height: 32,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+            }}
           />
         </Header>
         <Content
           style={{
-            margin: isMobile ? "12px" : "24px 16px",
-            padding: isMobile ? 16 : 24,
+            margin: isMobile ? 8 : 12,
+            padding: isMobile ? 12 : 16,
             background: colorBgContainer,
             borderRadius: borderRadiusLG,
             overflow: "auto",

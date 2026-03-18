@@ -2,25 +2,33 @@ import {
   Controller,
   Get,
   Post,
+  Query,
   UseGuards,
   Req,
   Res,
   Logger,
+  ForbiddenException,
+  UnauthorizedException,
 } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
 import { AuthService } from './auth.service';
 import { FeishuService } from './services/feishu.service';
 import type { Request, Response } from 'express';
 import { AuthUser } from './types/auth.types';
+import { PrismaService } from '../prisma.service';
 
 @Controller('auth')
 export class AuthController {
   private readonly logger = new Logger(AuthController.name);
+  private readonly isDevelopment: boolean;
 
   constructor(
     private readonly authService: AuthService,
     private readonly feishuService: FeishuService,
-  ) {}
+    private readonly prisma: PrismaService,
+  ) {
+    this.isDevelopment = process.env.NODE_ENV !== 'production';
+  }
 
   @Get('feishu')
   async feishuLogin(@Res() res: Response) {
@@ -148,6 +156,96 @@ export class AuthController {
     } catch (error) {
       this.logger.error('Feishu log error:', error);
       return { status: 'error', message: 'Failed to log request' };
+    }
+  }
+
+  /**
+   * 开发环境快速登录接口
+   * 仅用于开发和测试环境，允许直接通过用户名登录，无需OAuth授权
+   */
+  @Get('dev-login')
+  async devLogin(@Query('username') username: string, @Res() res: Response) {
+    // 只允许在开发环境使用
+    if (!this.isDevelopment) {
+      throw new ForbiddenException(
+        'Dev login is only available in development mode',
+      );
+    }
+
+    try {
+      // 如果没有提供用户名，默认使用第一个演示管理员
+      const targetUsername = username || 'admin@demo';
+
+      // 查找用户
+      const user = await this.prisma.user.findUnique({
+        where: { username: targetUsername },
+      });
+
+      if (!user) {
+        this.logger.error(`Dev login failed: User ${targetUsername} not found`);
+        return res
+          .status(404)
+          .send(
+            `User ${targetUsername} not found. Please run seed script first.`,
+          );
+      }
+
+      this.logger.log(`Dev login: ${user.username} (${user.role})`);
+
+      // 生成登录token
+      const loginResult = await this.authService.login({
+        id: user.id,
+        username: user.username,
+        name: user.name ?? undefined,
+        role: user.role,
+      });
+
+      // 重定向到前端，带上token
+      const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:8080';
+      res.redirect(
+        `${frontendUrl}/login#token=${loginResult.access_token}&user=${JSON.stringify(loginResult.user)}`,
+      );
+    } catch (error) {
+      this.logger.error('Dev login error:', error);
+      return res.status(500).send('Dev login failed');
+    }
+  }
+
+  /**
+   * 开发环境快速登录 - 返回JSON格式（用于API调用）
+   * 仅用于开发和测试环境
+   */
+  @Get('dev-login/json')
+  async devLoginJson(@Query('username') username: string) {
+    // 只允许在开发环境使用
+    if (!this.isDevelopment) {
+      throw new ForbiddenException(
+        'Dev login is only available in development mode',
+      );
+    }
+
+    try {
+      const targetUsername = username || 'admin@demo';
+
+      const user = await this.prisma.user.findUnique({
+        where: { username: targetUsername },
+      });
+
+      if (!user) {
+        throw new UnauthorizedException(`User ${targetUsername} not found`);
+      }
+
+      this.logger.log(`Dev login (JSON): ${user.username} (${user.role})`);
+
+      return await this.authService.login({
+        id: user.id,
+        username: user.username,
+        name: user.name ?? undefined,
+        role: user.role,
+      });
+    } catch (error) {
+      this.logger.error('Dev login JSON error:', error);
+      throw error;
     }
   }
 }

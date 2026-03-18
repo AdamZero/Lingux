@@ -49,7 +49,7 @@ export class RequestLogMiddleware implements NestMiddleware {
         const statusCode = res.statusCode;
 
         if (statusCode >= 500) {
-          this.logger.error('Request failed', {
+          this.logger.error('Request failed', undefined, {
             requestId,
             userId,
             method: req.method,

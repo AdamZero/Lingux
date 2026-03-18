@@ -944,6 +944,29 @@ export class ReleaseService {
     return { releaseId: created.id, currentReleaseId: created.id };
   }
 
+  private isSameScope(
+    a: ReleaseScope,
+    b: { type: string; namespaceIds?: string[]; keyIds?: string[] },
+  ): boolean {
+    if (a.type !== b.type) return false;
+
+    if (a.type === 'namespaces' && b.type === 'namespaces') {
+      const aIds = new Set(a.namespaceIds);
+      const bIds = new Set(b.namespaceIds ?? []);
+      if (aIds.size !== bIds.size) return false;
+      return Array.from(aIds).every((id) => bIds.has(id));
+    }
+
+    if (a.type === 'keys' && b.type === 'keys') {
+      const aIds = new Set(a.keyIds);
+      const bIds = new Set(b.keyIds ?? []);
+      if (aIds.size !== bIds.size) return false;
+      return Array.from(aIds).every((id) => bIds.has(id));
+    }
+
+    return a.type === 'all' && b.type === 'all';
+  }
+
   async previewRelease(projectId: string, dto: CreateReleaseDto) {
     const ctx = await this.getProjectContext(projectId);
     const scope = this.parseScope(dto.scope);
@@ -998,7 +1021,19 @@ export class ReleaseService {
       orderBy: { createdAt: 'desc' },
     });
 
-    if (active && active.status !== 'DRAFT') {
+    // 检查 scope 是否匹配，如果不匹配则视为没有 active session
+    const scopeMatches =
+      active &&
+      this.isSameScope(
+        scope,
+        (active.scope as {
+          type: string;
+          namespaceIds?: string[];
+          keyIds?: string[];
+        }) ?? { type: 'all' },
+      );
+
+    if (active && active.status !== 'DRAFT' && scopeMatches) {
       throw new ConflictException({
         code: 'RELEASE_SESSION_LOCKED',
         sessionId: active.id,
@@ -1025,14 +1060,16 @@ export class ReleaseService {
       nextJson: this.stringifyJson(next),
     } as const;
 
-    const session = active
-      ? await this.prisma.releaseSession.update({
-          where: { id: active.id },
-          data,
-        })
-      : await this.prisma.releaseSession.create({
-          data: { projectId, ...data },
-        });
+    // 只有 scope 匹配时才更新现有 session，否则创建新 session
+    const session =
+      active && scopeMatches
+        ? await this.prisma.releaseSession.update({
+            where: { id: active.id },
+            data,
+          })
+        : await this.prisma.releaseSession.create({
+            data: { projectId, ...data },
+          });
 
     return {
       sessionId: session.id,
