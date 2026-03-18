@@ -3,36 +3,31 @@ import { useParams } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   Layout,
-  Menu,
-  Table,
   Button,
   Space,
-  Typography,
   Empty,
   Modal,
   Form,
   Input,
   Select,
   App as AntdApp,
-  Tag,
-  Drawer,
-  Tooltip,
 } from "antd";
 import {
   PlusOutlined,
-  FolderAddOutlined,
-  DeleteOutlined,
-  EditOutlined,
-  GlobalOutlined,
   UploadOutlined,
   DownloadOutlined,
   InboxOutlined,
 } from "@ant-design/icons";
 import apiClient from "@/api/client";
 import PublishDrawer from "@/components/release/PublishDrawer";
+import { NamespaceSidebar } from "@/components/translation/NamespaceSidebar";
+import { KeysTable } from "@/components/translation/KeysTable";
+import { TranslationDrawer } from "@/components/translation/TranslationDrawer";
+import { FilterBar } from "@/components/common/FilterBar";
+import { PageHeader } from "@/components/common/PageHeader";
+import type { TranslationStatus } from "@/components/common/StatusBadge";
 
 const { Sider, Content } = Layout;
-const { Title, Text } = Typography;
 const { Option } = Select;
 
 interface Namespace {
@@ -41,14 +36,18 @@ interface Namespace {
   description?: string;
 }
 
+interface Locale {
+  id: string;
+  code: string;
+  name: string;
+}
+
 interface Translation {
   id: string;
   content: string;
-  status: "PENDING" | "TRANSLATING" | "REVIEWING" | "APPROVED" | "PUBLISHED";
-  locale: {
-    code: string;
-    name: string;
-  };
+  status: TranslationStatus;
+  locale: Locale;
+  reviewComment?: string;
 }
 
 interface Key {
@@ -59,28 +58,11 @@ interface Key {
   translations: Translation[];
 }
 
-interface LookupKeyCandidate {
-  id: string;
-  name: string;
-  updatedAt: string;
-  namespace: {
-    id: string;
-    name: string;
-  };
-  _count: {
-    translations: number;
-  };
-}
-
 interface Project {
   id: string;
   baseLocale: string;
   currentReleaseId?: string | null;
-  locales: {
-    id: string;
-    code: string;
-    name: string;
-  }[];
+  locales: Locale[];
 }
 
 const KeysPage: React.FC = () => {
@@ -111,43 +93,16 @@ const KeysPage: React.FC = () => {
 
   // Search and Filter State
   const [searchKeyword, setSearchKeyword] = useState("");
-  const [statusFilter, setStatusFilter] = useState<string | null>(null);
-
-  const handleSearch = (value: string) => {
-    setSearchKeyword(value);
-  };
-
-  const handleStatusFilter = (value: string | null) => {
-    setStatusFilter(value);
-  };
+  const [statusFilter, setStatusFilter] = useState<TranslationStatus | null>(
+    null,
+  );
 
   const [namespaceForm] = Form.useForm();
   const [keyForm] = Form.useForm();
-  const [translationForm] = Form.useForm();
   const [importForm] = Form.useForm();
 
   const isRecord = (value: unknown): value is Record<string, unknown> =>
     typeof value === "object" && value !== null;
-
-  const extractApiError = (error: unknown) => {
-    if (!isRecord(error)) {
-      return {
-        status: undefined as number | undefined,
-        data: undefined as unknown,
-      };
-    }
-    const response = error.response;
-    if (!isRecord(response)) {
-      return {
-        status: undefined as number | undefined,
-        data: undefined as unknown,
-      };
-    }
-    const status =
-      typeof response.status === "number" ? response.status : undefined;
-    const data = response.data;
-    return { status, data };
-  };
 
   // Fetch Project (for locales)
   const { data: project } = useQuery<Project>({
@@ -206,13 +161,10 @@ const KeysPage: React.FC = () => {
     mutationFn: (values: { name: string; description?: string }) =>
       apiClient.post(`/projects/${projectId}/namespaces`, values),
     onSuccess: () => {
-      message.success("Namespace created");
+      message.success("命名空间创建成功");
       setIsNamespaceModalOpen(false);
       namespaceForm.resetFields();
       queryClient.invalidateQueries({ queryKey: ["namespaces", projectId] });
-    },
-    onError: () => {
-      return;
     },
   });
 
@@ -240,7 +192,7 @@ const KeysPage: React.FC = () => {
         baseContent: string;
       },
     ) => {
-      message.success("Key created");
+      message.success("词条创建成功");
       setIsKeyModalOpen(false);
       keyForm.resetFields();
       queryClient.invalidateQueries({
@@ -251,21 +203,13 @@ const KeysPage: React.FC = () => {
         isRecord(created) && typeof created.id === "string"
           ? created.id
           : undefined;
-      const createdKeyName =
-        isRecord(created) && typeof created.name === "string"
-          ? created.name
-          : undefined;
 
-      if (!createdKeyId || !createdKeyName) {
-        return;
-      }
+      if (!createdKeyId) return;
 
       const baseContent = variables.baseContent.trim();
       const defaultLocaleCode =
         project?.baseLocale || project?.locales?.[0]?.code;
-      if (!defaultLocaleCode) {
-        return;
-      }
+      if (!defaultLocaleCode) return;
 
       try {
         await apiClient.patch(
@@ -276,68 +220,16 @@ const KeysPage: React.FC = () => {
           queryKey: ["keys", projectId, selectedNamespaceId],
         });
       } catch {
-        return;
-      }
-
-      try {
-        const candidates = await lookupSameNameKeys(
-          createdKeyName,
-          createdKeyId,
-        );
-        if (candidates.length === 0) {
-          return;
-        }
-
-        const source = candidates[0];
-        Modal.confirm({
-          title: "发现同名词条",
-          content: `在「${source.namespace.name}」中找到同名词条（${source._count.translations} 条翻译），是否一键复用？`,
-          okText: "一键复用翻译",
-          cancelText: "跳过",
-          onOk: async () => {
-            await copyTranslationsFromKey(createdKeyId, source.id);
-            message.success("已复用翻译");
-            queryClient.invalidateQueries({
-              queryKey: ["keys", projectId, selectedNamespaceId],
-            });
-            const fullKey = await fetchKeyById(createdKeyId);
-            openEditDrawer(fullKey);
-          },
-        });
-      } catch {
-        return;
+        // ignore
       }
     },
     onError: (error: unknown) => {
-      const { status, data } = extractApiError(error);
-      if (status === 409) {
-        const existingKey =
-          isRecord(data) &&
-          isRecord(data.message) &&
-          isRecord(data.message.existingKey)
-            ? (data.message.existingKey as Key)
-            : isRecord(data) && isRecord(data.existingKey)
-              ? (data.existingKey as Key)
-              : null;
-
-        if (existingKey) {
-          setIsKeyModalOpen(false);
-          keyForm.resetFields();
-
-          Modal.confirm({
-            title: "Key 已存在",
-            content: `已存在同名词条：${existingKey.name}`,
-            okText: "打开并编辑翻译",
-            cancelText: "取消",
-            onOk: () => {
-              openEditDrawer(existingKey);
-            },
-          });
-          return;
+      if (isRecord(error) && isRecord(error.response)) {
+        const status = error.response.status;
+        if (status === 409) {
+          message.error("词条已存在");
         }
       }
-
-      return;
     },
   });
 
@@ -352,14 +244,10 @@ const KeysPage: React.FC = () => {
         setEditingKey(null);
       }
       setDeletingKeyId(null);
-      message.success("Key deleted");
+      message.success("词条删除成功");
       await queryClient.invalidateQueries({
         queryKey: ["keys", projectId, selectedNamespaceId],
       });
-    },
-    onError: () => {
-      setDeletingKeyId(null);
-      return;
     },
   });
 
@@ -367,25 +255,6 @@ const KeysPage: React.FC = () => {
     return (await apiClient.get(
       `/projects/${projectId}/namespaces/${selectedNamespaceId}/keys/${keyId}`,
     )) as Key;
-  };
-
-  const lookupSameNameKeys = async (name: string, excludeKeyId?: string) => {
-    return (await apiClient.get(
-      `/projects/${projectId}/namespaces/${selectedNamespaceId}/keys/lookup`,
-      {
-        params: { name, excludeKeyId },
-      },
-    )) as LookupKeyCandidate[];
-  };
-
-  const copyTranslationsFromKey = async (
-    targetKeyId: string,
-    sourceKeyId: string,
-  ) => {
-    return await apiClient.post(
-      `/projects/${projectId}/namespaces/${selectedNamespaceId}/keys/${targetKeyId}/copy-translations`,
-      { sourceKeyId, mode: "fillMissing" },
-    );
   };
 
   // Save Translations
@@ -396,14 +265,14 @@ const KeysPage: React.FC = () => {
           `/projects/${projectId}/namespaces/${selectedNamespaceId}/keys/${editingKey?.id}/translations/${localeCode}`,
           {
             content,
-            status: "PENDING", // Reset to pending on edit
+            status: "PENDING",
           },
         ),
       );
       return Promise.all(promises);
     },
     onSuccess: () => {
-      message.success("Translations saved");
+      message.success("翻译保存成功");
       setIsDrawerOpen(false);
       setEditingKey(null);
       queryClient.invalidateQueries({
@@ -411,7 +280,7 @@ const KeysPage: React.FC = () => {
       });
     },
     onError: () => {
-      message.error("Failed to save translations");
+      message.error("保存失败");
     },
   });
 
@@ -420,17 +289,16 @@ const KeysPage: React.FC = () => {
       await apiClient.post(
         `/projects/${projectId}/namespaces/${selectedNamespaceId}/keys/${keyId}/translations/${localeCode}/submit-review`,
       );
-      message.success("Translation submitted for review");
+      message.success("已提交审核");
       queryClient.invalidateQueries({
         queryKey: ["keys", projectId, selectedNamespaceId],
       });
-      // Refresh editing key
       if (editingKey?.id === keyId) {
         const updatedKey = await fetchKeyById(keyId);
         setEditingKey(updatedKey);
       }
-    } catch (error) {
-      message.error("Failed to submit for review");
+    } catch {
+      message.error("提交失败");
     }
   };
 
@@ -439,22 +307,21 @@ const KeysPage: React.FC = () => {
       await apiClient.post(
         `/projects/${projectId}/namespaces/${selectedNamespaceId}/keys/${keyId}/translations/${localeCode}/approve`,
       );
-      message.success("Translation approved");
+      message.success("已通过");
       queryClient.invalidateQueries({
         queryKey: ["keys", projectId, selectedNamespaceId],
       });
-      // Refresh editing key
       if (editingKey?.id === keyId) {
         const updatedKey = await fetchKeyById(keyId);
         setEditingKey(updatedKey);
       }
-    } catch (error) {
-      message.error("Failed to approve translation");
+    } catch {
+      message.error("操作失败");
     }
   };
 
   const handleReject = async (keyId: string, localeCode: string) => {
-    const reason = prompt("Please enter the reason for rejection:");
+    const reason = prompt("请输入驳回原因:");
     if (!reason) return;
 
     try {
@@ -462,17 +329,16 @@ const KeysPage: React.FC = () => {
         `/projects/${projectId}/namespaces/${selectedNamespaceId}/keys/${keyId}/translations/${localeCode}/reject`,
         { reason },
       );
-      message.success("Translation rejected");
+      message.success("已驳回");
       queryClient.invalidateQueries({
         queryKey: ["keys", projectId, selectedNamespaceId],
       });
-      // Refresh editing key
       if (editingKey?.id === keyId) {
         const updatedKey = await fetchKeyById(keyId);
         setEditingKey(updatedKey);
       }
-    } catch (error) {
-      message.error("Failed to reject translation");
+    } catch {
+      message.error("操作失败");
     }
   };
 
@@ -481,33 +347,28 @@ const KeysPage: React.FC = () => {
       await apiClient.post(
         `/projects/${projectId}/namespaces/${selectedNamespaceId}/keys/${keyId}/translations/${localeCode}/publish`,
       );
-      message.success("Translation published");
+      message.success("已发布");
       queryClient.invalidateQueries({
         queryKey: ["keys", projectId, selectedNamespaceId],
       });
-      // Refresh editing key
       if (editingKey?.id === keyId) {
         const updatedKey = await fetchKeyById(keyId);
         setEditingKey(updatedKey);
       }
-    } catch (error) {
-      message.error("Failed to publish translation");
+    } catch {
+      message.error("发布失败");
     }
   };
 
   const handleExport = async () => {
     try {
-      const format = "json"; // Default format
       const response = await apiClient.get(
         `/projects/${projectId}/namespaces/${selectedNamespaceId}/keys/export`,
-        {
-          params: { format },
-        },
+        { params: { format: "json" } },
       );
 
-      // Create download link
       const blob = new Blob([response.content], {
-        type: format === "json" ? "application/json" : "application/yaml",
+        type: "application/json",
       });
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
@@ -518,15 +379,15 @@ const KeysPage: React.FC = () => {
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
 
-      message.success("Translations exported successfully");
-    } catch (error) {
-      message.error("Failed to export translations");
+      message.success("导出成功");
+    } catch {
+      message.error("导出失败");
     }
   };
 
   const handleImport = async () => {
     if (!importFile) {
-      message.error("Please select a file to import");
+      message.error("请选择文件");
       return;
     }
 
@@ -547,7 +408,7 @@ const KeysPage: React.FC = () => {
       );
 
       message.success(
-        `Imported successfully: ${response.createdKeys} created, ${response.updatedKeys} updated, ${response.skippedKeys} skipped`,
+        `导入成功: ${response.createdKeys} 新建, ${response.updatedKeys} 更新`,
       );
       setIsImportModalOpen(false);
       setImportFile(null);
@@ -555,8 +416,8 @@ const KeysPage: React.FC = () => {
       queryClient.invalidateQueries({
         queryKey: ["keys", projectId, selectedNamespaceId],
       });
-    } catch (error) {
-      message.error("Failed to import translations");
+    } catch {
+      message.error("导入失败");
     }
   };
 
@@ -568,103 +429,17 @@ const KeysPage: React.FC = () => {
 
   const openEditDrawer = (key: Key) => {
     setEditingKey(key);
-    // Pre-fill form
-    const initialValues: Record<string, string> = {};
-    key.translations.forEach((t) => {
-      initialValues[t.locale.code] = t.content;
-    });
-    translationForm.setFieldsValue(initialValues);
     setIsDrawerOpen(true);
   };
 
-  const columns = [
-    {
-      title: "Key Name",
-      dataIndex: "name",
-      key: "name",
-      width: "20%",
-      render: (text: string, record: Key) => (
-        <div>
-          <Text strong style={{ display: "block" }}>
-            {text}
-          </Text>
-          {record.description && (
-            <Text type="secondary" style={{ fontSize: 12 }}>
-              {record.description}
-            </Text>
-          )}
-        </div>
-      ),
-    },
-    {
-      title: "Translations Preview",
-      key: "translations",
-      render: (_: unknown, record: Key) => (
-        <Space wrap>
-          {project?.locales.map((locale) => {
-            const translation = record.translations.find(
-              (t) => t.locale.code === locale.code,
-            );
-            const statusColor = {
-              PENDING: "default",
-              TRANSLATING: "processing",
-              REVIEWING: "warning",
-              APPROVED: "success",
-              PUBLISHED: "geekblue",
-            }[translation?.status || "PENDING"];
+  const handleDeleteKey = async (key: Key) => {
+    setDeletingKeyId(key.id);
+    await deleteKeyMutation.mutateAsync(key.id);
+  };
 
-            return (
-              <Tooltip
-                key={locale.code}
-                title={translation?.content || "No translation"}
-              >
-                <Tag color={translation ? statusColor : "error"}>
-                  {locale.code}
-                </Tag>
-              </Tooltip>
-            );
-          })}
-        </Space>
-      ),
-    },
-    {
-      title: "Actions",
-      key: "action",
-      width: 150,
-      render: (_: unknown, record: Key) => (
-        <Space>
-          <Button
-            type="primary"
-            ghost
-            size="small"
-            icon={<EditOutlined />}
-            onClick={() => openEditDrawer(record)}
-          >
-            Translate
-          </Button>
-          <Button
-            type="text"
-            danger
-            size="small"
-            icon={<DeleteOutlined />}
-            loading={deleteKeyMutation.isPending && deletingKeyId === record.id}
-            onClick={() => {
-              Modal.confirm({
-                title: "Delete Key",
-                content: `Are you sure you want to delete "${record.name}"?`,
-                okText: "Delete",
-                okButtonProps: { danger: true },
-                onOk: async () => {
-                  setDeletingKeyId(record.id);
-                  await deleteKeyMutation.mutateAsync(record.id);
-                },
-              });
-            }}
-          />
-        </Space>
-      ),
-    },
-  ];
+  const selectedNamespace = namespaces.find(
+    (n) => n.id === selectedNamespaceId,
+  );
 
   return (
     <Layout style={{ background: "transparent", height: "100%" }}>
@@ -672,258 +447,96 @@ const KeysPage: React.FC = () => {
         width={250}
         style={{ background: "transparent", borderRight: "1px solid #f0f0f0" }}
       >
-        <div style={{ padding: "0 16px 16px 0" }}>
-          <div
-            style={{
-              display: "flex",
-              justifyContent: "space-between",
-              alignItems: "center",
-              marginBottom: 16,
-            }}
-          >
-            <Text strong>Namespaces</Text>
-            <Button
-              type="text"
-              size="small"
-              icon={<PlusOutlined />}
-              onClick={() => setIsNamespaceModalOpen(true)}
-            />
-          </div>
-          <Menu
-            mode="inline"
-            selectedKeys={selectedNamespaceId ? [selectedNamespaceId] : []}
-            style={{ borderRight: 0, background: "transparent" }}
-            items={namespaces.map((ns) => ({
-              key: ns.id,
-              label: ns.name,
-              icon: <FolderAddOutlined />,
-            }))}
-            onClick={({ key }) => setSelectedNamespaceId(key)}
-          />
-          {namespaces.length === 0 && !isNamespacesLoading && (
-            <Empty
-              description="No Namespaces"
-              image={Empty.PRESENTED_IMAGE_SIMPLE}
-            >
-              <Button
-                type="primary"
-                size="small"
-                onClick={() => setIsNamespaceModalOpen(true)}
-              >
-                Create
-              </Button>
-            </Empty>
-          )}
-        </div>
+        <NamespaceSidebar
+          namespaces={namespaces}
+          selectedId={selectedNamespaceId}
+          isLoading={isNamespacesLoading}
+          onSelect={setSelectedNamespaceId}
+          onCreate={() => setIsNamespaceModalOpen(true)}
+        />
       </Sider>
 
       <Content style={{ padding: "0 24px", minHeight: 280 }}>
-        <div
-          style={{
-            display: "flex",
-            justifyContent: "space-between",
-            alignItems: "center",
-            marginBottom: 16,
-          }}
-        >
-          <Title level={4} style={{ margin: 0 }}>
-            {namespaces.find((n) => n.id === selectedNamespaceId)?.name ||
-              "Keys"}
-          </Title>
-          <Space>
-            <Button
-              icon={<UploadOutlined />}
-              disabled={!projectId || namespaces.length === 0}
-              onClick={() => setIsPublishOpen(true)}
-            >
-              Publish
-            </Button>
-            <Button
-              icon={<DownloadOutlined />}
-              disabled={!selectedNamespaceId}
-              onClick={handleExport}
-            >
-              Export
-            </Button>
-            <Button
-              icon={<InboxOutlined />}
-              disabled={!selectedNamespaceId}
-              onClick={() => setIsImportModalOpen(true)}
-            >
-              Import
-            </Button>
-            <Button
-              type="primary"
-              icon={<PlusOutlined />}
-              disabled={!selectedNamespaceId}
-              onClick={() => setIsKeyModalOpen(true)}
-            >
-              Create Key
-            </Button>
-          </Space>
-        </div>
+        <PageHeader
+          title={selectedNamespace?.name || "词条管理"}
+          description={selectedNamespace?.description}
+          extra={
+            <Space>
+              <Button
+                icon={<UploadOutlined />}
+                disabled={!projectId || namespaces.length === 0}
+                onClick={() => setIsPublishOpen(true)}
+              >
+                发布
+              </Button>
+              <Button
+                icon={<DownloadOutlined />}
+                disabled={!selectedNamespaceId}
+                onClick={handleExport}
+              >
+                导出
+              </Button>
+              <Button
+                icon={<InboxOutlined />}
+                disabled={!selectedNamespaceId}
+                onClick={() => setIsImportModalOpen(true)}
+              >
+                导入
+              </Button>
+              <Button
+                type="primary"
+                icon={<PlusOutlined />}
+                disabled={!selectedNamespaceId}
+                onClick={() => setIsKeyModalOpen(true)}
+              >
+                新建词条
+              </Button>
+            </Space>
+          }
+        />
 
-        {/* Search and Filter */}
-        <div
-          style={{
-            display: "flex",
-            gap: 16,
-            marginBottom: 16,
-            flexWrap: "wrap",
-          }}
-        >
-          <Input.Search
-            placeholder="Search keys..."
-            style={{ width: 300 }}
-            onSearch={(value) => handleSearch(value)}
-            allowClear
-          />
-          <Select
-            placeholder="Filter by status"
-            style={{ width: 150 }}
-            onChange={(value) => handleStatusFilter(value)}
-            allowClear
-          >
-            <Option value="PENDING">Pending</Option>
-            <Option value="TRANSLATING">Translating</Option>
-            <Option value="REVIEWING">Reviewing</Option>
-            <Option value="APPROVED">Approved</Option>
-            <Option value="PUBLISHED">Published</Option>
-          </Select>
-        </div>
+        <FilterBar
+          searchValue={searchKeyword}
+          statusValue={statusFilter}
+          onSearch={setSearchKeyword}
+          onStatusChange={setStatusFilter}
+          searchPlaceholder="搜索词条..."
+        />
 
         {!selectedNamespaceId ? (
-          <Empty description="Select a namespace to view keys" />
+          <Empty description="请选择命名空间" />
         ) : (
-          <Table
-            columns={columns}
-            dataSource={keys}
-            rowKey="id"
-            loading={isKeysLoading}
-            pagination={{ pageSize: 10 }}
+          <KeysTable
+            keys={keys}
+            locales={project?.locales || []}
+            isLoading={isKeysLoading}
+            deletingKeyId={deletingKeyId}
+            onEdit={openEditDrawer}
+            onDelete={handleDeleteKey}
           />
         )}
       </Content>
 
       {/* Translation Drawer */}
-      <Drawer
-        title={`Translate: ${editingKey?.name}`}
-        width={600}
-        onClose={() => setIsDrawerOpen(false)}
+      <TranslationDrawer
         open={isDrawerOpen}
-        extra={
-          <Space>
-            <Button onClick={() => setIsDrawerOpen(false)}>Cancel</Button>
-            <Button
-              type="primary"
-              onClick={() => translationForm.submit()}
-              loading={saveTranslationsMutation.isPending}
-            >
-              Save
-            </Button>
-          </Space>
-        }
-      >
-        <Form
-          form={translationForm}
-          layout="vertical"
-          onFinish={(values) => saveTranslationsMutation.mutate(values)}
-        >
-          {project?.locales.map((locale) => {
-            const translation = editingKey?.translations.find(
-              (t) => t.locale.code === locale.code,
-            );
-            const statusColor = {
-              PENDING: "default",
-              TRANSLATING: "processing",
-              REVIEWING: "warning",
-              APPROVED: "success",
-              PUBLISHED: "geekblue",
-            }[translation?.status || "PENDING"];
-
-            return (
-              <Form.Item
-                key={locale.code}
-                name={locale.code}
-                label={
-                  <Space>
-                    <GlobalOutlined />
-                    {locale.name} ({locale.code})
-                    <Tag color={statusColor}>
-                      {translation?.status || "PENDING"}
-                    </Tag>
-                  </Space>
-                }
-              >
-                <Input.TextArea
-                  rows={3}
-                  placeholder={`Enter translation for ${locale.name}...`}
-                />
-                {translation?.reviewComment && (
-                  <div style={{ marginTop: 8, color: "#ff4d4f" }}>
-                    <Text type="danger">
-                      Review Comment: {translation.reviewComment}
-                    </Text>
-                  </div>
-                )}
-                <div style={{ marginTop: 8, display: "flex", gap: 8 }}>
-                  {translation && (
-                    <>
-                      {translation.status === "PENDING" && (
-                        <Button
-                          size="small"
-                          onClick={() =>
-                            handleSubmitReview(editingKey.id, locale.code)
-                          }
-                        >
-                          Submit for Review
-                        </Button>
-                      )}
-                      {translation.status === "REVIEWING" && (
-                        <>
-                          <Button
-                            size="small"
-                            type="primary"
-                            onClick={() =>
-                              handleApprove(editingKey.id, locale.code)
-                            }
-                          >
-                            Approve
-                          </Button>
-                          <Button
-                            size="small"
-                            danger
-                            onClick={() =>
-                              handleReject(editingKey.id, locale.code)
-                            }
-                          >
-                            Reject
-                          </Button>
-                        </>
-                      )}
-                      {translation.status === "APPROVED" && (
-                        <Button
-                          size="small"
-                          type="primary"
-                          onClick={() =>
-                            handlePublish(editingKey.id, locale.code)
-                          }
-                        >
-                          Publish
-                        </Button>
-                      )}
-                    </>
-                  )}
-                </div>
-              </Form.Item>
-            );
-          })}
-        </Form>
-      </Drawer>
+        editingKey={editingKey}
+        locales={project?.locales || []}
+        isSaving={saveTranslationsMutation.isPending}
+        onClose={() => {
+          setIsDrawerOpen(false);
+          setEditingKey(null);
+        }}
+        onSave={(values) => saveTranslationsMutation.mutate(values)}
+        onSubmitReview={handleSubmitReview}
+        onApprove={handleApprove}
+        onReject={handleReject}
+        onPublish={handlePublish}
+      />
 
       {/* Create Namespace Modal */}
       <Modal
-        title="Create Namespace"
+        title="创建命名空间"
         open={isNamespaceModalOpen}
         onOk={() => namespaceForm.submit()}
         onCancel={() => setIsNamespaceModalOpen(false)}
@@ -936,10 +549,14 @@ const KeysPage: React.FC = () => {
             createNamespaceMutation.mutate(values)
           }
         >
-          <Form.Item name="name" label="Name" rules={[{ required: true }]}>
-            <Input placeholder="e.g. common, auth, home" />
+          <Form.Item
+            name="name"
+            label="名称"
+            rules={[{ required: true, message: "请输入名称" }]}
+          >
+            <Input placeholder="例如: common, auth, home" />
           </Form.Item>
-          <Form.Item name="description" label="Description">
+          <Form.Item name="description" label="描述">
             <Input.TextArea rows={2} />
           </Form.Item>
         </Form>
@@ -947,7 +564,7 @@ const KeysPage: React.FC = () => {
 
       {/* Create Key Modal */}
       <Modal
-        title="Create Key"
+        title="新建词条"
         open={isKeyModalOpen}
         onOk={() => keyForm.submit()}
         onCancel={() => setIsKeyModalOpen(false)}
@@ -959,48 +576,52 @@ const KeysPage: React.FC = () => {
           onFinish={(values) => createKeyMutation.mutate(values)}
           initialValues={{ type: "TEXT" }}
         >
-          <Form.Item name="name" label="Key Name" rules={[{ required: true }]}>
-            <Input placeholder="e.g. button.submit" />
+          <Form.Item
+            name="name"
+            label="词条名称"
+            rules={[{ required: true, message: "请输入词条名称" }]}
+          >
+            <Input placeholder="例如: button.submit" />
           </Form.Item>
-          <Form.Item name="description" label="Description">
+          <Form.Item name="description" label="描述">
             <Input.TextArea rows={2} />
           </Form.Item>
-          <Form.Item name="type" label="Type">
+          <Form.Item name="type" label="类型">
             <Select>
-              <Option value="TEXT">Text</Option>
-              <Option value="RICH_TEXT">Rich Text</Option>
-              <Option value="ASSET">Asset</Option>
+              <Option value="TEXT">文本</Option>
+              <Option value="RICH_TEXT">富文本</Option>
+              <Option value="ASSET">资源</Option>
             </Select>
           </Form.Item>
           <Form.Item
             name="baseContent"
-            label={`Default (${project?.baseLocale || "base locale"})`}
-            rules={[{ required: true, whitespace: true }]}
+            label={`默认语言 (${project?.baseLocale || "基础语言"})`}
+            rules={[{ required: true, message: "请输入默认语言内容" }]}
           >
-            <Input.TextArea rows={3} placeholder="Input default locale text" />
+            <Input.TextArea rows={3} placeholder="输入默认语言文本" />
           </Form.Item>
         </Form>
       </Modal>
 
       {/* Import Modal */}
       <Modal
-        title="Import Translations"
+        title="导入翻译"
         open={isImportModalOpen}
         onOk={handleImport}
         onCancel={() => setIsImportModalOpen(false)}
       >
         <Form form={importForm} layout="vertical">
-          <Form.Item label="File">
+          <Form.Item label="文件">
             <input
               type="file"
               accept=".json,.yaml,.yml"
               onChange={handleFileChange}
             />
             {importFile && (
-              <div style={{ marginTop: 8 }}>Selected: {importFile.name}</div>
+              <div style={{ marginTop: 8 }}>已选择: {importFile.name}</div>
             )}
           </Form.Item>
-          <Form.Item label="Format">
+          <Form.Item label="格式">
             <Select
               value={importFormat}
               onChange={(value) => setImportFormat(value)}
@@ -1009,13 +630,13 @@ const KeysPage: React.FC = () => {
               <Option value="yaml">YAML</Option>
             </Select>
           </Form.Item>
-          <Form.Item label="Mode">
+          <Form.Item label="模式">
             <Select
               value={importMode}
               onChange={(value) => setImportMode(value)}
             >
-              <Option value="fillMissing">Fill Missing</Option>
-              <Option value="overwrite">Overwrite</Option>
+              <Option value="fillMissing">仅填充缺失</Option>
+              <Option value="overwrite">覆盖全部</Option>
             </Select>
           </Form.Item>
         </Form>
@@ -1036,8 +657,8 @@ const KeysPage: React.FC = () => {
           }
           scopeLabel={
             selectedNamespaceId
-              ? `Namespace: ${namespaces.find((n) => n.id === selectedNamespaceId)?.name ?? selectedNamespaceId}`
-              : "All"
+              ? `命名空间: ${selectedNamespace?.name ?? selectedNamespaceId}`
+              : "全部"
           }
         />
       ) : null}

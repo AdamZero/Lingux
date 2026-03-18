@@ -58,7 +58,58 @@ async function main() {
     console.log('System user already exists');
   }
 
+  await seedFeatureFlags();
+
   console.log('Seeding finished.');
+}
+
+async function seedFeatureFlags() {
+  console.log('Start seeding feature flags...');
+
+  const featureFlags = [
+    {
+      key: 'feature.review',
+      value: { enabled: false },
+      description: '审核工作台菜单和页面',
+    },
+    {
+      key: 'feature.import',
+      value: { enabled: false },
+      description: '导入按钮和功能入口',
+    },
+    {
+      key: 'feature.invite',
+      value: { enabled: false },
+      description: '成员邀请功能',
+    },
+    {
+      key: 'feature.llm',
+      value: { enabled: false },
+      description: 'LLM 自动翻译',
+    },
+    {
+      key: 'feature.tm',
+      value: { enabled: false },
+      description: '翻译记忆提示',
+    },
+  ];
+
+  for (const flag of featureFlags) {
+    const existing = await prisma.config.findUnique({
+      where: { key: flag.key },
+    });
+
+    if (!existing) {
+      await prisma.config.create({
+        data: flag,
+      });
+      console.log(`Created feature flag: ${flag.key}`);
+    } else {
+      console.log(`Feature flag already exists: ${flag.key}`);
+    }
+  }
+
+  console.log('Feature flags seeding finished.');
 }
 
 main()

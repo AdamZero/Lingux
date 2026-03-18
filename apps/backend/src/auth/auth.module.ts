@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { AuthController } from './auth.controller';
 import { AuthService } from './auth.service';
+import { FeishuService } from './services/feishu.service';
 import { JwtModule } from '@nestjs/jwt';
 import { PassportModule } from '@nestjs/passport';
 import { PrismaModule } from '../prisma.module';
@@ -25,6 +26,7 @@ import { DingTalkStrategy } from './strategies/dingtalk.strategy';
   controllers: [AuthController],
   providers: [
     AuthService,
+    FeishuService,
     JwtStrategy,
     FeishuStrategy,
     QixinStrategy,

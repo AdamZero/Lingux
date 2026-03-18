@@ -95,6 +95,12 @@ enum TranslationStatus {
   PUBLISHED    // 已发布
 }
 
+enum TranslationPriority {
+  LOW
+  MEDIUM
+  HIGH
+}
+
 model Translation {
   id             String            @id @default(cuid())
   content        String
@@ -107,13 +113,22 @@ model Translation {
   localeId  String
   locale    Locale   @relation(fields: [localeId], references: [id])
   
-  reviewerId String?
-  reviewer   User?    @relation("Reviewer", fields: [reviewerId], references: [id])
+  submitterId String?
+  submitter   User?    @relation("TranslationSubmitter", fields: [submitterId], references: [id])
+  reviewerId  String?
+  reviewer    User?    @relation("Reviewer", fields: [reviewerId], references: [id])
+  
+  priority    TranslationPriority @default(MEDIUM)
+  dueDate     DateTime?
+  approvedAt  DateTime?
   
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   @@unique([keyId, localeId])
+  @@index([status, submitterId])
+  @@index([status, reviewerId])
+  @@index([priority, updatedAt])
 }
 
 enum UserRole {
@@ -175,6 +190,7 @@ model User {
 
   projects     Project[]          @relation("ProjectUsers")
   reviews      Translation[]      @relation("Reviewer")
+  submissions  Translation[]      @relation("TranslationSubmitter")
   auditLogs    AuditLog[]
   enterprises  EnterpriseMember[]
 }
@@ -284,4 +300,15 @@ model Asset {
   projectId   String
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
+}
+
+model Config {
+  id          String   @id @default(cuid())
+  key         String   @unique // e.g., "feature.review", "feature.import"
+  value       Json     // 配置值
+  description String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([key])
 }
