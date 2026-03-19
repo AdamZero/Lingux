@@ -1,4 +1,12 @@
-import { Body, Controller, Get, Param, Post, Query, Request } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  Param,
+  Post,
+  Query,
+  Request,
+} from '@nestjs/common';
 import {
   ListReleasesQueryDto,
   PreviewReleaseDto,
@@ -27,7 +35,11 @@ export class ReleaseController {
     @Body() dto: PublishReleaseDto,
     @Request() req: { user: { id: string } },
   ) {
-    return this.releaseService.publishReleaseSession(projectId, dto.sessionId, req.user.id);
+    return this.releaseService.publishReleaseSession(
+      projectId,
+      dto.sessionId,
+      req.user.id,
+    );
   }
 
   @Get('release-sessions/active')
@@ -92,7 +104,11 @@ export class ReleaseController {
     @Param('sessionId') sessionId: string,
     @Request() req: { user: { id: string } },
   ) {
-    return this.releaseService.publishReleaseSession(projectId, sessionId, req.user.id);
+    return this.releaseService.publishReleaseSession(
+      projectId,
+      sessionId,
+      req.user.id,
+    );
   }
 
   @Get('releases')

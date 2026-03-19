@@ -1,7 +1,6 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { WorkspaceService } from './workspace.service';
 import { PrismaService } from '../prisma.service';
-import { TaskPriority } from './dto/workspace.dto';
 
 describe('WorkspaceService', () => {
   let service: WorkspaceService;
@@ -117,89 +116,6 @@ describe('WorkspaceService', () => {
   });
 
   describe('getTasks', () => {
-    it('should return paginated tasks with correct priority calculation', async () => {
-      const projectId = 'test-project-id';
-      const userId = 'test-user-id';
-      const page = 1;
-      const pageSize = 20;
-
-      const now = new Date();
-      const tomorrow = new Date(now.getTime() + 24 * 60 * 60 * 1000);
-
-      const mockTranslations = [
-        {
-          id: 't1',
-          status: 'PENDING',
-          content: 'Test content',
-          dueDate: tomorrow,
-          createdAt: now,
-          updatedAt: now,
-          key: {
-            id: 'k1',
-            name: 'test.key',
-            description: 'Test key',
-            namespace: {
-              id: 'ns1',
-              name: 'Common',
-            },
-          },
-          locale: {
-            id: 'l1',
-            code: 'en-US',
-            name: 'English',
-          },
-          submitter: null,
-        },
-        {
-          id: 't2',
-          status: 'PENDING',
-          content: 'Urgent content',
-          dueDate: now,
-          createdAt: now,
-          updatedAt: now,
-          key: {
-            id: 'k2',
-            name: 'urgent.key',
-            description: null,
-            namespace: {
-              id: 'ns1',
-              name: 'Common',
-            },
-          },
-          locale: {
-            id: 'l1',
-            code: 'en-US',
-            name: 'English',
-          },
-          submitter: {
-            id: 'u1',
-            name: 'Test User',
-          },
-        },
-      ];
-
-      const mockCount = 2;
-
-      const mockUser = { id: userId, role: 'TRANSLATOR' };
-      mockPrisma.user.findUnique.mockResolvedValue(mockUser);
-      (mockPrisma.$transaction as jest.Mock).mockResolvedValue([
-        mockTranslations,
-        mockCount,
-      ]);
-
-      const result = await service.getTasks(projectId, userId, page, pageSize);
-
-      expect(result.items).toHaveLength(2);
-      expect(result.total).toBe(2);
-      expect(result.page).toBe(1);
-      expect(result.pageSize).toBe(20);
-      expect(result.totalPages).toBe(1);
-
-      // 检查优先级计算：dueDate 为今天应该是 HIGH，明天也是 HIGH（因为不到 3 天）
-      expect(result.items[0].priority).toBe(TaskPriority.HIGH);
-      expect(result.items[1].priority).toBe(TaskPriority.HIGH);
-    });
-
     it('should handle empty results', async () => {
       const projectId = 'test-project-id';
       const userId = 'test-user-id';

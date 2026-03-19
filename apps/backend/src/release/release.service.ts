@@ -65,7 +65,10 @@ export class ReleaseService {
     return await this.isProjectOwner(projectId, userId);
   }
 
-  async canPublishWithoutApproval(projectId: string, userId: string): Promise<boolean> {
+  async canPublishWithoutApproval(
+    projectId: string,
+    userId: string,
+  ): Promise<boolean> {
     const owners = await this.prisma.projectOwner.findMany({
       where: { projectId },
     });
@@ -373,9 +376,9 @@ export class ReleaseService {
         id: true,
         baseLocale: true,
         currentReleaseId: true,
-        projectLocales: {
+        ProjectLocale: {
           where: { enabled: true },
-          include: { locale: { select: { code: true } } },
+          include: { Locale: { select: { code: true } } },
         },
       },
     });
@@ -383,8 +386,8 @@ export class ReleaseService {
       throw new NotFoundException(`Project with ID ${projectId} not found`);
     }
 
-    const enabledLocaleCodes = project.projectLocales.map(
-      (pl) => pl.locale.code,
+    const enabledLocaleCodes = project.ProjectLocale.map(
+      (pl) => pl.Locale.code,
     );
     const baseLocale = project.baseLocale || 'zh-CN';
     const enabledSet = new Set(enabledLocaleCodes);
@@ -403,7 +406,7 @@ export class ReleaseService {
   private resolveLocaleCodes(params: {
     requested?: string[];
     enabled: string[];
-  }) {
+  }): string[] {
     if (!params.requested) {
       return params.enabled;
     }
@@ -482,29 +485,29 @@ export class ReleaseService {
 
     const whereKey: Prisma.KeyWhereInput =
       params.scope.type === 'all'
-        ? { namespace: { projectId: params.projectId } }
+        ? { Namespace: { projectId: params.projectId } }
         : params.scope.type === 'namespaces'
           ? {
               namespaceId: { in: params.scope.namespaceIds },
-              namespace: { projectId: params.projectId },
+              Namespace: { projectId: params.projectId },
             }
           : {
               id: { in: params.scope.keyIds },
-              namespace: { projectId: params.projectId },
+              Namespace: { projectId: params.projectId },
             };
 
     const keys = await this.prisma.key.findMany({
       where: whereKey,
       include: {
-        namespace: { select: { id: true, name: true } },
-        translations: {
+        Namespace: { select: { id: true, name: true } },
+        Translation: {
           where: {
-            locale: {
+            Locale: {
               code: { in: localeCodesForFetch },
             },
           },
           include: {
-            locale: { select: { code: true } },
+            Locale: { select: { code: true } },
           },
         },
       },
@@ -536,21 +539,21 @@ export class ReleaseService {
     );
 
     for (const key of params.keys) {
-      const namespaceName = key.namespace.name;
-      const baseTranslation = key.translations.find(
-        (t) => t.locale.code === params.baseLocale,
+      const namespaceName = key.Namespace.name;
+      const baseTranslation = key.Translation.find(
+        (t) => t.Locale.code === params.baseLocale,
       );
       const baseContent = baseTranslation?.content ?? '';
 
       for (const localeCode of params.localeCodes) {
-        const t = key.translations.find((tr) => tr.locale.code === localeCode);
+        const t = key.Translation.find((tr) => tr.Locale.code === localeCode);
         const content = t?.content ?? '';
 
         if (!t) {
           errors.push({
             localeCode,
             keyId: key.id,
-            namespaceId: key.namespace.id,
+            namespaceId: key.Namespace.id,
             keyName: key.name,
             namespaceName,
             reason: 'MISSING_TRANSLATION',
@@ -562,7 +565,7 @@ export class ReleaseService {
           errors.push({
             localeCode,
             keyId: key.id,
-            namespaceId: key.namespace.id,
+            namespaceId: key.Namespace.id,
             keyName: key.name,
             namespaceName,
             reason: 'EMPTY_CONTENT',
@@ -574,7 +577,7 @@ export class ReleaseService {
           errors.push({
             localeCode,
             keyId: key.id,
-            namespaceId: key.namespace.id,
+            namespaceId: key.Namespace.id,
             keyName: key.name,
             namespaceName,
             reason: 'ICU_INVALID',
@@ -592,7 +595,7 @@ export class ReleaseService {
             errors.push({
               localeCode,
               keyId: key.id,
-              namespaceId: key.namespace.id,
+              namespaceId: key.Namespace.id,
               keyName: key.name,
               namespaceName,
               reason: 'PLACEHOLDER_MISMATCH',
@@ -818,7 +821,9 @@ export class ReleaseService {
     // 检查权限
     const canApprove = await this.canApproveRelease(projectId, userId);
     if (!canApprove) {
-      throw new BadRequestException('Only project owners or admins can approve releases');
+      throw new BadRequestException(
+        'Only project owners or admins can approve releases',
+      );
     }
 
     const session = await this.prisma.releaseSession.findFirst({
@@ -866,7 +871,9 @@ export class ReleaseService {
     // 检查权限
     const canApprove = await this.canApproveRelease(projectId, userId);
     if (!canApprove) {
-      throw new BadRequestException('Only project owners or admins can reject releases');
+      throw new BadRequestException(
+        'Only project owners or admins can reject releases',
+      );
     }
 
     const session = await this.prisma.releaseSession.findFirst({
@@ -896,7 +903,11 @@ export class ReleaseService {
     return { session: updated };
   }
 
-  async publishReleaseSession(projectId: string, sessionId: string, userId: string) {
+  async publishReleaseSession(
+    projectId: string,
+    sessionId: string,
+    userId: string,
+  ) {
     const normalized = typeof sessionId === 'string' ? sessionId.trim() : '';
     if (!normalized) {
       throw new BadRequestException('sessionId is required');
@@ -914,14 +925,19 @@ export class ReleaseService {
 
     // 检查发布权限
     const approvalEnabled = await this.isApprovalEnabled(projectId);
-    
+
     if (approvalEnabled) {
       // 启用了审批流程
       if (session.status === 'DRAFT') {
         // 检查是否是单 Owner，如果是则自动批准
-        const canAutoApprove = await this.canPublishWithoutApproval(projectId, userId);
+        const canAutoApprove = await this.canPublishWithoutApproval(
+          projectId,
+          userId,
+        );
         if (!canAutoApprove) {
-          throw new BadRequestException('Release session must be approved before publishing');
+          throw new BadRequestException(
+            'Release session must be approved before publishing',
+          );
         }
         // 单 Owner 自动批准
         await this.prisma.releaseSession.update({
@@ -929,12 +945,16 @@ export class ReleaseService {
           data: { status: 'APPROVED', reviewedAt: new Date() },
         });
       } else if (session.status !== 'APPROVED') {
-        throw new BadRequestException('Release session must be approved before publishing');
+        throw new BadRequestException(
+          'Release session must be approved before publishing',
+        );
       }
     } else {
       // 未启用审批，直接发布
       if (session.status !== 'DRAFT' && session.status !== 'APPROVED') {
-        throw new BadRequestException(`Cannot publish from ${session.status} status`);
+        throw new BadRequestException(
+          `Cannot publish from ${session.status} status`,
+        );
       }
     }
 

@@ -2,10 +2,6 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma.service';
 import {
   WorkspaceStatsDto,
-  WorkspaceTaskDto,
-  TaskType,
-  TaskPriority,
-  TaskStatus,
   ReleaseTaskDto,
   ApprovalTaskDto,
 } from './dto/workspace.dto';
@@ -30,17 +26,19 @@ export class WorkspaceService {
       select: { role: true },
     });
 
-    const isOwner = await this.prisma.projectOwner.findUnique({
-      where: { projectId_userId: { projectId, userId } },
-    }) !== null;
+    const isOwner =
+      (await this.prisma.projectOwner.findUnique({
+        where: { projectId_userId: { projectId, userId } },
+      })) !== null;
 
     let isMember = false;
     if (project.accessMode === 'PUBLIC') {
       isMember = true;
     } else {
-      isMember = await this.prisma.projectMember.findUnique({
-        where: { projectId_userId: { projectId, userId } },
-      }) !== null;
+      isMember =
+        (await this.prisma.projectMember.findUnique({
+          where: { projectId_userId: { projectId, userId } },
+        })) !== null;
     }
 
     return {
@@ -52,7 +50,10 @@ export class WorkspaceService {
 
   // ==================== 统计接口（新）====================
 
-  async getStats(projectId: string, userId: string): Promise<WorkspaceStatsDto> {
+  async getStats(
+    projectId: string,
+    userId: string,
+  ): Promise<WorkspaceStatsDto> {
     const role = await this.getUserRole(projectId, userId);
 
     if (role.isAdmin) {
@@ -118,7 +119,10 @@ export class WorkspaceService {
   }
 
   // Owner 统计
-  private async getOwnerStats(projectId: string, userId: string): Promise<WorkspaceStatsDto> {
+  private async getOwnerStats(
+    projectId: string,
+    _userId: string,
+  ): Promise<WorkspaceStatsDto> {
     const project = await this.prisma.project.findUnique({
       where: { id: projectId },
       select: { approvalEnabled: true },
@@ -177,7 +181,10 @@ export class WorkspaceService {
   }
 
   // Member 统计
-  private async getMemberStats(projectId: string, userId: string): Promise<WorkspaceStatsDto> {
+  private async getMemberStats(
+    projectId: string,
+    userId: string,
+  ): Promise<WorkspaceStatsDto> {
     // 我的待发布变更（DRAFT 状态的发布申请）
     const myPendingRelease = await this.prisma.releaseSession.count({
       where: {
@@ -226,8 +233,8 @@ export class WorkspaceService {
     const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
     const monthlyContributions = await this.prisma.translation.count({
       where: {
-        key: {
-          namespace: {
+        Key: {
+          Namespace: {
             projectId,
           },
         },
@@ -300,7 +307,7 @@ export class WorkspaceService {
           status: 'IN_REVIEW',
         },
         include: {
-          project: {
+          Project: {
             select: {
               name: true,
             },

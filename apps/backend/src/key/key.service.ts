@@ -35,18 +35,18 @@ export class KeyService {
         name: createKeyDto.name,
       },
       include: {
-        namespace: {
+        Namespace: {
           select: {
             id: true,
             name: true,
           },
         },
-        translations: {
+        Translation: {
           orderBy: {
             updatedAt: 'desc',
           },
           include: {
-            locale: true,
+            Locale: true,
           },
         },
       },
@@ -70,18 +70,18 @@ export class KeyService {
     return this.prisma.key.findMany({
       where: {
         namespaceId: namespaceId,
-        namespace: { projectId },
+        Namespace: { projectId },
       },
       orderBy: {
         updatedAt: 'desc',
       },
       include: {
-        translations: {
+        Translation: {
           orderBy: {
             updatedAt: 'desc',
           },
           include: {
-            locale: true,
+            Locale: true,
           },
         },
       },
@@ -97,14 +97,14 @@ export class KeyService {
     return this.prisma.key.findMany({
       where: {
         name: normalized,
-        namespace: { projectId },
+        Namespace: { projectId },
         ...(excludeKeyId ? { NOT: { id: excludeKeyId } } : {}),
       },
       orderBy: {
         updatedAt: 'desc',
       },
       include: {
-        namespace: {
+        Namespace: {
           select: {
             id: true,
             name: true,
@@ -112,7 +112,7 @@ export class KeyService {
         },
         _count: {
           select: {
-            translations: true,
+            Translation: true,
           },
         },
       },
@@ -137,7 +137,7 @@ export class KeyService {
       where: {
         id: targetKeyId,
         namespaceId,
-        namespace: { projectId },
+        Namespace: { projectId },
       },
     });
     if (!targetKey) {
@@ -147,7 +147,7 @@ export class KeyService {
     const sourceKey = await this.prisma.key.findFirst({
       where: {
         id: sourceKeyId,
-        namespace: { projectId },
+        Namespace: { projectId },
       },
     });
     if (!sourceKey) {
@@ -157,8 +157,8 @@ export class KeyService {
     const sourceTranslations = await this.prisma.translation.findMany({
       where: {
         keyId: sourceKeyId,
-        key: {
-          namespace: { projectId },
+        Key: {
+          Namespace: { projectId },
         },
       },
       select: {
@@ -208,15 +208,15 @@ export class KeyService {
       where: {
         id,
         namespaceId,
-        namespace: { projectId },
+        Namespace: { projectId },
       },
       include: {
-        translations: {
+        Translation: {
           orderBy: {
             updatedAt: 'desc',
           },
           include: {
-            locale: true,
+            Locale: true,
           },
         },
       },
@@ -248,7 +248,7 @@ export class KeyService {
       where: {
         id,
         namespaceId,
-        namespace: { projectId },
+        Namespace: { projectId },
       },
       select: { id: true },
     });
@@ -287,12 +287,12 @@ export class KeyService {
     const keys = await this.prisma.key.findMany({
       where: {
         namespaceId,
-        namespace: { projectId },
+        Namespace: { projectId },
       },
       include: {
-        translations: {
+        Translation: {
           include: {
-            locale: true,
+            Locale: true,
           },
         },
       },
@@ -302,8 +302,8 @@ export class KeyService {
     const exportData: Record<string, Record<string, string>> = {};
     keys.forEach((key) => {
       const translations: Record<string, string> = {};
-      key.translations.forEach((translation) => {
-        translations[translation.locale.code] = translation.content;
+      key.Translation.forEach((translation) => {
+        translations[translation.Locale.code] = translation.content;
       });
       exportData[key.name] = translations;
     });

@@ -19,12 +19,12 @@ export class NamespaceService {
       select: {
         id: true,
         baseLocale: true,
-        projectLocales: {
+        ProjectLocale: {
           where: {
             enabled: true,
           },
           select: {
-            locale: {
+            Locale: {
               select: {
                 code: true,
               },
@@ -38,8 +38,8 @@ export class NamespaceService {
     }
 
     const baseLocale = project.baseLocale || 'zh-CN';
-    const hasBaseLocale = project.projectLocales.some(
-      (pl) => pl.locale.code === baseLocale,
+    const hasBaseLocale = project.ProjectLocale.some(
+      (pl) => pl.Locale.code === baseLocale,
     );
 
     if (!hasBaseLocale) {
@@ -167,11 +167,11 @@ export class NamespaceService {
         projectId,
       },
       include: {
-        keys: {
+        Key: {
           include: {
-            translations: {
+            Translation: {
               include: {
-                locale: true,
+                Locale: true,
               },
             },
           },
@@ -196,10 +196,10 @@ export class NamespaceService {
     for (const namespace of namespaces) {
       const namespaceData: Record<string, Record<string, string>> = {};
 
-      for (const key of namespace.keys) {
+      for (const key of namespace.Key) {
         const translations: Record<string, string> = {};
-        for (const translation of key.translations) {
-          translations[translation.locale.code] = translation.content;
+        for (const translation of key.Translation) {
+          translations[translation.Locale.code] = translation.content;
         }
         namespaceData[key.name] = translations;
       }
@@ -221,7 +221,9 @@ export class NamespaceService {
     });
 
     if (!project?.currentReleaseId) {
-      throw new NotFoundException('No published release found for this project');
+      throw new NotFoundException(
+        'No published release found for this project',
+      );
     }
 
     // 获取命名空间名称
@@ -256,7 +258,7 @@ export class NamespaceService {
 
     for (const artifact of artifacts) {
       const data = artifact.data as Record<string, Record<string, string>>;
-      
+
       // 只包含指定的命名空间
       for (const namespaceName of namespaceNames) {
         if (data[namespaceName]) {
@@ -264,7 +266,9 @@ export class NamespaceService {
             exportData[namespaceName] = {};
           }
           // 合并该命名空间下的所有 key
-          for (const [keyName, content] of Object.entries(data[namespaceName])) {
+          for (const [keyName, content] of Object.entries(
+            data[namespaceName],
+          )) {
             if (!exportData[namespaceName][keyName]) {
               exportData[namespaceName][keyName] = {};
             }

@@ -37,8 +37,8 @@ export class ReviewsService {
 
     // 构建查询条件
     const whereCondition: any = {
-      key: {
-        namespace: {
+      Key: {
+        Namespace: {
           projectId,
         },
       },
@@ -59,13 +59,13 @@ export class ReviewsService {
       this.prisma.translation.findMany({
         where: whereCondition,
         include: {
-          key: {
+          Key: {
             include: {
-              namespace: true,
+              Namespace: true,
             },
           },
-          locale: true,
-          submitter: true,
+          Locale: true,
+          User_Translation_submitterIdToUser: true,
         },
         orderBy: {
           updatedAt: 'desc',
@@ -80,13 +80,14 @@ export class ReviewsService {
 
     const items: ReviewTask[] = translations.map((translation) => ({
       id: translation.id,
-      keyName: translation.key.name,
-      keyDescription: translation.key.description || undefined,
-      namespace: translation.key.namespace.name,
+      keyName: translation.Key.name,
+      keyDescription: translation.Key.description || undefined,
+      namespace: translation.Key.Namespace.name,
       content: translation.content,
-      localeCode: translation.locale.code,
-      localeName: translation.locale.name,
-      submitterName: translation.submitter?.name || undefined,
+      localeCode: translation.Locale.code,
+      localeName: translation.Locale.name,
+      submitterName:
+        translation.User_Translation_submitterIdToUser?.name || undefined,
       status: translation.status,
       createdAt: translation.createdAt.toISOString(),
       updatedAt: translation.updatedAt.toISOString(),

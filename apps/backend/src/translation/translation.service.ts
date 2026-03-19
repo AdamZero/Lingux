@@ -26,7 +26,7 @@ export class TranslationService {
       where: {
         id: keyId,
         namespaceId,
-        namespace: { projectId },
+        Namespace: { projectId },
       },
     });
     if (!key) {
@@ -136,16 +136,16 @@ export class TranslationService {
     return this.prisma.translation.findMany({
       where: {
         keyId: keyId,
-        key: {
+        Key: {
           namespaceId,
-          namespace: { projectId },
+          Namespace: { projectId },
         },
       },
       orderBy: {
         updatedAt: 'desc',
       },
       include: {
-        locale: true,
+        Locale: true,
       },
     });
   }
@@ -161,13 +161,13 @@ export class TranslationService {
       where: {
         keyId,
         localeId,
-        key: {
+        Key: {
           namespaceId,
-          namespace: { projectId },
+          Namespace: { projectId },
         },
       },
       include: {
-        locale: true,
+        Locale: true,
       },
     });
     if (!translation) {

@@ -18,18 +18,18 @@ model Config {
 }
 
 model Asset {
-  id          String   @id
+  id          String   @id @default(cuid())
   name        String
   url         String
   type        String
   description String?
   projectId   String
   createdAt   DateTime @default(now())
-  updatedAt   DateTime
+  updatedAt   DateTime @updatedAt
 }
 
 model AuditLog {
-  id            String         @id
+  id            String         @id @default(cuid())
   action        String
   targetType    String
   targetId      String
@@ -50,23 +50,23 @@ model AuditLog {
 }
 
 model Enterprise {
-  id               String             @id
+  id               String             @id @default(cuid())
   name             String
   domain           String?            @unique
   externalId       String?            @unique
   platform         String
   createdAt        DateTime           @default(now())
-  updatedAt        DateTime
+  updatedAt        DateTime           @updatedAt
   EnterpriseMember EnterpriseMember[]
 }
 
 model EnterpriseMember {
-  id           String     @id
+  id           String     @id @default(cuid())
   enterpriseId String
   userId       String
   role         String     @default("member")
   createdAt    DateTime   @default(now())
-  updatedAt    DateTime
+  updatedAt    DateTime   @updatedAt
   Enterprise   Enterprise @relation(fields: [enterpriseId], references: [id], onDelete: Cascade)
   User         User       @relation(fields: [userId], references: [id], onDelete: Cascade)
 
@@ -74,13 +74,13 @@ model EnterpriseMember {
 }
 
 model Key {
-  id          String        @id
+  id          String        @id @default(cuid())
   name        String
   description String?
   type        KeyType       @default(TEXT)
   namespaceId String
   createdAt   DateTime      @default(now())
-  updatedAt   DateTime
+  updatedAt   DateTime      @updatedAt
   Namespace   Namespace     @relation(fields: [namespaceId], references: [id])
   Translation Translation[]
 
@@ -88,22 +88,22 @@ model Key {
 }
 
 model Locale {
-  id            String          @id
+  id            String          @id @default(cuid())
   code          String          @unique
   name          String
   createdAt     DateTime        @default(now())
-  updatedAt     DateTime
+  updatedAt     DateTime        @updatedAt
   ProjectLocale ProjectLocale[]
   Translation   Translation[]
 }
 
 model Namespace {
-  id          String   @id
+  id          String   @id @default(cuid())
   name        String
   description String?
   projectId   String
   createdAt   DateTime @default(now())
-  updatedAt   DateTime
+  updatedAt   DateTime @updatedAt
   Key         Key[]
   Project     Project  @relation(fields: [projectId], references: [id])
 
@@ -111,12 +111,12 @@ model Namespace {
 }
 
 model Project {
-  id                                        String           @id
+  id                                        String           @id @default(cuid())
   name                                      String
   description                               String?
   baseLocale                                String           @default("zh-CN")
   createdAt                                 DateTime         @default(now())
-  updatedAt                                 DateTime
+  updatedAt                                 DateTime         @updatedAt
   currentReleaseId                          String?          @unique
   approvalEnabled                           Boolean          @default(false)
   accessMode                                String           @default("PUBLIC")
@@ -136,7 +136,7 @@ model ProjectLocale {
   enabled    Boolean   @default(true)
   disabledAt DateTime?
   createdAt  DateTime  @default(now())
-  updatedAt  DateTime
+  updatedAt  DateTime  @updatedAt
   Locale     Locale    @relation(fields: [localeId], references: [id])
   Project    Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
 
@@ -145,7 +145,7 @@ model ProjectLocale {
 }
 
 model ProjectMember {
-  id        String   @id
+  id        String   @id @default(cuid())
   projectId String
   userId    String
   createdAt DateTime @default(now())
@@ -157,7 +157,7 @@ model ProjectMember {
 }
 
 model ProjectOwner {
-  id        String   @id
+  id        String   @id @default(cuid())
   projectId String
   userId    String
   createdAt DateTime @default(now())
@@ -169,7 +169,7 @@ model ProjectOwner {
 }
 
 model Release {
-  id                                                        String            @id
+  id                                                        String            @id @default(cuid())
   projectId                                                 String
   basedOnReleaseId                                          String?
   version                                                   Int
@@ -189,7 +189,7 @@ model Release {
 }
 
 model ReleaseArtifact {
-  id         String   @id
+  id         String   @id @default(cuid())
   releaseId  String
   localeCode String
   data       Json
@@ -201,7 +201,7 @@ model ReleaseArtifact {
 }
 
 model ReleaseSession {
-  id                                                 String               @id
+  id                                                 String               @id @default(cuid())
   projectId                                          String
   status                                             ReleaseSessionStatus @default(DRAFT)
   baseReleaseId                                      String?
@@ -219,7 +219,7 @@ model ReleaseSession {
   publishedReleaseId                                 String?
   expiresAt                                          DateTime?
   createdAt                                          DateTime             @default(now())
-  updatedAt                                          DateTime
+  updatedAt                                          DateTime             @updatedAt
   Release_ReleaseSession_baseReleaseIdToRelease      Release?             @relation("ReleaseSession_baseReleaseIdToRelease", fields: [baseReleaseId], references: [id])
   Project                                            Project              @relation(fields: [projectId], references: [id], onDelete: Cascade)
   Release_ReleaseSession_publishedReleaseIdToRelease Release?             @relation("ReleaseSession_publishedReleaseIdToRelease", fields: [publishedReleaseId], references: [id])
@@ -229,7 +229,7 @@ model ReleaseSession {
 }
 
 model Translation {
-  id                                 String              @id
+  id                                 String              @id @default(cuid())
   content                            String
   status                             TranslationStatus   @default(PENDING)
   isLlmTranslated                    Boolean             @default(false)
@@ -238,7 +238,7 @@ model Translation {
   localeId                           String
   reviewerId                         String?
   createdAt                          DateTime            @default(now())
-  updatedAt                          DateTime
+  updatedAt                          DateTime            @updatedAt
   approvedAt                         DateTime?
   dueDate                            DateTime?
   priority                           TranslationPriority @default(MEDIUM)
@@ -255,13 +255,13 @@ model Translation {
 }
 
 model User {
-  id                                        String             @id
+  id                                        String             @id @default(cuid())
   username                                  String             @unique
   email                                     String?            @unique
   role                                      UserRole           @default(EDITOR)
   externalId                                String?            @unique
   createdAt                                 DateTime           @default(now())
-  updatedAt                                 DateTime
+  updatedAt                                 DateTime           @updatedAt
   avatar                                    String?
   mobile                                    String?
   name                                      String?

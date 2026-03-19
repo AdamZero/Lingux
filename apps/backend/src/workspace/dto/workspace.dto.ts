@@ -1,8 +1,8 @@
 export class WorkspaceStatsDto {
-  pendingApproval: number;   // 待审批的发布申请
-  myPendingRelease: number;  // 我的待发布变更
-  monthlyReleases: number;   // 本月发布次数
-  memberCount: number;       // 成员数（或贡献数）
+  pendingApproval: number; // 待审批的发布申请
+  myPendingRelease: number; // 我的待发布变更
+  monthlyReleases: number; // 本月发布次数
+  memberCount: number; // 成员数（或贡献数）
 }
 
 // 旧的 DTO 保留兼容

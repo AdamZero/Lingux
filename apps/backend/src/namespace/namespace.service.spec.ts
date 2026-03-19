@@ -242,7 +242,12 @@ describe('NamespaceService', () => {
         },
       ]);
 
-      const result = await service.exportMultiple(projectId, ['ns-1'], 'json', 'all');
+      const result = await service.exportMultiple(
+        projectId,
+        ['ns-1'],
+        'json',
+        'all',
+      );
       const parsed = JSON.parse(result as string);
       expect(parsed).toEqual({ common: {} });
     });
@@ -265,7 +270,12 @@ describe('NamespaceService', () => {
       ];
       prisma.namespace.findMany.mockResolvedValue(mockNamespaces);
 
-      const result = await service.exportMultiple(projectId, ['ns-1'], 'xlsx', 'all');
+      const result = await service.exportMultiple(
+        projectId,
+        ['ns-1'],
+        'xlsx',
+        'all',
+      );
       expect(Buffer.isBuffer(result)).toBe(true);
     });
   });

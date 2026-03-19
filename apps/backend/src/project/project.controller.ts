@@ -159,7 +159,8 @@ export class ProjectController {
   @Patch(':projectId/settings')
   updateSettings(
     @Param('projectId') projectId: string,
-    @Body() body: { approvalEnabled?: boolean; accessMode?: 'PUBLIC' | 'PRIVATE' },
+    @Body()
+    body: { approvalEnabled?: boolean; accessMode?: 'PUBLIC' | 'PRIVATE' },
     @Request() req: { user: { id: string } },
   ) {
     return this.projectService.updateSettings(projectId, body, req.user.id);
