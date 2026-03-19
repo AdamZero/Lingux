@@ -39,7 +39,7 @@ export class NamespaceController {
     @Param('projectId') projectId: string,
     @Query('namespaceIds') namespaceIds: string,
     @Query('format') format: 'json' | 'yaml' | 'xlsx' = 'json',
-    @Res({ passthrough: true }) res?: Response,
+    @Res() res: Response,
   ) {
     if (!namespaceIds) {
       throw new BadRequestException('namespaceIds is required');
@@ -59,7 +59,7 @@ export class NamespaceController {
     const fileName = `translations-${new Date().toISOString().slice(0, 19).replace(/:/g, '')}.${format}`;
 
     // For Excel format, stream the buffer directly
-    if (format === 'xlsx' && Buffer.isBuffer(content) && res) {
+    if (format === 'xlsx' && Buffer.isBuffer(content)) {
       res.setHeader(
         'Content-Type',
         'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
