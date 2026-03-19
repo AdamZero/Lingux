@@ -96,6 +96,9 @@ const KeysPage: React.FC = () => {
     "json" | "yaml" | "xlsx"
   >("json");
 
+  // Batch publish state
+  const [isBatchPublishMode, setIsBatchPublishMode] = useState(false);
+
   const [isImportPreviewModalOpen, setIsImportPreviewModalOpen] =
     useState(false);
   const [importPreviewData, setImportPreviewData] = useState<{
@@ -390,6 +393,16 @@ const KeysPage: React.FC = () => {
     setIsBatchExportModalOpen(true);
   };
 
+  const openBatchPublish = () => {
+    setIsBatchPublishMode(true);
+    setIsPublishOpen(true);
+  };
+
+  const handlePublishClose = () => {
+    setIsPublishOpen(false);
+    setIsBatchPublishMode(false);
+  };
+
   const handleImport = async () => {
     if (!importFile) {
       message.error("请选择文件");
@@ -555,6 +568,7 @@ const KeysPage: React.FC = () => {
           onSelect={setSelectedNamespaceId}
           onCreate={() => setIsNamespaceModalOpen(true)}
           onBatchExport={openBatchExportModal}
+          onBatchPublish={openBatchPublish}
         />
       </Sider>
 
@@ -568,7 +582,10 @@ const KeysPage: React.FC = () => {
                 size="small"
                 icon={<UploadOutlined />}
                 disabled={!projectId || namespaces.length === 0}
-                onClick={() => setIsPublishOpen(true)}
+                onClick={() => {
+                  setIsBatchPublishMode(false);
+                  setIsPublishOpen(true);
+                }}
               >
                 发布
               </Button>
@@ -743,22 +760,28 @@ const KeysPage: React.FC = () => {
       {projectId && project?.locales?.length ? (
         <PublishDrawer
           open={isPublishOpen}
-          onClose={() => setIsPublishOpen(false)}
+          onClose={handlePublishClose}
           projectId={projectId}
           baseLocale={project.baseLocale}
           locales={project.locales.map((l) => ({ code: l.code, name: l.name }))}
           currentReleaseId={project.currentReleaseId ?? null}
           scope={
-            selectedNamespaceId
-              ? { type: "namespaces", namespaceIds: [selectedNamespaceId] }
-              : { type: "all" }
+            isBatchPublishMode
+              ? { type: "namespaces", namespaceIds: [] }
+              : selectedNamespaceId
+                ? { type: "namespaces", namespaceIds: [selectedNamespaceId] }
+                : { type: "all" }
           }
           scopeLabel={
-            selectedNamespaceId
-              ? `命名空间: ${selectedNamespace?.name ?? selectedNamespaceId}`
-              : "全部"
+            isBatchPublishMode
+              ? "请选择命名空间"
+              : selectedNamespaceId
+                ? `命名空间: ${selectedNamespace?.name ?? selectedNamespaceId}`
+                : "全部"
           }
           onEditKey={handleEditKeyByName}
+          namespaces={namespaces.map((n) => ({ id: n.id, name: n.name }))}
+          allowScopeChange={isBatchPublishMode}
         />
       ) : null}
 

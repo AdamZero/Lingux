@@ -638,9 +638,7 @@ async function createProjectTestData(
   console.log(`    Created translations for ${project.name}`);
 }
 
-function generateKeysForNamespace(
-  namespace: string,
-): Array<{
+function generateKeysForNamespace(namespace: string): Array<{
   name: string;
   description?: string;
   type?: KeyType;

@@ -13,6 +13,7 @@ import {
   FolderOutlined,
   MoreOutlined,
   DownloadOutlined,
+  CloudUploadOutlined,
 } from "@ant-design/icons";
 
 const { Text } = Typography;
@@ -30,6 +31,7 @@ interface NamespaceSidebarProps {
   onSelect: (id: string) => void;
   onCreate: () => void;
   onBatchExport?: () => void;
+  onBatchPublish?: () => void;
 }
 
 export const NamespaceSidebar: React.FC<NamespaceSidebarProps> = ({
@@ -39,6 +41,7 @@ export const NamespaceSidebar: React.FC<NamespaceSidebarProps> = ({
   onSelect,
   onCreate,
   onBatchExport,
+  onBatchPublish,
 }) => {
   if (isLoading) {
     return (
@@ -49,6 +52,12 @@ export const NamespaceSidebar: React.FC<NamespaceSidebarProps> = ({
   }
 
   const batchMenuItems = [
+    {
+      key: "publish",
+      label: "批量发布",
+      icon: <CloudUploadOutlined />,
+      onClick: onBatchPublish,
+    },
     {
       key: "export",
       label: "批量导出",
@@ -69,7 +78,7 @@ export const NamespaceSidebar: React.FC<NamespaceSidebarProps> = ({
       >
         <Text strong>命名空间</Text>
         <Space>
-          {namespaces.length > 0 && onBatchExport && (
+          {namespaces.length > 0 && (onBatchExport || onBatchPublish) && (
             <Dropdown menu={{ items: batchMenuItems }} placement="bottomRight">
               <Button type="text" size="small" icon={<MoreOutlined />} />
             </Dropdown>

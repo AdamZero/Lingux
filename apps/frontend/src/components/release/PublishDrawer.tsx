@@ -6,6 +6,7 @@ import {
   Drawer,
   Input,
   Modal,
+  Select,
   Space,
   Table,
   Typography,
@@ -36,6 +37,11 @@ import type {
 
 type LocaleOption = { code: string; name: string };
 
+interface NamespaceOption {
+  id: string;
+  name: string;
+}
+
 type Props = {
   open: boolean;
   onClose: () => void;
@@ -46,6 +52,8 @@ type Props = {
   scope: PreviewReleasePayload["scope"];
   scopeLabel: string;
   onEditKey?: (keyName: string) => void;
+  namespaces?: NamespaceOption[];
+  allowScopeChange?: boolean;
 };
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
@@ -76,12 +84,28 @@ const PublishDrawer: React.FC<Props> = (props) => {
   const [preview, setPreview] = useState<PreviewReleaseResponse | null>(null);
   const isInitializingRef = useRef(false);
 
+  // Scope selection state (only for batch publish)
+  const [selectedNamespaceIds, setSelectedNamespaceIds] = useState<string[]>(
+    [],
+  );
+
+  // Initialize scope from props
+  useEffect(() => {
+    if (props.open) {
+      if (props.scope.type === "namespaces") {
+        setSelectedNamespaceIds(props.scope.namespaceIds);
+      } else {
+        setSelectedNamespaceIds([]);
+      }
+    }
+  }, [props.open, props.scope]);
+
   const allLocaleCodes = useMemo(
     () => props.locales.map((l) => l.code),
     [props.locales],
   );
 
-  // 合并同一个 key 的错误，按 key 分组
+  // 合并同一个 key 的错误，按 key 分组，并根据当前 scope 过滤
   const groupedErrors = useMemo(() => {
     if (!preview) return [];
 
@@ -94,7 +118,22 @@ const PublishDrawer: React.FC<Props> = (props) => {
       }
     >();
 
+    // Get the list of allowed namespace IDs based on current scope
+    const allowedNamespaceIds = props.allowScopeChange
+      ? selectedNamespaceIds
+      : props.scope.type === "namespaces"
+        ? props.scope.namespaceIds
+        : null; // null means all namespaces (no filter)
+
     preview.errors.forEach((error) => {
+      // Filter by namespace if in scoped mode
+      if (
+        allowedNamespaceIds !== null &&
+        !allowedNamespaceIds.includes(error.namespaceId)
+      ) {
+        return;
+      }
+
       const key = `${error.namespaceId}:${error.keyId}`;
       if (groupMap.has(key)) {
         groupMap.get(key)!.localeCodes.push(error.localeCode);
@@ -108,7 +147,7 @@ const PublishDrawer: React.FC<Props> = (props) => {
     });
 
     return Array.from(groupMap.values());
-  }, [preview]);
+  }, [preview, props.allowScopeChange, props.scope, selectedNamespaceIds]);
 
   const errorColumns: ColumnsType<{
     keyName: string;
@@ -278,7 +317,7 @@ const PublishDrawer: React.FC<Props> = (props) => {
     onSuccess: (res) => {
       message.success(`发布成功：${res.releaseId}`);
       setPreview(null);
-      form.resetFields();
+      setSelectedNamespaceIds([]);
       props.onClose();
     },
     onError: (error: unknown) => {
@@ -338,8 +377,31 @@ const PublishDrawer: React.FC<Props> = (props) => {
 
   const close = () => {
     setPreview(null);
+    setSelectedNamespaceIds([]);
     props.onClose();
   };
+
+  // Compute current scope based on selection
+  const currentScope = useMemo<PreviewReleasePayload["scope"]>(() => {
+    // In batch publish mode (allowScopeChange), always use namespaces scope
+    // In single publish mode, use the scope from props
+    if (props.allowScopeChange) {
+      return { type: "namespaces", namespaceIds: selectedNamespaceIds };
+    }
+    return props.scope;
+  }, [props.allowScopeChange, props.scope, selectedNamespaceIds]);
+
+  // Compute scope label for display
+  const currentScopeLabel = useMemo(() => {
+    if (selectedNamespaceIds.length === 0) {
+      return "未选择命名空间";
+    }
+    if (selectedNamespaceIds.length === 1 && props.namespaces) {
+      const ns = props.namespaces.find((n) => n.id === selectedNamespaceIds[0]);
+      return `命名空间: ${ns?.name ?? selectedNamespaceIds[0]}`;
+    }
+    return `命名空间: ${selectedNamespaceIds.length}个`;
+  }, [selectedNamespaceIds, props.namespaces]);
 
   useEffect(() => {
     if (!props.open) {
@@ -357,7 +419,7 @@ const PublishDrawer: React.FC<Props> = (props) => {
 
         isInitializingRef.current = false;
         previewMutation.mutate({
-          scope: props.scope,
+          scope: currentScope,
           localeCodes: allLocaleCodes,
         });
       } catch {
@@ -370,7 +432,7 @@ const PublishDrawer: React.FC<Props> = (props) => {
     previewMutation,
     props.open,
     props.projectId,
-    props.scope,
+    currentScope,
   ]);
 
   return (
@@ -470,6 +532,59 @@ const PublishDrawer: React.FC<Props> = (props) => {
           gap: 16,
         }}
       >
+        {/* Scope Selection - Only show in batch publish mode */}
+        {props.allowScopeChange &&
+          props.namespaces &&
+          props.namespaces.length > 0 && (
+            <Card size="small" title="选择要发布的命名空间">
+              <Select
+                mode="multiple"
+                placeholder="请选择命名空间"
+                value={selectedNamespaceIds}
+                onChange={(newIds) => {
+                  // Check if "__ALL__" was selected
+                  if (newIds.includes("__ALL__")) {
+                    const allIds = props.namespaces!.map((n) => n.id);
+                    setSelectedNamespaceIds(allIds);
+                    previewMutation.mutate({
+                      scope: { type: "namespaces", namespaceIds: allIds },
+                      localeCodes: allLocaleCodes,
+                    });
+                  } else {
+                    setSelectedNamespaceIds(newIds);
+                    // Auto-trigger preview when selection changes
+                    if (newIds.length > 0) {
+                      previewMutation.mutate({
+                        scope: { type: "namespaces", namespaceIds: newIds },
+                        localeCodes: allLocaleCodes,
+                      });
+                    } else {
+                      setPreview(null);
+                    }
+                  }
+                }}
+                options={[
+                  { label: "全选", value: "__ALL__" },
+                  ...props.namespaces.map((ns) => ({
+                    label: ns.name,
+                    value: ns.id,
+                  })),
+                ]}
+                style={{ width: "100%" }}
+                maxTagCount={3}
+                allowClear
+              />
+            </Card>
+          )}
+
+        {/* Scope Label Display - Only show in single namespace publish mode */}
+        {!props.allowScopeChange && (
+          <Card size="small">
+            <Typography.Text type="secondary">发布范围: </Typography.Text>
+            <Typography.Text strong>{currentScopeLabel}</Typography.Text>
+          </Card>
+        )}
+
         {groupedErrors.length > 0 && !preview?.canPublish ? (
           <Card
             size="small"
