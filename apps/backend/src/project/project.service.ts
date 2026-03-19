@@ -801,9 +801,50 @@ export class ProjectService {
     return { success: true };
   }
 
+  async getMyRole(projectId: string, userId: string) {
+    const project = await this.prisma.project.findUnique({
+      where: { id: projectId },
+      select: { accessMode: true },
+    });
+    if (!project) {
+      throw new NotFoundException(`Project with ID ${projectId} not found`);
+    }
+
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { role: true },
+    });
+
+    // 检查是否是 Owner
+    const ownerRecord = await this.prisma.projectOwner.findUnique({
+      where: { projectId_userId: { projectId, userId } },
+    });
+    const isOwner = !!ownerRecord;
+
+    // 检查是否是成员
+    let isMember = false;
+    if (project.accessMode === 'PUBLIC') {
+      // PUBLIC 模式：全员可访问
+      isMember = true;
+    } else {
+      // PRIVATE 模式：检查是否在成员列表
+      const memberRecord = await this.prisma.projectMember.findUnique({
+        where: { projectId_userId: { projectId, userId } },
+      });
+      isMember = !!memberRecord;
+    }
+
+    return {
+      isAdmin: user?.role === 'ADMIN',
+      isOwner,
+      isMember: isOwner || isMember, // Owner 一定是 Member
+      accessMode: project.accessMode,
+    };
+  }
+
   async updateSettings(
     projectId: string,
-    settings: { approvalEnabled?: boolean },
+    settings: { approvalEnabled?: boolean; accessMode?: 'PUBLIC' | 'PRIVATE' },
     currentUserId: string,
   ) {
     // 检查项目是否存在
@@ -825,11 +866,17 @@ export class ProjectService {
     }
 
     // 更新设置
+    const updateData: any = {};
+    if (settings.approvalEnabled !== undefined) {
+      updateData.approvalEnabled = settings.approvalEnabled;
+    }
+    if (settings.accessMode !== undefined) {
+      updateData.accessMode = settings.accessMode;
+    }
+
     const updatedProject = await this.prisma.project.update({
       where: { id: projectId },
-      data: {
-        approvalEnabled: settings.approvalEnabled,
-      },
+      data: updateData,
       include: {
         projectLocales: {
           where: { enabled: true },

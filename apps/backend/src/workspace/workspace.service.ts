@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma.service';
 import {
   WorkspaceStatsDto,
@@ -6,93 +6,257 @@ import {
   TaskType,
   TaskPriority,
   TaskStatus,
+  ReleaseTaskDto,
+  ApprovalTaskDto,
 } from './dto/workspace.dto';
 
 @Injectable()
 export class WorkspaceService {
   constructor(private prisma: PrismaService) {}
 
-  async getStats(
-    projectId: string,
-    userId: string,
-  ): Promise<WorkspaceStatsDto> {
-    // 获取用户有 EDIT 权限的命名空间
-    const userProject = await this.prisma.project.findFirst({
-      where: {
-        id: projectId,
-        users: {
-          some: {
-            id: userId,
-          },
-        },
-      },
-      include: {
-        namespaces: {
-          include: {
-            keys: {
-              include: {
-                translations: {
-                  where: {
-                    status: 'PENDING',
-                  },
-                },
-              },
-            },
-          },
-        },
-      },
+  // ==================== 角色判定 ====================
+
+  async getUserRole(projectId: string, userId: string) {
+    const project = await this.prisma.project.findUnique({
+      where: { id: projectId },
+      select: { accessMode: true },
+    });
+    if (!project) {
+      throw new NotFoundException(`Project with ID ${projectId} not found`);
+    }
+
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { role: true },
     });
 
-    if (!userProject) {
-      return { pending: 0, reviewing: 0, approved: 0 };
+    const isOwner = await this.prisma.projectOwner.findUnique({
+      where: { projectId_userId: { projectId, userId } },
+    }) !== null;
+
+    let isMember = false;
+    if (project.accessMode === 'PUBLIC') {
+      isMember = true;
+    } else {
+      isMember = await this.prisma.projectMember.findUnique({
+        where: { projectId_userId: { projectId, userId } },
+      }) !== null;
     }
 
-    // 统计 pending 数量
-    let pendingCount = 0;
-    for (const namespace of userProject.namespaces) {
-      for (const key of namespace.keys) {
-        pendingCount += key.translations.length;
-      }
+    return {
+      isAdmin: user?.role === 'ADMIN',
+      isOwner,
+      isMember: isOwner || isMember,
+    };
+  }
+
+  // ==================== 统计接口（新）====================
+
+  async getStats(projectId: string, userId: string): Promise<WorkspaceStatsDto> {
+    const role = await this.getUserRole(projectId, userId);
+
+    if (role.isAdmin) {
+      return this.getAdminStats(projectId);
+    } else if (role.isOwner) {
+      return this.getOwnerStats(projectId, userId);
+    } else if (role.isMember) {
+      return this.getMemberStats(projectId, userId);
     }
 
-    // 统计 reviewing 数量（当前用户提交的）
-    const reviewingCount = await this.prisma.translation.count({
-      where: {
-        status: 'REVIEWING',
-        submitterId: userId,
-        key: {
-          namespace: {
+    throw new NotFoundException('Project not found or no access');
+  }
+
+  // Admin 统计（全局视角）
+  private async getAdminStats(projectId: string): Promise<WorkspaceStatsDto> {
+    const project = await this.prisma.project.findUnique({
+      where: { id: projectId },
+      select: { approvalEnabled: true },
+    });
+
+    if (!project) {
+      throw new NotFoundException(`Project with ID ${projectId} not found`);
+    }
+
+    // 待审批的发布申请
+    const pendingApproval = project.approvalEnabled
+      ? await this.prisma.releaseSession.count({
+          where: {
             projectId,
+            status: 'IN_REVIEW',
           },
-        },
-      },
-    });
+        })
+      : 0;
 
-    // 统计 approved 数量（当前用户本月提交的）
+    // 本月发布次数
     const now = new Date();
     const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-
-    const approvedCount = await this.prisma.translation.count({
+    const monthlyReleases = await this.prisma.release.count({
       where: {
-        status: 'APPROVED',
-        submitterId: userId,
-        approvedAt: {
+        projectId,
+        createdAt: {
           gte: startOfMonth,
         },
+      },
+    });
+
+    // 项目成员数
+    const memberCount = await this.prisma.projectMember.count({
+      where: { projectId },
+    });
+
+    // Owner 数量
+    const ownerCount = await this.prisma.projectOwner.count({
+      where: { projectId },
+    });
+
+    return {
+      pendingApproval,
+      myPendingRelease: 0, // Admin 不关注个人
+      monthlyReleases,
+      memberCount: memberCount + ownerCount,
+    };
+  }
+
+  // Owner 统计
+  private async getOwnerStats(projectId: string, userId: string): Promise<WorkspaceStatsDto> {
+    const project = await this.prisma.project.findUnique({
+      where: { id: projectId },
+      select: { approvalEnabled: true },
+    });
+
+    if (!project) {
+      throw new NotFoundException(`Project with ID ${projectId} not found`);
+    }
+
+    // 待我审批的发布申请
+    const pendingApproval = project.approvalEnabled
+      ? await this.prisma.releaseSession.count({
+          where: {
+            projectId,
+            status: 'IN_REVIEW',
+          },
+        })
+      : 0;
+
+    // 我的待发布变更（DRAFT 状态的发布申请）
+    const myPendingRelease = await this.prisma.releaseSession.count({
+      where: {
+        projectId,
+        status: 'DRAFT',
+      },
+    });
+
+    // 本月发布次数
+    const now = new Date();
+    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+    const monthlyReleases = await this.prisma.release.count({
+      where: {
+        projectId,
+        createdAt: {
+          gte: startOfMonth,
+        },
+      },
+    });
+
+    // 项目成员数
+    const memberCount = await this.prisma.projectMember.count({
+      where: { projectId },
+    });
+
+    // Owner 数量
+    const ownerCount = await this.prisma.projectOwner.count({
+      where: { projectId },
+    });
+
+    return {
+      pendingApproval,
+      myPendingRelease,
+      monthlyReleases,
+      memberCount: memberCount + ownerCount,
+    };
+  }
+
+  // Member 统计
+  private async getMemberStats(projectId: string, userId: string): Promise<WorkspaceStatsDto> {
+    // 我的待发布变更（DRAFT 状态的发布申请）
+    const myPendingRelease = await this.prisma.releaseSession.count({
+      where: {
+        projectId,
+        status: 'DRAFT',
+      },
+    });
+
+    // 我的发布申请状态统计
+    const mySessions = await this.prisma.releaseSession.groupBy({
+      by: ['status'],
+      where: {
+        projectId,
+      },
+      _count: {
+        status: true,
+      },
+    });
+
+    const sessionStats = {
+      draft: 0,
+      inReview: 0,
+      approved: 0,
+      rejected: 0,
+    };
+
+    mySessions.forEach((s) => {
+      switch (s.status) {
+        case 'DRAFT':
+          sessionStats.draft = s._count.status;
+          break;
+        case 'IN_REVIEW':
+          sessionStats.inReview = s._count.status;
+          break;
+        case 'APPROVED':
+          sessionStats.approved = s._count.status;
+          break;
+        case 'REJECTED':
+          sessionStats.rejected = s._count.status;
+          break;
+      }
+    });
+
+    // 本月贡献（修改的翻译数量）
+    const now = new Date();
+    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+    const monthlyContributions = await this.prisma.translation.count({
+      where: {
         key: {
           namespace: {
             projectId,
           },
+        },
+        submitterId: userId,
+        createdAt: {
+          gte: startOfMonth,
+        },
+      },
+    });
+
+    // 项目总发布次数
+    const monthlyReleases = await this.prisma.release.count({
+      where: {
+        projectId,
+        createdAt: {
+          gte: startOfMonth,
         },
       },
     });
 
     return {
-      pending: pendingCount,
-      reviewing: reviewingCount,
-      approved: approvedCount,
+      pendingApproval: 0, // Member 不关注待审批
+      myPendingRelease,
+      monthlyReleases,
+      memberCount: monthlyContributions, // 用 memberCount 字段存贡献数
     };
   }
+
+  // ==================== 任务接口（新）====================
 
   async getTasks(
     projectId: string,
@@ -100,105 +264,112 @@ export class WorkspaceService {
     page: number = 1,
     pageSize: number = 20,
   ) {
-    const user = await this.prisma.user.findUnique({
-      where: { id: userId },
+    const role = await this.getUserRole(projectId, userId);
+
+    if (role.isAdmin || role.isOwner) {
+      return this.getApprovalTasks(projectId, userId, page, pageSize);
+    } else if (role.isMember) {
+      return this.getMyReleaseTasks(projectId, userId, page, pageSize);
+    }
+
+    return { items: [], total: 0, page, pageSize, totalPages: 0 };
+  }
+
+  // Owner/Admin：待审批的发布申请
+  private async getApprovalTasks(
+    projectId: string,
+    userId: string,
+    page: number,
+    pageSize: number,
+  ) {
+    const skip = (page - 1) * pageSize;
+
+    const project = await this.prisma.project.findUnique({
+      where: { id: projectId },
+      select: { approvalEnabled: true },
     });
 
-    if (!user) {
+    if (!project?.approvalEnabled) {
       return { items: [], total: 0, page, pageSize, totalPages: 0 };
     }
 
-    const skip = (page - 1) * pageSize;
-
-    // 根据用户角色确定任务类型
-    const isReviewer = user.role === 'REVIEWER' || user.role === 'ADMIN';
-
-    // 查询任务
-    const whereCondition: any = {
-      key: {
-        namespace: {
+    const [sessions, total] = await this.prisma.$transaction([
+      this.prisma.releaseSession.findMany({
+        where: {
           projectId,
+          status: 'IN_REVIEW',
         },
-      },
-    };
-
-    if (isReviewer) {
-      // 审核员查看待审核的任务
-      whereCondition.status = 'REVIEWING';
-    } else {
-      // 翻译员查看待翻译的任务
-      whereCondition.status = 'PENDING';
-    }
-
-    const [translations, total] = await this.prisma.$transaction([
-      this.prisma.translation.findMany({
-        where: whereCondition,
         include: {
-          key: {
-            include: {
-              namespace: true,
+          project: {
+            select: {
+              name: true,
             },
           },
-          locale: true,
-          submitter: true,
         },
-        orderBy: [{ priority: 'desc' }, { updatedAt: 'desc' }],
+        orderBy: { createdAt: 'desc' },
         skip,
         take: pageSize,
       }),
-      this.prisma.translation.count({
-        where: whereCondition,
+      this.prisma.releaseSession.count({
+        where: {
+          projectId,
+          status: 'IN_REVIEW',
+        },
       }),
     ]);
 
-    const tasks: WorkspaceTaskDto[] = translations.map((translation) => {
-      const type = isReviewer ? TaskType.REVIEW : TaskType.TRANSLATION;
-      const status =
-        translation.status === 'REVIEWING'
-          ? TaskStatus.REVIEWING
-          : TaskStatus.PENDING;
+    const tasks: ApprovalTaskDto[] = sessions.map((session) => ({
+      id: session.id,
+      type: 'RELEASE_APPROVAL' as const,
+      title: `审批发布申请`,
+      description: session.note || '无描述',
+      status: 'PENDING' as const,
+      scope: session.scope as any,
+      createdAt: session.createdAt.toISOString(),
+    }));
 
-      // 计算优先级
-      let priority = TaskPriority.MEDIUM;
-      if (translation.dueDate) {
-        const daysUntilDue = Math.ceil(
-          (new Date(translation.dueDate).getTime() - Date.now()) /
-            (1000 * 60 * 60 * 24),
-        );
-        if (daysUntilDue < 3) {
-          priority = TaskPriority.HIGH;
-        } else if (daysUntilDue > 7) {
-          priority = TaskPriority.LOW;
-        }
-      }
+    return {
+      items: tasks,
+      total,
+      page,
+      pageSize,
+      totalPages: Math.ceil(total / pageSize),
+    };
+  }
 
-      return {
-        id: translation.id,
-        type,
-        title: `翻译 ${translation.key.name}`,
-        description: translation.key.description || undefined,
-        priority,
-        status,
-        dueDate: translation.dueDate?.toISOString(),
-        key: {
-          id: translation.key.id,
-          name: translation.key.name,
-          namespace: translation.key.namespace.name,
-          description: translation.key.description || undefined,
+  // Member：我的发布申请
+  private async getMyReleaseTasks(
+    projectId: string,
+    userId: string,
+    page: number,
+    pageSize: number,
+  ) {
+    const skip = (page - 1) * pageSize;
+
+    const [sessions, total] = await this.prisma.$transaction([
+      this.prisma.releaseSession.findMany({
+        where: {
+          projectId,
         },
-        sourceTranslation: {
-          id: translation.id,
-          content: translation.content,
-          locale: translation.locale.code,
+        orderBy: { createdAt: 'desc' },
+        skip,
+        take: pageSize,
+      }),
+      this.prisma.releaseSession.count({
+        where: {
+          projectId,
         },
-        targetLocale: {
-          code: translation.locale.code,
-          name: translation.locale.name,
-        },
-        createdAt: translation.createdAt.toISOString(),
-        updatedAt: translation.updatedAt.toISOString(),
-      };
-    });
+      }),
+    ]);
+
+    const tasks: ReleaseTaskDto[] = sessions.map((session) => ({
+      id: session.id,
+      type: 'MY_RELEASE' as const,
+      title: `发布申请`,
+      status: session.status as any,
+      scope: session.scope as any,
+      createdAt: session.createdAt.toISOString(),
+    }));
 
     return {
       items: tasks,
