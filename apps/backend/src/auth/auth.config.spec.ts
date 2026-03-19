@@ -1,5 +1,13 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { AuthModule } from './auth.module';
+import { WinstonLoggerService } from '../common/logger/logger.service';
+
+const mockLoggerService = {
+  log: jest.fn(),
+  error: jest.fn(),
+  warn: jest.fn(),
+  debug: jest.fn(),
+};
 
 describe('AuthModule Configuration', () => {
   const originalEnv = process.env;
@@ -20,7 +28,10 @@ describe('AuthModule Configuration', () => {
 
     const module: TestingModule = await Test.createTestingModule({
       imports: [AuthModule],
-    }).compile();
+    })
+      .overrideProvider(WinstonLoggerService)
+      .useValue(mockLoggerService)
+      .compile();
 
     expect(module).toBeDefined();
     // The module should compile successfully with the env JWT_SECRET
@@ -32,7 +43,10 @@ describe('AuthModule Configuration', () => {
 
     const module: TestingModule = await Test.createTestingModule({
       imports: [AuthModule],
-    }).compile();
+    })
+      .overrideProvider(WinstonLoggerService)
+      .useValue(mockLoggerService)
+      .compile();
 
     expect(module).toBeDefined();
     // The module should compile with default secret

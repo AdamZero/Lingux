@@ -6,6 +6,7 @@ describe('AuthService', () => {
   let prismaService: any;
   let jwtService: any;
   let enterpriseService: any;
+  let loggerService: any;
 
   beforeEach(() => {
     // Create fresh mocks for each test
@@ -28,11 +29,19 @@ describe('AuthService', () => {
       associateUserWithEnterprise: jest.fn(),
     };
 
+    loggerService = {
+      log: jest.fn(),
+      error: jest.fn(),
+      warn: jest.fn(),
+      debug: jest.fn(),
+    };
+
     // Directly instantiate the service with mocks
     authService = new AuthService(
       prismaService as any,
       jwtService as any,
       enterpriseService as any,
+      loggerService as any,
     );
   });
 

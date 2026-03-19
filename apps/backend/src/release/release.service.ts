@@ -47,6 +47,40 @@ export class ReleaseService {
 
   private systemUserId: string | null = null;
 
+  // ==================== 权限检查 ====================
+
+  async isProjectOwner(projectId: string, userId: string): Promise<boolean> {
+    const owner = await this.prisma.projectOwner.findUnique({
+      where: { projectId_userId: { projectId, userId } },
+    });
+    return !!owner;
+  }
+
+  async canApproveRelease(projectId: string, userId: string): Promise<boolean> {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { role: true },
+    });
+    if (user?.role === 'ADMIN') return true;
+    return await this.isProjectOwner(projectId, userId);
+  }
+
+  async canPublishWithoutApproval(projectId: string, userId: string): Promise<boolean> {
+    const owners = await this.prisma.projectOwner.findMany({
+      where: { projectId },
+    });
+    // 必须有且只有一个 Owner，且该 Owner 是当前用户
+    return owners.length === 1 && owners[0]?.userId === userId;
+  }
+
+  async isApprovalEnabled(projectId: string): Promise<boolean> {
+    const project = await this.prisma.project.findUnique({
+      where: { id: projectId },
+      select: { approvalEnabled: true },
+    });
+    return project?.approvalEnabled ?? false;
+  }
+
   private isPlainObject(value: unknown): value is Record<string, unknown> {
     return typeof value === 'object' && value !== null && !Array.isArray(value);
   }
@@ -773,11 +807,18 @@ export class ReleaseService {
   async approveReleaseSession(
     projectId: string,
     sessionId: string,
+    userId: string,
     note?: string,
   ) {
     const normalized = typeof sessionId === 'string' ? sessionId.trim() : '';
     if (!normalized) {
       throw new BadRequestException('sessionId is required');
+    }
+
+    // 检查权限
+    const canApprove = await this.canApproveRelease(projectId, userId);
+    if (!canApprove) {
+      throw new BadRequestException('Only project owners or admins can approve releases');
     }
 
     const session = await this.prisma.releaseSession.findFirst({
@@ -810,6 +851,7 @@ export class ReleaseService {
   async rejectReleaseSession(
     projectId: string,
     sessionId: string,
+    userId: string,
     reason: string,
   ) {
     const normalized = typeof sessionId === 'string' ? sessionId.trim() : '';
@@ -819,6 +861,12 @@ export class ReleaseService {
     const normalizedReason = typeof reason === 'string' ? reason.trim() : '';
     if (!normalizedReason) {
       throw new BadRequestException('reason is required');
+    }
+
+    // 检查权限
+    const canApprove = await this.canApproveRelease(projectId, userId);
+    if (!canApprove) {
+      throw new BadRequestException('Only project owners or admins can reject releases');
     }
 
     const session = await this.prisma.releaseSession.findFirst({
@@ -848,7 +896,7 @@ export class ReleaseService {
     return { session: updated };
   }
 
-  async publishReleaseSession(projectId: string, sessionId: string) {
+  async publishReleaseSession(projectId: string, sessionId: string, userId: string) {
     const normalized = typeof sessionId === 'string' ? sessionId.trim() : '';
     if (!normalized) {
       throw new BadRequestException('sessionId is required');
@@ -864,8 +912,30 @@ export class ReleaseService {
       );
     }
 
-    if (session.status !== 'APPROVED') {
-      throw new BadRequestException('ReleaseSession is not approved');
+    // 检查发布权限
+    const approvalEnabled = await this.isApprovalEnabled(projectId);
+    
+    if (approvalEnabled) {
+      // 启用了审批流程
+      if (session.status === 'DRAFT') {
+        // 检查是否是单 Owner，如果是则自动批准
+        const canAutoApprove = await this.canPublishWithoutApproval(projectId, userId);
+        if (!canAutoApprove) {
+          throw new BadRequestException('Release session must be approved before publishing');
+        }
+        // 单 Owner 自动批准
+        await this.prisma.releaseSession.update({
+          where: { id: normalized },
+          data: { status: 'APPROVED', reviewedAt: new Date() },
+        });
+      } else if (session.status !== 'APPROVED') {
+        throw new BadRequestException('Release session must be approved before publishing');
+      }
+    } else {
+      // 未启用审批，直接发布
+      if (session.status !== 'DRAFT' && session.status !== 'APPROVED') {
+        throw new BadRequestException(`Cannot publish from ${session.status} status`);
+      }
     }
 
     const baseReleaseId = session.baseReleaseId ?? null;

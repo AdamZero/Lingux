@@ -243,7 +243,7 @@ describe('ReleaseService', () => {
       });
 
       await expect(
-        service.publishReleaseSession(projectId, 'sess-1'),
+        service.publishReleaseSession(projectId, 'sess-1', 'user-1'),
       ).rejects.toThrow(BadRequestException);
     });
 
@@ -272,7 +272,7 @@ describe('ReleaseService', () => {
         createdAt: new Date(),
       });
 
-      const result = await service.publishReleaseSession(projectId, 'sess-1');
+      const result = await service.publishReleaseSession(projectId, 'sess-1', 'user-1');
 
       expect(result.releaseId).toBe('rel-2');
       expect(result.currentReleaseId).toBe('rel-2');

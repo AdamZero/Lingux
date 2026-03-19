@@ -135,7 +135,31 @@ export class NamespaceService {
     projectId: string,
     namespaceIds: string[],
     format: 'json' | 'yaml' | 'xlsx',
+    mode: 'published' | 'all' = 'published',
   ): Promise<string | Buffer> {
+    let exportData: Record<string, Record<string, Record<string, string>>>;
+
+    if (mode === 'published') {
+      // 从 ReleaseArtifact 导出已发布数据
+      exportData = await this.exportPublishedData(projectId, namespaceIds);
+    } else {
+      // 从 Translation 表导出所有数据
+      exportData = await this.exportAllData(projectId, namespaceIds);
+    }
+
+    if (format === 'yaml') {
+      return yaml.dump(exportData);
+    } else if (format === 'xlsx') {
+      return this.exportToExcel(exportData);
+    } else {
+      return JSON.stringify(exportData, null, 2);
+    }
+  }
+
+  private async exportAllData(
+    projectId: string,
+    namespaceIds: string[],
+  ): Promise<Record<string, Record<string, Record<string, string>>>> {
     // Verify all namespaces belong to this project
     const namespaces = await this.prisma.namespace.findMany({
       where: {
@@ -183,13 +207,74 @@ export class NamespaceService {
       exportData[namespace.name] = namespaceData;
     }
 
-    if (format === 'yaml') {
-      return yaml.dump(exportData);
-    } else if (format === 'xlsx') {
-      return this.exportToExcel(exportData);
-    } else {
-      return JSON.stringify(exportData, null, 2);
+    return exportData;
+  }
+
+  private async exportPublishedData(
+    projectId: string,
+    namespaceIds: string[],
+  ): Promise<Record<string, Record<string, Record<string, string>>>> {
+    // 获取项目的当前发布
+    const project = await this.prisma.project.findUnique({
+      where: { id: projectId },
+      select: { currentReleaseId: true },
+    });
+
+    if (!project?.currentReleaseId) {
+      throw new NotFoundException('No published release found for this project');
     }
+
+    // 获取命名空间名称
+    const namespaces = await this.prisma.namespace.findMany({
+      where: {
+        id: { in: namespaceIds },
+        projectId,
+      },
+      select: { id: true, name: true },
+    });
+
+    if (namespaces.length !== namespaceIds.length) {
+      const foundIds = namespaces.map((n) => n.id);
+      const missingIds = namespaceIds.filter((id) => !foundIds.includes(id));
+      throw new NotFoundException(
+        `Namespaces not found: ${missingIds.join(', ')}`,
+      );
+    }
+
+    const namespaceNames = namespaces.map((n) => n.name);
+
+    // 获取 ReleaseArtifact
+    const artifacts = await this.prisma.releaseArtifact.findMany({
+      where: { releaseId: project.currentReleaseId },
+    });
+
+    // Build export data
+    const exportData: Record<
+      string,
+      Record<string, Record<string, string>>
+    > = {};
+
+    for (const artifact of artifacts) {
+      const data = artifact.data as Record<string, Record<string, string>>;
+      
+      // 只包含指定的命名空间
+      for (const namespaceName of namespaceNames) {
+        if (data[namespaceName]) {
+          if (!exportData[namespaceName]) {
+            exportData[namespaceName] = {};
+          }
+          // 合并该命名空间下的所有 key
+          for (const [keyName, content] of Object.entries(data[namespaceName])) {
+            if (!exportData[namespaceName][keyName]) {
+              exportData[namespaceName][keyName] = {};
+            }
+            exportData[namespaceName][keyName][artifact.localeCode] = content;
+          }
+        }
+      }
+    }
+
+    return exportData;
   }
 
   private exportToExcel(

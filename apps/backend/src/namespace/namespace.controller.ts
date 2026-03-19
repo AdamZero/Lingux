@@ -39,6 +39,7 @@ export class NamespaceController {
     @Param('projectId') projectId: string,
     @Query('namespaceIds') namespaceIds: string,
     @Query('format') format: 'json' | 'yaml' | 'xlsx' = 'json',
+    @Query('mode') mode: 'published' | 'all' = 'published',
     @Res() res: Response,
   ) {
     if (!namespaceIds) {
@@ -54,11 +55,12 @@ export class NamespaceController {
       projectId,
       ids,
       format,
+      mode,
     );
 
     const fileName = `translations-${new Date().toISOString().slice(0, 19).replace(/:/g, '')}.${format}`;
 
-    // For Excel format, stream the buffer directly
+    // For Excel format, stream the buffer directly as file download
     if (format === 'xlsx' && Buffer.isBuffer(content)) {
       res.setHeader(
         'Content-Type',
@@ -72,11 +74,12 @@ export class NamespaceController {
       return;
     }
 
-    return {
-      content,
-      format,
-      fileName,
-    };
+    // For JSON/YAML formats, return as file download with appropriate content type
+    const contentType = format === 'yaml' ? 'text/yaml' : 'application/json';
+    res.setHeader('Content-Type', contentType);
+    res.setHeader('Content-Disposition', `attachment; filename="${fileName}"`);
+    res.send(content);
+    return;
   }
 
   @Get(':namespaceId')

@@ -120,7 +120,7 @@ describe('NamespaceService', () => {
   describe('exportMultiple', () => {
     const projectId = 'proj-1';
 
-    it('should export namespaces as JSON', async () => {
+    it('should export namespaces as JSON (all mode)', async () => {
       const namespaceIds = ['ns-1'];
       const mockNamespaces = [
         {
@@ -145,6 +145,7 @@ describe('NamespaceService', () => {
         projectId,
         namespaceIds,
         'json',
+        'all',
       );
 
       expect(typeof result).toBe('string');
@@ -157,7 +158,7 @@ describe('NamespaceService', () => {
       });
     });
 
-    it('should export namespaces as YAML', async () => {
+    it('should export namespaces as YAML (all mode)', async () => {
       const namespaceIds = ['ns-1'];
       const mockNamespaces = [
         {
@@ -179,6 +180,7 @@ describe('NamespaceService', () => {
         projectId,
         namespaceIds,
         'yaml',
+        'all',
       );
 
       expect(typeof result).toBe('string');
@@ -187,7 +189,7 @@ describe('NamespaceService', () => {
       expect(result).toContain('zh-CN: 你好');
     });
 
-    it('should export namespaces as Excel buffer', async () => {
+    it('should export namespaces as Excel buffer (all mode)', async () => {
       const namespaceIds = ['ns-1'];
       const mockNamespaces = [
         {
@@ -212,24 +214,25 @@ describe('NamespaceService', () => {
         projectId,
         namespaceIds,
         'xlsx',
+        'all',
       );
 
       expect(Buffer.isBuffer(result)).toBe(true);
       expect((result as Buffer).length).toBeGreaterThan(0);
     });
 
-    it('should throw NotFoundException if some namespaces not found', async () => {
+    it('should throw NotFoundException if some namespaces not found (all mode)', async () => {
       const namespaceIds = ['ns-1', 'ns-2'];
       prisma.namespace.findMany.mockResolvedValue([
         { id: 'ns-1', name: 'common', projectId, keys: [] },
       ]);
 
       await expect(
-        service.exportMultiple(projectId, namespaceIds, 'json'),
+        service.exportMultiple(projectId, namespaceIds, 'json', 'all'),
       ).rejects.toThrow(NotFoundException);
     });
 
-    it('should handle empty namespaces', async () => {
+    it('should handle empty namespaces (all mode)', async () => {
       prisma.namespace.findMany.mockResolvedValue([
         {
           id: 'ns-1',
@@ -239,12 +242,12 @@ describe('NamespaceService', () => {
         },
       ]);
 
-      const result = await service.exportMultiple(projectId, ['ns-1'], 'json');
+      const result = await service.exportMultiple(projectId, ['ns-1'], 'json', 'all');
       const parsed = JSON.parse(result as string);
       expect(parsed).toEqual({ common: {} });
     });
 
-    it('should handle namespace with long name for Excel (truncate to 31 chars)', async () => {
+    it('should handle namespace with long name for Excel (truncate to 31 chars, all mode)', async () => {
       const longName = 'a'.repeat(50);
       const mockNamespaces = [
         {
@@ -262,7 +265,7 @@ describe('NamespaceService', () => {
       ];
       prisma.namespace.findMany.mockResolvedValue(mockNamespaces);
 
-      const result = await service.exportMultiple(projectId, ['ns-1'], 'xlsx');
+      const result = await service.exportMultiple(projectId, ['ns-1'], 'xlsx', 'all');
       expect(Buffer.isBuffer(result)).toBe(true);
     });
   });

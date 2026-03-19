@@ -580,4 +580,264 @@ export class ProjectService {
 
     return result;
   }
+
+  // ==================== 项目成员管理 ====================
+
+  async getMembers(projectId: string) {
+    const project = await this.prisma.project.findUnique({
+      where: { id: projectId },
+      include: {
+        owners: {
+          include: {
+            user: {
+              select: { id: true, username: true, name: true, email: true, avatar: true },
+            },
+          },
+        },
+        users: {
+          select: { id: true, username: true, name: true, email: true, avatar: true },
+        },
+      },
+    });
+
+    if (!project) {
+      throw new NotFoundException(`Project with ID ${projectId} not found`);
+    }
+
+    const ownerIds = new Set(project.owners.map((o) => o.userId));
+
+    return {
+      owners: project.owners.map((o) => o.user),
+      members: project.users.filter((u) => !ownerIds.has(u.id)),
+    };
+  }
+
+  async addOwner(projectId: string, userId: string, currentUserId: string) {
+    // 检查项目是否存在
+    const project = await this.prisma.project.findUnique({
+      where: { id: projectId },
+      include: { owners: true },
+    });
+    if (!project) {
+      throw new NotFoundException(`Project with ID ${projectId} not found`);
+    }
+
+    // 检查当前用户是否有权限（Owner 或 ADMIN）
+    const currentUser = await this.prisma.user.findUnique({
+      where: { id: currentUserId },
+    });
+    const isOwner = project.owners.some((o) => o.userId === currentUserId);
+    if (!isOwner && currentUser?.role !== 'ADMIN') {
+      throw new BadRequestException('Only project owners or admins can add owners');
+    }
+
+    // 检查用户是否存在
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+    });
+    if (!user) {
+      throw new NotFoundException(`User with ID ${userId} not found`);
+    }
+
+    // 检查是否已经是 Owner
+    const existingOwner = await this.prisma.projectOwner.findUnique({
+      where: { projectId_userId: { projectId, userId } },
+    });
+    if (existingOwner) {
+      throw new BadRequestException('User is already an owner of this project');
+    }
+
+    // 添加 Owner
+    await this.prisma.projectOwner.create({
+      data: { projectId, userId },
+    });
+
+    // 同时添加到项目成员（如果还不是）
+    await this.prisma.project.update({
+      where: { id: projectId },
+      data: {
+        users: {
+          connect: { id: userId },
+        },
+      },
+    });
+
+    return { success: true };
+  }
+
+  async removeOwner(projectId: string, userId: string, currentUserId: string) {
+    // 检查项目是否存在
+    const project = await this.prisma.project.findUnique({
+      where: { id: projectId },
+      include: { owners: true },
+    });
+    if (!project) {
+      throw new NotFoundException(`Project with ID ${projectId} not found`);
+    }
+
+    // 检查当前用户是否有权限（Owner 或 ADMIN）
+    const currentUser = await this.prisma.user.findUnique({
+      where: { id: currentUserId },
+    });
+    const isOwner = project.owners.some((o) => o.userId === currentUserId);
+    if (!isOwner && currentUser?.role !== 'ADMIN') {
+      throw new BadRequestException('Only project owners or admins can remove owners');
+    }
+
+    // 检查是否是 Owner
+    const existingOwner = await this.prisma.projectOwner.findUnique({
+      where: { projectId_userId: { projectId, userId } },
+    });
+    if (!existingOwner) {
+      throw new BadRequestException('User is not an owner of this project');
+    }
+
+    // 检查是否是最后一个 Owner - 使用事务确保并发安全
+    await this.prisma.$transaction(async (tx) => {
+      // 重新查询 owner 数量（在事务内）
+      const ownerCount = await tx.projectOwner.count({
+        where: { projectId },
+      });
+
+      if (ownerCount <= 1) {
+        throw new BadRequestException('Cannot remove the last owner. Please add another owner first.');
+      }
+
+      // 移除 Owner
+      await tx.projectOwner.delete({
+        where: { projectId_userId: { projectId, userId } },
+      });
+    });
+
+    return { success: true };
+  }
+
+  async addMember(projectId: string, userId: string, currentUserId: string) {
+    // 检查项目是否存在
+    const project = await this.prisma.project.findUnique({
+      where: { id: projectId },
+      include: { owners: true },
+    });
+    if (!project) {
+      throw new NotFoundException(`Project with ID ${projectId} not found`);
+    }
+
+    // 检查当前用户是否有权限（Owner 或 ADMIN）
+    const currentUser = await this.prisma.user.findUnique({
+      where: { id: currentUserId },
+    });
+    const isOwner = project.owners.some((o) => o.userId === currentUserId);
+    if (!isOwner && currentUser?.role !== 'ADMIN') {
+      throw new BadRequestException('Only project owners or admins can add members');
+    }
+
+    // 检查用户是否存在
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+    });
+    if (!user) {
+      throw new NotFoundException(`User with ID ${userId} not found`);
+    }
+
+    // 检查是否已经是成员
+    const existingMember = await this.prisma.project.findFirst({
+      where: {
+        id: projectId,
+        users: { some: { id: userId } },
+      },
+    });
+    if (existingMember) {
+      throw new BadRequestException('User is already a member of this project');
+    }
+
+    // 添加成员
+    await this.prisma.project.update({
+      where: { id: projectId },
+      data: {
+        users: {
+          connect: { id: userId },
+        },
+      },
+    });
+
+    return { success: true };
+  }
+
+  async removeMember(projectId: string, userId: string, currentUserId: string) {
+    // 检查项目是否存在
+    const project = await this.prisma.project.findUnique({
+      where: { id: projectId },
+      include: { owners: true },
+    });
+    if (!project) {
+      throw new NotFoundException(`Project with ID ${projectId} not found`);
+    }
+
+    // 检查当前用户是否有权限（Owner 或 ADMIN）
+    const currentUser = await this.prisma.user.findUnique({
+      where: { id: currentUserId },
+    });
+    const isOwner = project.owners.some((o) => o.userId === currentUserId);
+    if (!isOwner && currentUser?.role !== 'ADMIN') {
+      throw new BadRequestException('Only project owners or admins can remove members');
+    }
+
+    // 检查是否是 Owner（Owner 不能直接移除，需要先移除 Owner 身份）
+    const isTargetOwner = project.owners.some((o) => o.userId === userId);
+    if (isTargetOwner) {
+      throw new BadRequestException('Cannot remove an owner. Please remove owner status first.');
+    }
+
+    // 移除成员
+    await this.prisma.project.update({
+      where: { id: projectId },
+      data: {
+        users: {
+          disconnect: { id: userId },
+        },
+      },
+    });
+
+    return { success: true };
+  }
+
+  async updateSettings(
+    projectId: string,
+    settings: { approvalEnabled?: boolean },
+    currentUserId: string,
+  ) {
+    // 检查项目是否存在
+    const project = await this.prisma.project.findUnique({
+      where: { id: projectId },
+      include: { owners: true },
+    });
+    if (!project) {
+      throw new NotFoundException(`Project with ID ${projectId} not found`);
+    }
+
+    // 检查当前用户是否有权限（Owner 或 ADMIN）
+    const currentUser = await this.prisma.user.findUnique({
+      where: { id: currentUserId },
+    });
+    const isOwner = project.owners.some((o) => o.userId === currentUserId);
+    if (!isOwner && currentUser?.role !== 'ADMIN') {
+      throw new BadRequestException('Only project owners or admins can update settings');
+    }
+
+    // 更新设置
+    const updatedProject = await this.prisma.project.update({
+      where: { id: projectId },
+      data: {
+        approvalEnabled: settings.approvalEnabled,
+      },
+      include: {
+        projectLocales: {
+          where: { enabled: true },
+          include: { locale: true },
+        },
+      },
+    });
+
+    return this.toProjectResponse(updatedProject);
+  }
 }

@@ -58,11 +58,13 @@ describe('ReleaseController', () => {
     const expected = { releaseId: 'rel-2', currentReleaseId: 'rel-2' };
     service.publishReleaseSession.mockResolvedValue(expected);
 
-    const result = await controller.create(projectId, dto as never);
+    const mockReq = { user: { id: 'user-1' } };
+    const result = await controller.create(projectId, dto as never, mockReq as never);
     expect(result).toEqual(expected);
     expect(service.publishReleaseSession).toHaveBeenCalledWith(
       projectId,
       'sess-1',
+      'user-1',
     );
   });
 

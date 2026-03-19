@@ -5,10 +5,18 @@ import { PassportModule } from '@nestjs/passport';
 import { JwtModule } from '@nestjs/jwt';
 import { EnterpriseModule } from '../enterprise/enterprise.module';
 import { PrismaModule } from '../prisma.module';
+import { WinstonLoggerService } from '../common/logger/logger.service';
 
 const mockAuthService = {
   validateUser: jest.fn(),
   login: jest.fn(),
+};
+
+const mockLoggerService = {
+  log: jest.fn(),
+  error: jest.fn(),
+  warn: jest.fn(),
+  debug: jest.fn(),
 };
 
 describe('AuthController', () => {
@@ -30,6 +38,10 @@ describe('AuthController', () => {
         {
           provide: AuthService,
           useValue: mockAuthService,
+        },
+        {
+          provide: WinstonLoggerService,
+          useValue: mockLoggerService,
         },
       ],
     }).compile();

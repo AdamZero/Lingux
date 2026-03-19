@@ -12,6 +12,7 @@ import {
   UploadedFile,
   UseInterceptors,
   BadRequestException,
+  Request,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { ProjectService } from './project.service';
@@ -110,5 +111,57 @@ export class ProjectController {
       mode,
       selectedNamespaces,
     );
+  }
+
+  // ==================== 项目成员管理 ====================
+
+  @Get(':projectId/members')
+  getMembers(@Param('projectId') projectId: string) {
+    return this.projectService.getMembers(projectId);
+  }
+
+  @Post(':projectId/owners')
+  addOwner(
+    @Param('projectId') projectId: string,
+    @Body() body: { userId: string },
+    @Request() req: { user: { id: string } },
+  ) {
+    return this.projectService.addOwner(projectId, body.userId, req.user.id);
+  }
+
+  @Delete(':projectId/owners/:userId')
+  removeOwner(
+    @Param('projectId') projectId: string,
+    @Param('userId') userId: string,
+    @Request() req: { user: { id: string } },
+  ) {
+    return this.projectService.removeOwner(projectId, userId, req.user.id);
+  }
+
+  @Post(':projectId/members')
+  addMember(
+    @Param('projectId') projectId: string,
+    @Body() body: { userId: string },
+    @Request() req: { user: { id: string } },
+  ) {
+    return this.projectService.addMember(projectId, body.userId, req.user.id);
+  }
+
+  @Delete(':projectId/members/:userId')
+  removeMember(
+    @Param('projectId') projectId: string,
+    @Param('userId') userId: string,
+    @Request() req: { user: { id: string } },
+  ) {
+    return this.projectService.removeMember(projectId, userId, req.user.id);
+  }
+
+  @Patch(':projectId/settings')
+  updateSettings(
+    @Param('projectId') projectId: string,
+    @Body() body: { approvalEnabled?: boolean },
+    @Request() req: { user: { id: string } },
+  ) {
+    return this.projectService.updateSettings(projectId, body, req.user.id);
   }
 }
