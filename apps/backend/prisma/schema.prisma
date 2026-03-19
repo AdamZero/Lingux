@@ -11,8 +11,8 @@ model Config {
   key         String   @unique
   value       Json
   description String?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  createdAt   DateTime @default(now()) @db.Timestamptz
+  updatedAt   DateTime @updatedAt @db.Timestamptz
 
   @@index([key])
 }
@@ -24,8 +24,8 @@ model Asset {
   type        String
   description String?
   projectId   String
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  createdAt   DateTime @default(now()) @db.Timestamptz
+  updatedAt   DateTime @updatedAt @db.Timestamptz
 }
 
 model AuditLog {
@@ -41,7 +41,7 @@ model AuditLog {
   correlationId String?
   version       Int            @default(1)
   payload       Json?
-  createdAt     DateTime       @default(now())
+  createdAt     DateTime       @default(now()) @db.Timestamptz
   User          User?          @relation(fields: [userId], references: [id])
 
   @@index([projectId, createdAt])
@@ -65,8 +65,8 @@ model EnterpriseMember {
   enterpriseId String
   userId       String
   role         String     @default("member")
-  createdAt    DateTime   @default(now())
-  updatedAt    DateTime   @updatedAt
+  createdAt    DateTime   @default(now()) @db.Timestamptz
+  updatedAt    DateTime   @updatedAt @db.Timestamptz
   Enterprise   Enterprise @relation(fields: [enterpriseId], references: [id], onDelete: Cascade)
   User         User       @relation(fields: [userId], references: [id], onDelete: Cascade)
 
@@ -79,8 +79,8 @@ model Key {
   description String?
   type        KeyType       @default(TEXT)
   namespaceId String
-  createdAt   DateTime      @default(now())
-  updatedAt   DateTime      @updatedAt
+  createdAt   DateTime      @default(now()) @db.Timestamptz
+  updatedAt   DateTime      @updatedAt @db.Timestamptz
   Namespace   Namespace     @relation(fields: [namespaceId], references: [id])
   Translation Translation[]
 
@@ -134,9 +134,9 @@ model ProjectLocale {
   projectId  String
   localeId   String
   enabled    Boolean   @default(true)
-  disabledAt DateTime?
-  createdAt  DateTime  @default(now())
-  updatedAt  DateTime  @updatedAt
+  disabledAt DateTime? @db.Timestamptz
+  createdAt  DateTime  @default(now()) @db.Timestamptz
+  updatedAt  DateTime  @updatedAt @db.Timestamptz
   Locale     Locale    @relation(fields: [localeId], references: [id])
   Project    Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
 
@@ -148,7 +148,7 @@ model ProjectMember {
   id        String   @id @default(cuid())
   projectId String
   userId    String
-  createdAt DateTime @default(now())
+  createdAt DateTime @default(now()) @db.Timestamptz
   Project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
   User      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
@@ -160,7 +160,7 @@ model ProjectOwner {
   id        String   @id @default(cuid())
   projectId String
   userId    String
-  createdAt DateTime @default(now())
+  createdAt DateTime @default(now()) @db.Timestamptz
   Project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
   User      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
@@ -175,7 +175,7 @@ model Release {
   version                                                   Int
   note                                                      String?
   scope                                                     Json
-  createdAt                                                 DateTime          @default(now())
+  createdAt                                                 DateTime          @default(now()) @db.Timestamptz
   Project_Project_currentReleaseIdToRelease                 Project?          @relation("Project_currentReleaseIdToRelease")
   Release                                                   Release?          @relation("ReleaseToRelease", fields: [basedOnReleaseId], references: [id])
   other_Release                                             Release[]         @relation("ReleaseToRelease")
@@ -193,7 +193,7 @@ model ReleaseArtifact {
   releaseId  String
   localeCode String
   data       Json
-  createdAt  DateTime @default(now())
+  createdAt  DateTime @default(now()) @db.Timestamptz
   Release    Release  @relation(fields: [releaseId], references: [id], onDelete: Cascade)
 
   @@unique([releaseId, localeCode])
@@ -212,14 +212,14 @@ model ReleaseSession {
   nextArtifacts                                      Json
   baseJson                                           String?
   nextJson                                           String?
-  submittedAt                                        DateTime?
-  reviewedAt                                         DateTime?
+  submittedAt                                        DateTime?            @db.Timestamptz
+  reviewedAt                                         DateTime?            @db.Timestamptz
   reviewNote                                         String?
-  publishedAt                                        DateTime?
+  publishedAt                                        DateTime?            @db.Timestamptz
   publishedReleaseId                                 String?
-  expiresAt                                          DateTime?
-  createdAt                                          DateTime             @default(now())
-  updatedAt                                          DateTime             @updatedAt
+  expiresAt                                          DateTime?            @db.Timestamptz
+  createdAt                                          DateTime             @default(now()) @db.Timestamptz
+  updatedAt                                          DateTime             @updatedAt @db.Timestamptz
   Release_ReleaseSession_baseReleaseIdToRelease      Release?             @relation("ReleaseSession_baseReleaseIdToRelease", fields: [baseReleaseId], references: [id])
   Project                                            Project              @relation(fields: [projectId], references: [id], onDelete: Cascade)
   Release_ReleaseSession_publishedReleaseIdToRelease Release?             @relation("ReleaseSession_publishedReleaseIdToRelease", fields: [publishedReleaseId], references: [id])
@@ -237,10 +237,10 @@ model Translation {
   keyId                              String
   localeId                           String
   reviewerId                         String?
-  createdAt                          DateTime            @default(now())
-  updatedAt                          DateTime            @updatedAt
-  approvedAt                         DateTime?
-  dueDate                            DateTime?
+  createdAt                          DateTime            @default(now()) @db.Timestamptz
+  updatedAt                          DateTime            @updatedAt @db.Timestamptz
+  approvedAt                         DateTime?           @db.Timestamptz
+  dueDate                            DateTime?           @db.Timestamptz
   priority                           TranslationPriority @default(MEDIUM)
   submitterId                        String?
   Key                                Key                 @relation(fields: [keyId], references: [id])
@@ -260,8 +260,8 @@ model User {
   email                                     String?            @unique
   role                                      UserRole           @default(EDITOR)
   externalId                                String?            @unique
-  createdAt                                 DateTime           @default(now())
-  updatedAt                                 DateTime           @updatedAt
+  createdAt                                 DateTime           @default(now()) @db.Timestamptz
+  updatedAt                                 DateTime           @updatedAt @db.Timestamptz
   avatar                                    String?
   mobile                                    String?
   name                                      String?

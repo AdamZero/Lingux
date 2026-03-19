@@ -106,12 +106,13 @@ export const TranslationDrawer: React.FC<TranslationDrawerProps> = ({
   if (!editingKey) return null;
 
   const getStatusProgress = () => {
-    const total = editingKey.translations.length;
+    const translations = editingKey.translations || [];
+    const total = translations.length;
     if (total === 0) return 0;
-    const published = editingKey.translations.filter(
+    const published = translations.filter(
       (t) => t.status === "PUBLISHED",
     ).length;
-    const approved = editingKey.translations.filter(
+    const approved = translations.filter(
       (t) => t.status === "APPROVED",
     ).length;
     return Math.round(((published + approved) / total) * 100);
