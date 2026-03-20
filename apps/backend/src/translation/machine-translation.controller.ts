@@ -303,6 +303,14 @@ export class MachineTranslationController {
   }
 
   /**
+   * 获取翻译任务详情
+   */
+  @Get('jobs/:id')
+  async getTranslationJobDetail(@Param('id') id: string) {
+    return this.machineTranslationService.getTranslationJobDetail(id);
+  }
+
+  /**
    * 创建翻译任务（异步）
    */
   @Post('jobs')

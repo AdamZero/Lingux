@@ -359,6 +359,34 @@ export class MachineTranslationService {
   }
 
   /**
+   * 获取翻译任务详情
+   */
+  async getTranslationJobDetail(jobId: string) {
+    const job = await this.prisma.translationJob.findUnique({
+      where: { id: jobId },
+      include: {
+        provider: { select: { id: true, name: true, type: true } },
+        user: { select: { id: true, name: true, avatar: true } },
+        project: { select: { id: true, name: true } },
+        items: {
+          include: {
+            translations: {
+              orderBy: { targetLanguage: 'asc' },
+            },
+          },
+          orderBy: { keyName: 'asc' },
+        },
+      },
+    });
+
+    if (!job) {
+      throw new NotFoundException(`Translation job ${jobId} not found`);
+    }
+
+    return job;
+  }
+
+  /**
    * 创建翻译供应商
    */
   async createProvider(data: CreateProviderData): Promise<ProviderResponse> {
