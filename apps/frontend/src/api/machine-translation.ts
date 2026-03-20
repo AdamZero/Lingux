@@ -163,3 +163,118 @@ export const setDefaultTranslationProvider = async (
 ): Promise<{ message: string }> => {
   return apiClient.put(`/translation-providers/${providerId}/default`);
 };
+
+// ========== 新增：翻译任务分析 API ==========
+
+export interface TranslationJobItem {
+  id: string;
+  keyId: string;
+  keyName: string;
+  namespaceName?: string;
+  sourceContent: string;
+  translations: {
+    targetLanguage: string;
+    translatedContent: string | null;
+    status: string;
+    errorMessage?: string | null;
+    characterCount: number;
+  }[];
+}
+
+export interface TranslationJobDetail {
+  id: string;
+  provider: {
+    id: string;
+    name: string;
+    type: string;
+  };
+  user: {
+    id: string;
+    name: string;
+    avatar?: string;
+  } | null;
+  project?: {
+    id: string;
+    name: string;
+  };
+  status: string;
+  sourceLanguage: string;
+  targetLanguages: string[];
+  totalKeys: number;
+  translatedKeys: number;
+  characterCount: number;
+  error?: string;
+  createdAt: string;
+  completedAt?: string;
+  items: TranslationJobItem[];
+}
+
+export interface TranslationJobListItem {
+  id: string;
+  providerName: string;
+  providerType: string;
+  userId: string | null;
+  userName: string | null;
+  projectId: string | null;
+  projectName: string | null;
+  status: string;
+  sourceLanguage: string;
+  targetLanguages: string[];
+  totalKeys: number;
+  translatedKeys: number;
+  successCount: number;
+  failedCount: number;
+  characterCount: number;
+  createdAt: string;
+  completedAt: string | null;
+}
+
+export interface TranslationJobListResponse {
+  items: TranslationJobListItem[];
+  total: number;
+  page: number;
+  pageSize: number;
+}
+
+export interface MonthlyStats {
+  totalCharacters: number;
+  totalJobs: number;
+  providers: {
+    providerId: string;
+    providerName: string;
+    providerType: string;
+    characterCount: number;
+    jobCount: number;
+    percentage: number;
+  }[];
+}
+
+// 获取翻译任务列表
+export const getTranslationJobs = async (
+  params?: {
+    page?: number;
+    pageSize?: number;
+    userId?: string;
+    providerId?: string;
+    projectId?: string;
+    status?: string;
+    startDate?: string;
+    endDate?: string;
+  },
+): Promise<TranslationJobListResponse> => {
+  return apiClient.get('/translation-providers/jobs', { params });
+};
+
+// 获取翻译任务详情
+export const getTranslationJobDetail = async (
+  jobId: string,
+): Promise<TranslationJobDetail> => {
+  return apiClient.get(`/translation-providers/jobs/${jobId}`);
+};
+
+// 获取月度统计
+export const getMonthlyStats = async (
+  params?: { year?: number; month?: number },
+): Promise<MonthlyStats> => {
+  return apiClient.get('/translation-providers/monthly-stats', { params });
+};
