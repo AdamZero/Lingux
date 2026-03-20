@@ -4,7 +4,7 @@ import { EnterpriseService } from './enterprise.service';
 import type { Request } from 'express';
 import '../auth/types/auth.types'; // 引入类型扩展
 
-@Controller('api/enterprises')
+@Controller('enterprises')
 export class EnterpriseController {
   constructor(private readonly enterpriseService: EnterpriseService) {}
 

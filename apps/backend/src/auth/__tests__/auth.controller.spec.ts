@@ -67,7 +67,7 @@ describe('AuthController', () => {
       // Set up environment variables
       process.env.FEISHU_CLIENT_ID = 'test-client-id';
       process.env.FEISHU_CALLBACK_URL =
-        'http://localhost:3001/api/v1/auth/feishu/callback';
+        'http://localhost:3000/api/v1/auth/feishu/callback';
 
       await authController.feishuLogin(mockResponse);
 

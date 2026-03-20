@@ -10,7 +10,7 @@ export interface Fixtures {
 
 export const test = base.extend<Fixtures>({
   apiClient: async ({ page }, use) => {
-    const apiClient = new APIClient("http://localhost:3001");
+    const apiClient = new APIClient("http://localhost:3000");
     await use(apiClient);
   },
 

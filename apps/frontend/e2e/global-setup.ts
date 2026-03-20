@@ -5,7 +5,7 @@ import { cleanupTestData } from "./utils/test-data";
 async function globalSetup(config: FullConfig) {
   console.log(" Starting global setup...");
 
-  const apiClient = new APIClient("http://localhost:3001");
+  const apiClient = new APIClient("http://localhost:3000");
 
   try {
     await apiClient.devLogin();

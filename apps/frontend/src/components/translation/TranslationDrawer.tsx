@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState } from "react";
 import {
   Drawer,
   Form,
@@ -8,9 +8,15 @@ import {
   Tag,
   Typography,
   Badge,
+  message,
 } from "antd";
-import { GlobalOutlined } from "@ant-design/icons";
+import { GlobalOutlined, ThunderboltOutlined } from "@ant-design/icons";
 import type { TranslationStatus } from "@/components/common/StatusBadge";
+import { MachineTranslateButton } from "./MachineTranslateButton";
+import {
+  translateBatch,
+  getTranslationProviders,
+} from "@/api/machine-translation";
 
 const { Text } = Typography;
 
@@ -37,6 +43,7 @@ interface TranslationDrawerProps {
   open: boolean;
   editingKey: Key | null;
   locales: Locale[];
+  baseLocale: string;
   isSaving: boolean;
   onClose: () => void;
   onSave: (values: Record<string, string>) => void;
@@ -87,16 +94,18 @@ export const TranslationDrawer: React.FC<TranslationDrawerProps> = ({
   open,
   editingKey,
   locales,
+  baseLocale,
   isSaving,
   onClose,
   onSave,
 }) => {
   const [form] = Form.useForm();
+  const [isTranslating, setIsTranslating] = useState(false);
 
   React.useEffect(() => {
     if (editingKey && open) {
       const initialValues: Record<string, string> = {};
-      editingKey.translations.forEach((t) => {
+      (editingKey.translations || []).forEach((t) => {
         initialValues[t.locale.code] = t.content;
       });
       form.setFieldsValue(initialValues);
@@ -112,13 +121,79 @@ export const TranslationDrawer: React.FC<TranslationDrawerProps> = ({
     const published = translations.filter(
       (t) => t.status === "PUBLISHED",
     ).length;
-    const approved = translations.filter(
-      (t) => t.status === "APPROVED",
-    ).length;
+    const approved = translations.filter((t) => t.status === "APPROVED").length;
     return Math.round(((published + approved) / total) * 100);
   };
 
   const progress = getStatusProgress();
+
+  // 获取缺失翻译的目标语言
+  const getMissingTranslations = () => {
+    const translations = editingKey?.translations || [];
+    return locales.filter((locale) => {
+      if (locale.code === baseLocale) return false;
+      const translation = translations.find(
+        (t) => t.locale.code === locale.code,
+      );
+      return !translation?.content;
+    });
+  };
+
+  // 一键翻译缺失内容
+  const handleTranslateMissing = async () => {
+    const missingLocales = getMissingTranslations();
+    if (missingLocales.length === 0) {
+      message.info("没有需要翻译的缺失内容");
+      return;
+    }
+
+    const translations = editingKey?.translations || [];
+    const baseTranslation = translations.find(
+      (t) => t.locale.code === baseLocale,
+    );
+    const sourceText = baseTranslation?.content;
+
+    if (!sourceText) {
+      message.warning("基准语言没有内容，无法翻译");
+      return;
+    }
+
+    // 检查是否有可用的翻译供应商
+    const providers = await getTranslationProviders();
+    const availableProvider = providers?.find((p) => p.isEnabled);
+    if (!availableProvider) {
+      message.error("没有可用的翻译供应商，请先配置");
+      return;
+    }
+
+    setIsTranslating(true);
+    try {
+      // 批量翻译到所有缺失的目标语言
+      const targetLanguages = missingLocales.map((l) => l.code);
+
+      for (const targetLang of targetLanguages) {
+        const result = await translateBatch({
+          texts: [sourceText],
+          sourceLanguage: baseLocale,
+          targetLanguage: targetLang,
+          format: "text",
+        });
+
+        if (result.translations?.[0]?.translatedText) {
+          form.setFieldValue(targetLang, result.translations[0].translatedText);
+        }
+      }
+
+      message.success(`已翻译 ${targetLanguages.length} 个语言`);
+    } catch (error) {
+      message.error("翻译失败，请稍后重试");
+    } finally {
+      setIsTranslating(false);
+    }
+  };
+
+  const missingLocales = getMissingTranslations();
+  const hasMissingTranslations = missingLocales.length > 0;
 
   return (
     <Drawer
@@ -178,19 +253,34 @@ export const TranslationDrawer: React.FC<TranslationDrawerProps> = ({
       footer={
         <div
           className="animate-slide-up"
-          style={{ display: "flex", justifyContent: "flex-end", gap: 8 }}
+          style={{ display: "flex", justifyContent: "space-between", gap: 8 }}
         >
-          <Button onClick={onClose} className="btn-interactive">
-            取消
-          </Button>
           <Button
-            type="primary"
-            onClick={() => form.submit()}
-            loading={isSaving}
-            className="btn-interactive"
+            type="dashed"
+            icon={<ThunderboltOutlined />}
+            onClick={handleTranslateMissing}
+            loading={isTranslating}
+            disabled={!hasMissingTranslations}
           >
-            保存
+            {isTranslating
+              ? "翻译中..."
+              : hasMissingTranslations
+                ? `一键翻译缺失 (${missingLocales.length})`
+                : "已全部翻译"}
           </Button>
+          <Space>
+            <Button onClick={onClose} className="btn-interactive">
+              取消
+            </Button>
+            <Button
+              type="primary"
+              onClick={() => form.submit()}
+              loading={isSaving}
+              className="btn-interactive"
+            >
+              保存
+            </Button>
+          </Space>
         </div>
       }
     >
@@ -202,11 +292,18 @@ export const TranslationDrawer: React.FC<TranslationDrawerProps> = ({
       >
         <Space direction="vertical" style={{ width: "100%" }} size="small">
           {locales.map((locale, index) => {
-            const translation = editingKey.translations.find(
+            const translations = editingKey?.translations || [];
+            const translation = translations.find(
               (t) => t.locale.code === locale.code,
             );
             const status = translation?.status || "PENDING";
             const config = statusConfig[status];
+
+            // 获取基准语言的翻译作为源文本
+            const baseTranslation = translations.find(
+              (t) => t.locale.code === baseLocale,
+            );
+            const sourceText = baseTranslation?.content || "";
 
             return (
               <div
@@ -253,6 +350,18 @@ export const TranslationDrawer: React.FC<TranslationDrawerProps> = ({
                     />
                   </Form.Item>
                 </div>
+                {/* 为非基准语言显示机器翻译按钮 */}
+                {locale.code !== baseLocale && (
+                  <MachineTranslateButton
+                    sourceText={sourceText}
+                    sourceLanguage={baseLocale}
+                    targetLanguage={locale.code}
+                    onTranslateSuccess={(translatedText) => {
+                      form.setFieldValue(locale.code, translatedText);
+                    }}
+                    size="small"
+                  />
+                )}
               </div>
             );
           })}

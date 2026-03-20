@@ -321,3 +321,86 @@ enum UserRole {
   EDITOR
   REVIEWER
 }
+
+// 翻译供应商配置
+model TranslationProvider {
+  id                String   @id @default(cuid())
+  name              String   // 显示名称
+  type              TranslationProviderType
+  baseUrl           String   // API基础地址
+  apiKeyEncrypted   String   // 加密的API Key
+  config            Json     // 额外配置参数
+  isEnabled         Boolean  @default(true)
+  isDefault         Boolean  @default(false)  // 默认供应商
+  rateLimitPerMin   Int      @default(60)     // 每分钟请求限制
+  maxCharsPerReq    Int      @default(5000)   // 单次最大字符数
+  maxTextsPerReq    Int      @default(100)    // 单次最大文本数
+  timeoutMs         Int      @default(30000)  // 请求超时
+  createdAt         DateTime @default(now()) @db.Timestamptz
+  updatedAt         DateTime @updatedAt @db.Timestamptz
+  
+  TranslationJob    TranslationJob[]
+  TranslationCost   TranslationCost[]
+
+  @@index([type, isEnabled])
+}
+
+// 翻译任务
+model TranslationJob {
+  id                String            @id @default(cuid())
+  providerId        String
+  projectId         String?
+  status            TranslationJobStatus @default(PENDING)
+  sourceLanguage    String
+  targetLanguage    String
+  texts             String[]          // 原文数组
+  results           String[]          // 翻译结果
+  error             String?           // 错误信息
+  characterCount    Int               // 字符数统计
+  tokenCount        Int?              // Token数（AI翻译）
+  createdAt         DateTime          @default(now()) @db.Timestamptz
+  completedAt       DateTime?         @db.Timestamptz
+  
+  Provider          TranslationProvider @relation(fields: [providerId], references: [id])
+
+  @@index([providerId, createdAt])
+  @@index([projectId, status])
+  @@index([createdAt])
+}
+
+// 翻译成本统计
+model TranslationCost {
+  id                String   @id @default(cuid())
+  providerId        String
+  projectId         String?
+  characterCount    Int      // 字符数
+  tokenCount        Int?     // Token数
+  estimatedCost     Float    // 估算成本（USD）
+  actualCost        Float?   // 实际成本（对账后）
+  billingPeriod     String?  // 账单周期（如"2024-01"）
+  createdAt         DateTime @default(now()) @db.Timestamptz
+  
+  Provider          TranslationProvider @relation(fields: [providerId], references: [id])
+
+  @@index([providerId, billingPeriod])
+  @@index([projectId, createdAt])
+}
+
+enum TranslationProviderType {
+  GOOGLE
+  DEEPL
+  AZURE
+  OPENAI
+  BAIDU
+  CUSTOM
+  MOCK
+  TENCENT
+}
+
+enum TranslationJobStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  FAILED
+  PARTIAL  // 部分成功（批量翻译中部分失败）
+}

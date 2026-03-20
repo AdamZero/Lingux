@@ -45,7 +45,7 @@ export class APIClient {
   private http: AxiosInstance;
   private token: string = "";
 
-  constructor(baseURL: string = "http://localhost:3001") {
+  constructor(baseURL: string = "http://localhost:3000") {
     this.http = axios.create({
       baseURL,
       headers: {

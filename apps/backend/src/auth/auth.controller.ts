@@ -35,7 +35,7 @@ export class AuthController {
     const clientId = process.env.FEISHU_CLIENT_ID || 'your-feishu-client-id';
     const callbackUrl =
       process.env.FEISHU_CALLBACK_URL ||
-      'http://localhost:3001/api/v1/auth/feishu/callback';
+      'http://localhost:3000/api/v1/auth/feishu/callback';
 
     const authUrl = this.feishuService.buildAuthUrl(clientId, callbackUrl);
     res.redirect(authUrl);

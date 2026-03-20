@@ -8,6 +8,7 @@ import KeysPage from "@/pages/KeysPage";
 import LoginPage from "@/pages/LoginPage";
 import DashboardPage from "@/pages/DashboardPage";
 import ReleaseCenter from "@/pages/ReleaseCenter";
+import MachineTranslationSettingsPage from "@/pages/MachineTranslationSettingsPage";
 import {
   useAppStore,
   selectIsAuthenticated,
@@ -167,6 +168,12 @@ const App: React.FC = () => {
 
                 {/* 配置中心 */}
                 <Route path="settings" element={<div>Settings</div>} />
+
+                {/* 机器翻译设置 */}
+                <Route
+                  path="machine-translation"
+                  element={<MachineTranslationSettingsPage />}
+                />
 
                 {/* 审核工作台（预留） */}
                 <Route

@@ -11,6 +11,7 @@ import {
   ArrowLeftOutlined,
   SunOutlined,
   MoonOutlined,
+  RobotOutlined,
 } from "@ant-design/icons";
 import { Outlet, useNavigate, useLocation, useParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
@@ -108,6 +109,12 @@ const MainLayout: React.FC = () => {
       key: "/releases",
       icon: <RocketOutlined />,
       label: "发布中心",
+    });
+
+    items.push({
+      key: "/machine-translation",
+      icon: <RobotOutlined />,
+      label: "机器翻译",
     });
 
     items.push({

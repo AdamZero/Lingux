@@ -22,12 +22,12 @@ const cloudNativeFormat = combine(
 const developmentFormat = combine(
   timestamp({ format: 'YYYY-MM-DD HH:mm:ss' }),
   errors({ stack: true }),
-  printf(({ level, message, timestamp, metadata, stack }) => {
-    const metaStr = metadata
-      ? ` | ${JSON.stringify(maskSensitiveData(metadata))}`
-      : '';
-    const stackStr = stack ? `\n${stack}` : '';
-    return `${timestamp} [${level.toUpperCase()}]: ${message}${metaStr}${stackStr}`;
+  printf((info) => {
+    const { level, message, timestamp, stack } = info;
+    // 确保堆栈信息被正确显示 - 从 info 对象中获取 stack
+    const stackTrace = stack || (info as Record<string, unknown>).stack;
+    const stackStr = stackTrace ? `\n${stackTrace}` : '';
+    return `${timestamp} [${level.toUpperCase()}]: ${message}${stackStr}`;
   }),
 );
 

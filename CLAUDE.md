@@ -70,7 +70,7 @@ pnpm test:e2e          # Playwright E2E 测试
 
 - `TranslationStatus`: PENDING | TRANSLATING | REVIEWING | APPROVED | PUBLISHED
 - `UserRole`: ADMIN | EDITOR | REVIEWER
-- `KeyType`: TEXT | RICH_TEXT | ASSET
+- `KeyType`: TEXT | RICH\_TEXT | ASSET
 
 ## 设计系统
 
@@ -83,5 +83,7 @@ pnpm test:e2e          # Playwright E2E 测试
 
 1. 提交前运行 `pnpm lint`
 2. 后端 API 使用 `TransformInterceptor` 统一包装响应
-3. 前端使用 React Query 获取数据，Zustand 管理全局状态
-4. 认证使用 JWT，支持飞书/钉钉/企信 OAuth
+3. 后端使用WinstonLoggerService输出日志而不是console.log
+4. 前端使用 React Query 获取数据，Zustand 管理全局状态
+5. 认证使用 JWT，支持飞书/钉钉/企信 OAuth
+

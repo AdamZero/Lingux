@@ -644,6 +644,7 @@ const KeysPage: React.FC = () => {
         open={isDrawerOpen}
         editingKey={editingKey}
         locales={project?.locales || []}
+        baseLocale={project?.baseLocale || "zh-CN"}
         isSaving={saveTranslationsMutation.isPending}
         onClose={() => {
           setIsDrawerOpen(false);
