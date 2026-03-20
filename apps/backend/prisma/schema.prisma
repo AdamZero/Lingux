@@ -81,8 +81,9 @@ model Key {
   namespaceId String
   createdAt   DateTime      @default(now()) @db.Timestamptz
   updatedAt   DateTime      @updatedAt @db.Timestamptz
-  namespace   Namespace     @relation(fields: [namespaceId], references: [id])
-  translations Translation[]
+  namespace          Namespace     @relation(fields: [namespaceId], references: [id])
+  translations       Translation[]
+  translationJobItems TranslationJobItem[]
 
   @@unique([namespaceId, name])
 }
@@ -273,6 +274,7 @@ model User {
   reviewedTranslations  Translation[] @relation("TranslationReviewer")
   submittedTranslations Translation[] @relation("TranslationSubmitter")
   projects                                   Project[]          @relation("ProjectUsers")
+  translationJobs                            TranslationJob[]
 }
 
 enum AuditActorType {
@@ -350,22 +352,66 @@ model TranslationJob {
   id                String            @id @default(cuid())
   providerId        String
   projectId         String?
+  userId            String?           // 发起人 ID
   status            TranslationJobStatus @default(PENDING)
   sourceLanguage    String
-  targetLanguage    String
-  texts             String[]          // 原文数组
-  results           String[]          // 翻译结果
-  error             String?           // 错误信息
-  characterCount    Int               // 字符数统计
-  tokenCount        Int?              // Token数（AI翻译）
+  targetLanguages   String[]          // 多语言数组
+  totalKeys         Int               // 总词条数
+  translatedKeys    Int @default(0)   // 已翻译词条数
+  characterCount    Int
+  error             String?
   createdAt         DateTime          @default(now()) @db.Timestamptz
   completedAt       DateTime?         @db.Timestamptz
   
-  provider TranslationProvider @relation(fields: [providerId], references: [id])
-
+  provider          TranslationProvider @relation(fields: [providerId], references: [id], onDelete: Cascade)
+  user              User?               @relation(fields: [userId], references: [id])
+  items             TranslationJobItem[]
+  
   @@index([providerId, createdAt])
   @@index([projectId, status])
   @@index([createdAt])
+  @@index([userId, createdAt])  // 新增索引
+}
+
+// 翻译任务明细（一个词条）
+model TranslationJobItem {
+  id                String                @id @default(cuid())
+  jobId             String
+  keyId             String
+  keyName           String
+  namespaceName     String?
+  sourceContent     String
+  translations      TranslationJobItemTranslation[]
+  createdAt         DateTime              @default(now()) @db.Timestamptz
+  
+  job               TranslationJob        @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  key               Key                   @relation(fields: [keyId], references: [id])
+  
+  @@index([jobId])
+  @@index([keyId])
+}
+
+// 翻译任务项的多语言翻译结果
+model TranslationJobItemTranslation {
+  id                String                @id @default(cuid())
+  itemId            String
+  targetLanguage    String
+  translatedContent String?
+  status            TranslationJobItemStatus @default(SUCCESS)
+  errorMessage      String?
+  characterCount    Int
+  createdAt         DateTime              @default(now()) @db.Timestamptz
+  
+  item              TranslationJobItem    @relation(fields: [itemId], references: [id], onDelete: Cascade)
+  
+  @@index([itemId])
+  @@unique([itemId, targetLanguage])
+}
+
+enum TranslationJobItemStatus {
+  SUCCESS
+  FAILED
+  SKIPPED
 }
 
 // 翻译成本统计
