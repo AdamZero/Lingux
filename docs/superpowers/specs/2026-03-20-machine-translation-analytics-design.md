@@ -1441,7 +1441,7 @@ if (error instanceof BadRequestException &&
 
 ---
 
-## 九、实施计划
+## 十、实施计划
 
 ### Phase 1: 数据库迁移（1 天）
 - [ ] 修改 `schema.prisma`
@@ -1471,7 +1471,7 @@ if (error instanceof BadRequestException &&
 
 ---
 
-## 十、验收标准
+## 十一、验收标准
 
 ### 功能验收
 - [ ] 可以查看本月所有翻译任务列表
@@ -1493,7 +1493,7 @@ if (error instanceof BadRequestException &&
 
 ---
 
-## 附录
+## 十二、附录
 
 ### A. Prisma Schema 完整变更
 
