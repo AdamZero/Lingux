@@ -387,6 +387,65 @@ export class MachineTranslationService {
   }
 
   /**
+   * 获取月度统计
+   */
+  async getMonthlyStats(year?: number, month?: number) {
+    const now = new Date();
+    const targetYear = year ?? now.getFullYear();
+    const targetMonth = month ?? now.getMonth() + 1;
+
+    const startDate = new Date(targetYear, targetMonth - 1, 1);
+    const endDate = new Date(targetYear, targetMonth, 0);
+
+    const stats = await this.prisma.translationJob.groupBy({
+      by: ['providerId'],
+      where: {
+        createdAt: {
+          gte: startDate,
+          lte: endDate,
+        },
+      },
+      _sum: {
+        characterCount: true,
+      },
+      _count: true,
+    });
+
+    const providerIds = stats.map((s) => s.providerId);
+    const providers = await this.prisma.translationProvider.findMany({
+      where: { id: { in: providerIds } },
+      select: { id: true, name: true, type: true },
+    });
+
+    const totalCharacters = stats.reduce(
+      (sum, s) => sum + (s._sum.characterCount || 0),
+      0,
+    );
+    const totalJobs = stats.reduce((sum, s) => sum + s._count, 0);
+
+    const providerStats = stats.map((stat) => {
+      const provider = providers.find((p) => p.id === stat.providerId);
+      const characterCount = stat._sum.characterCount || 0;
+      return {
+        providerId: stat.providerId,
+        providerName: provider?.name || 'Unknown',
+        providerType: provider?.type || 'Unknown',
+        characterCount,
+        jobCount: stat._count,
+        percentage: totalCharacters > 0
+          ? Math.round((characterCount / totalCharacters) * 100 * 100) / 100
+          : 0,
+      };
+    });
+
+    return {
+      totalCharacters,
+      totalJobs,
+      providers: providerStats,
+    };
+  }
+
+  /**
    * 创建翻译供应商
    */
   async createProvider(data: CreateProviderData): Promise<ProviderResponse> {

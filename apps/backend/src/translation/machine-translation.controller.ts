@@ -311,6 +311,17 @@ export class MachineTranslationController {
   }
 
   /**
+   * 获取月度统计
+   */
+  @Get('monthly-stats')
+  async getMonthlyStats(
+    @Query('year') year?: number,
+    @Query('month') month?: number,
+  ) {
+    return this.machineTranslationService.getMonthlyStats(year, month);
+  }
+
+  /**
    * 创建翻译任务（异步）
    */
   @Post('jobs')
