@@ -264,7 +264,7 @@ export class MachineTranslationService {
     const job = await this.prisma.translationJob.findUnique({
       where: { id: jobId },
       include: {
-        Provider: {
+        provider: {
           select: {
             name: true,
             type: true,

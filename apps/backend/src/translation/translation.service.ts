@@ -26,7 +26,7 @@ export class TranslationService {
       where: {
         id: keyId,
         namespaceId,
-        Namespace: { projectId },
+        namespace: { projectId },
       },
     });
     if (!key) {
@@ -136,16 +136,16 @@ export class TranslationService {
     return this.prisma.translation.findMany({
       where: {
         keyId: keyId,
-        Key: {
+        key: {
           namespaceId,
-          Namespace: { projectId },
+          namespace: { projectId },
         },
       },
       orderBy: {
         updatedAt: 'desc',
       },
       include: {
-        Locale: true,
+        locale: true,
       },
     });
   }
@@ -161,13 +161,13 @@ export class TranslationService {
       where: {
         keyId,
         localeId,
-        Key: {
+        key: {
           namespaceId,
-          Namespace: { projectId },
+          namespace: { projectId },
         },
       },
       include: {
-        Locale: true,
+        locale: true,
       },
     });
     if (!translation) {
@@ -517,5 +517,54 @@ export class TranslationService {
     } catch (error) {
       throw new NotFoundException(`Translation not found`);
     }
+  }
+
+  async batchUpdate(
+    projectId: string,
+    namespaceId: string,
+    keyId: string,
+    translations: Array<{
+      localeCode: string;
+      content: string;
+      status?: string;
+    }>,
+  ) {
+    await this.assertKeyInPath(projectId, namespaceId, keyId);
+
+    const results = await Promise.all(
+      translations.map(async (t) => {
+        try {
+          const existing = await this.findOne(
+            projectId,
+            namespaceId,
+            keyId,
+            t.localeCode,
+          );
+          return await this.update(
+            projectId,
+            namespaceId,
+            keyId,
+            t.localeCode,
+            {
+              content: t.content,
+              status: t.status as TranslationStatus,
+            },
+          );
+        } catch (error) {
+          // If translation doesn't exist, create it
+          if (error instanceof NotFoundException) {
+            return await this.create(projectId, namespaceId, keyId, {
+              localeCode: t.localeCode,
+              content: t.content,
+              status:
+                (t.status as TranslationStatus) || TranslationStatus.PENDING,
+            });
+          }
+          throw error;
+        }
+      }),
+    );
+
+    return results;
   }
 }

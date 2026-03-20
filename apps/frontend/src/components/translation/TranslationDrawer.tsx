@@ -102,15 +102,22 @@ export const TranslationDrawer: React.FC<TranslationDrawerProps> = ({
   const [form] = Form.useForm();
   const [isTranslating, setIsTranslating] = useState(false);
 
+  // 重置表单并设置初始值
   React.useEffect(() => {
-    if (editingKey && open) {
+    if (open && editingKey) {
+      // 先重置表单
+      form.resetFields();
+      // 设置新的初始值
       const initialValues: Record<string, string> = {};
       (editingKey.translations || []).forEach((t) => {
         initialValues[t.locale.code] = t.content;
       });
-      form.setFieldsValue(initialValues);
+      // 使用 setTimeout 确保重置完成后再设置值
+      setTimeout(() => {
+        form.setFieldsValue(initialValues);
+      }, 0);
     }
-  }, [editingKey, open, form]);
+  }, [editingKey?.id, open, form]);
 
   if (!editingKey) return null;
 
@@ -147,11 +154,9 @@ export const TranslationDrawer: React.FC<TranslationDrawerProps> = ({
       return;
     }
 
-    const translations = editingKey?.translations || [];
-    const baseTranslation = translations.find(
-      (t) => t.locale.code === baseLocale,
-    );
-    const sourceText = baseTranslation?.content;
+    // 从表单获取最新的基准语言值（用户可能刚输入）
+    const formValues = form.getFieldsValue();
+    const sourceText = formValues[baseLocale];
 
     if (!sourceText) {
       message.warning("基准语言没有内容，无法翻译");
@@ -287,7 +292,19 @@ export const TranslationDrawer: React.FC<TranslationDrawerProps> = ({
       <Form
         form={form}
         layout="vertical"
-        onFinish={onSave}
+        onFinish={(values) => {
+          // 验证所有语言都有值
+          const missingLocales = locales.filter(
+            (locale) => !values[locale.code]?.trim()
+          );
+          if (missingLocales.length > 0) {
+            message.error(
+              `以下语言缺少翻译: ${missingLocales.map((l) => l.code).join(", ")}`
+            );
+            return;
+          }
+          onSave(values);
+        }}
         className="animate-fade-in"
       >
         <Space direction="vertical" style={{ width: "100%" }} size="small">
@@ -340,7 +357,16 @@ export const TranslationDrawer: React.FC<TranslationDrawerProps> = ({
                   </Tag>
                 </div>
                 <div style={{ flex: 1 }}>
-                  <Form.Item name={locale.code} style={{ marginBottom: 0 }}>
+                  <Form.Item
+                    name={locale.code}
+                    style={{ marginBottom: 0 }}
+                    rules={[
+                      {
+                        required: true,
+                        message: `请输入 ${locale.name} 的翻译`,
+                      },
+                    ]}
+                  >
                     <Input
                       placeholder={`输入 ${locale.name} 的翻译...`}
                       className="input-interactive"

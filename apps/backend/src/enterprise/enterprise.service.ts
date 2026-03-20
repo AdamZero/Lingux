@@ -100,7 +100,7 @@ export class EnterpriseService {
     return this.prisma.enterpriseMember.findMany({
       where: { userId },
       include: {
-        Enterprise: true,
+        enterprise: true,
       },
     });
   }
@@ -133,7 +133,7 @@ export class EnterpriseService {
     return this.prisma.enterpriseMember.findMany({
       where: { enterpriseId },
       include: {
-        User: true,
+        user: true,
       },
     });
   }

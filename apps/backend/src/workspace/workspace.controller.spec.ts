@@ -38,7 +38,7 @@ describe('WorkspaceController', () => {
 
       mockWorkspaceService.getStats.mockResolvedValue(mockStats);
 
-      const mockReq = { user: { userId } };
+      const mockReq = { user: { id: userId } };
       const result = await controller.getStats(projectId, mockReq as any);
 
       expect(service.getStats).toHaveBeenCalledWith(projectId, userId);
@@ -62,7 +62,7 @@ describe('WorkspaceController', () => {
 
       mockWorkspaceService.getTasks.mockResolvedValue(mockTasks);
 
-      const mockReq = { user: { userId } };
+      const mockReq = { user: { id: userId } };
       const result = await controller.getTasks(
         projectId,
         page,

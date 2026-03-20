@@ -86,4 +86,5 @@ pnpm test:e2e          # Playwright E2E 测试
 3. 后端使用WinstonLoggerService输出日志而不是console.log
 4. 前端使用 React Query 获取数据，Zustand 管理全局状态
 5. 认证使用 JWT，支持飞书/钉钉/企信 OAuth
+6. 数据库关联使用小驼峰命名
 

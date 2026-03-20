@@ -20,6 +20,7 @@ import {
   DownloadOutlined,
   InboxOutlined,
 } from "@ant-design/icons";
+import { NamespaceTranslateButton } from "@/components/translation/NamespaceTranslateButton";
 import apiClient from "@/api/client";
 import PublishDrawer from "@/components/release/PublishDrawer";
 import { NamespaceSidebar } from "@/components/translation/NamespaceSidebar";
@@ -266,28 +267,36 @@ const KeysPage: React.FC = () => {
   });
 
   const saveTranslationsMutation = useMutation({
-    mutationFn: (values: Record<string, string>) => {
-      const promises = Object.entries(values).map(([localeCode, content]) =>
-        apiClient.patch(
-          `/projects/${projectId}/namespaces/${selectedNamespaceId}/keys/${editingKey?.id}/translations/${localeCode}`,
-          {
-            content,
-            status: "PENDING",
-          },
-        ),
+    mutationFn: async (values: Record<string, string>) => {
+      // 过滤掉空值，只保存有内容的翻译
+      const translations = Object.entries(values)
+        .filter(([, content]) => content && content.trim())
+        .map(([localeCode, content]) => ({
+          localeCode,
+          content: content.trim(),
+        }));
+
+      if (translations.length === 0) {
+        throw new Error("没有可保存的翻译内容");
+      }
+
+      // 使用批量更新接口，状态自动设为 APPROVED
+      return apiClient.post(
+        `/projects/${projectId}/namespaces/${selectedNamespaceId}/keys/${editingKey?.id}/translations/batch`,
+        { translations },
       );
-      return Promise.all(promises);
     },
-    onSuccess: () => {
+    onSuccess: async () => {
       message.success("翻译保存成功");
-      setIsDrawerOpen(false);
-      setEditingKey(null);
-      queryClient.invalidateQueries({
+      // 等待数据刷新完成后再关闭抽屉
+      await queryClient.invalidateQueries({
         queryKey: ["keys", projectId, selectedNamespaceId],
       });
+      setIsDrawerOpen(false);
+      setEditingKey(null);
     },
-    onError: () => {
-      message.error("保存失败");
+    onError: (error: Error) => {
+      message.error(error.message || "保存失败");
     },
   });
 
@@ -606,17 +615,29 @@ const KeysPage: React.FC = () => {
                 导入
               </Button>
               <Button
-                type="primary"
-                size="small"
-                icon={<PlusOutlined />}
-                disabled={!selectedNamespaceId}
-                onClick={() => setIsKeyModalOpen(true)}
-              >
-                新建词条
-              </Button>
-            </Space>
-          }
-        />
+            type="primary"
+            size="small"
+            icon={<PlusOutlined />}
+            disabled={!selectedNamespaceId}
+            onClick={() => setIsKeyModalOpen(true)}
+          >
+            新建词条
+          </Button>
+          {selectedNamespace && (
+            <NamespaceTranslateButton
+              projectId={projectId}
+              namespaceId={selectedNamespace.id}
+              namespaceName={selectedNamespace.name}
+              onSuccess={() => {
+                queryClient.invalidateQueries({
+                  queryKey: ["keys", projectId, selectedNamespaceId],
+                });
+              }}
+            />
+          )}
+        </Space>
+      }
+    />
 
         <FilterBar
           searchValue={searchKeyword}

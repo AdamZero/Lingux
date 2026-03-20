@@ -42,7 +42,7 @@ model AuditLog {
   version       Int            @default(1)
   payload       Json?
   createdAt     DateTime       @default(now()) @db.Timestamptz
-  User          User?          @relation(fields: [userId], references: [id])
+  user          User?          @relation(fields: [userId], references: [id])
 
   @@index([projectId, createdAt])
   @@index([targetType, targetId, createdAt])
@@ -57,7 +57,7 @@ model Enterprise {
   platform         String
   createdAt        DateTime           @default(now())
   updatedAt        DateTime           @updatedAt
-  EnterpriseMember EnterpriseMember[]
+  enterpriseMembers EnterpriseMember[]
 }
 
 model EnterpriseMember {
@@ -67,8 +67,8 @@ model EnterpriseMember {
   role         String     @default("member")
   createdAt    DateTime   @default(now()) @db.Timestamptz
   updatedAt    DateTime   @updatedAt @db.Timestamptz
-  Enterprise   Enterprise @relation(fields: [enterpriseId], references: [id], onDelete: Cascade)
-  User         User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  enterprise   Enterprise @relation(fields: [enterpriseId], references: [id], onDelete: Cascade)
+  user         User       @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([enterpriseId, userId])
 }
@@ -81,8 +81,8 @@ model Key {
   namespaceId String
   createdAt   DateTime      @default(now()) @db.Timestamptz
   updatedAt   DateTime      @updatedAt @db.Timestamptz
-  Namespace   Namespace     @relation(fields: [namespaceId], references: [id])
-  Translation Translation[]
+  namespace   Namespace     @relation(fields: [namespaceId], references: [id])
+  translations Translation[]
 
   @@unique([namespaceId, name])
 }
@@ -93,8 +93,8 @@ model Locale {
   name          String
   createdAt     DateTime        @default(now())
   updatedAt     DateTime        @updatedAt
-  ProjectLocale ProjectLocale[]
-  Translation   Translation[]
+  projectLocales ProjectLocale[]
+  translations   Translation[]
 }
 
 model Namespace {
@@ -104,8 +104,8 @@ model Namespace {
   projectId   String
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
-  Key         Key[]
-  Project     Project  @relation(fields: [projectId], references: [id])
+  keys        Key[]
+  project     Project  @relation(fields: [projectId], references: [id])
 
   @@unique([projectId, name])
 }
@@ -120,14 +120,14 @@ model Project {
   currentReleaseId                          String?          @unique
   approvalEnabled                           Boolean          @default(false)
   accessMode                                String           @default("PUBLIC")
-  Namespace                                 Namespace[]
-  Release_Project_currentReleaseIdToRelease Release?         @relation("Project_currentReleaseIdToRelease", fields: [currentReleaseId], references: [id])
-  ProjectLocale                             ProjectLocale[]
-  ProjectMember                             ProjectMember[]
-  ProjectOwner                              ProjectOwner[]
-  Release_Release_projectIdToProject        Release[]        @relation("Release_projectIdToProject")
-  ReleaseSession                            ReleaseSession[]
-  User                                      User[]           @relation("ProjectUsers")
+  namespaces                                Namespace[]
+  currentRelease Release? @relation("ProjectCurrentRelease", fields: [currentReleaseId], references: [id])
+  projectLocales                            ProjectLocale[]
+  projectMembers                            ProjectMember[]
+  projectOwners                             ProjectOwner[]
+  releases        Release[] @relation("ProjectReleases")
+  releaseSessions                           ReleaseSession[]
+  users                                     User[]           @relation("ProjectUsers")
 }
 
 model ProjectLocale {
@@ -137,8 +137,8 @@ model ProjectLocale {
   disabledAt DateTime? @db.Timestamptz
   createdAt  DateTime  @default(now()) @db.Timestamptz
   updatedAt  DateTime  @updatedAt @db.Timestamptz
-  Locale     Locale    @relation(fields: [localeId], references: [id])
-  Project    Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  locale     Locale    @relation(fields: [localeId], references: [id])
+  project    Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
 
   @@id([projectId, localeId])
   @@index([localeId])
@@ -149,8 +149,8 @@ model ProjectMember {
   projectId String
   userId    String
   createdAt DateTime @default(now()) @db.Timestamptz
-  Project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  User      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([projectId, userId])
   @@index([userId])
@@ -161,8 +161,8 @@ model ProjectOwner {
   projectId String
   userId    String
   createdAt DateTime @default(now()) @db.Timestamptz
-  Project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  User      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([projectId, userId])
   @@index([userId])
@@ -176,13 +176,13 @@ model Release {
   note                                                      String?
   scope                                                     Json
   createdAt                                                 DateTime          @default(now()) @db.Timestamptz
-  Project_Project_currentReleaseIdToRelease                 Project?          @relation("Project_currentReleaseIdToRelease")
-  Release                                                   Release?          @relation("ReleaseToRelease", fields: [basedOnReleaseId], references: [id])
-  other_Release                                             Release[]         @relation("ReleaseToRelease")
-  Project_Release_projectIdToProject                        Project           @relation("Release_projectIdToProject", fields: [projectId], references: [id], onDelete: Cascade)
-  ReleaseArtifact                                           ReleaseArtifact[]
-  ReleaseSession_ReleaseSession_baseReleaseIdToRelease      ReleaseSession[]  @relation("ReleaseSession_baseReleaseIdToRelease")
-  ReleaseSession_ReleaseSession_publishedReleaseIdToRelease ReleaseSession[]  @relation("ReleaseSession_publishedReleaseIdToRelease")
+  projectForCurrentRelease Project? @relation("ProjectCurrentRelease")
+  basedOnRelease Release? @relation("ReleaseToRelease", fields: [basedOnReleaseId], references: [id])
+  derivedReleases Release[] @relation("ReleaseToRelease")
+  project Project @relation("ProjectReleases", fields: [projectId], references: [id], onDelete: Cascade)
+  artifacts ReleaseArtifact[]
+  sessionsAsBase ReleaseSession[] @relation("ReleaseSessionBaseRelease")
+  sessionsAsPublished ReleaseSession[] @relation("ReleaseSessionPublishedRelease")
 
   @@unique([projectId, version])
   @@index([projectId, createdAt])
@@ -194,7 +194,7 @@ model ReleaseArtifact {
   localeCode String
   data       Json
   createdAt  DateTime @default(now()) @db.Timestamptz
-  Release    Release  @relation(fields: [releaseId], references: [id], onDelete: Cascade)
+  release    Release  @relation(fields: [releaseId], references: [id], onDelete: Cascade)
 
   @@unique([releaseId, localeCode])
   @@index([localeCode])
@@ -213,16 +213,16 @@ model ReleaseSession {
   baseJson                                           String?
   nextJson                                           String?
   submittedAt                                        DateTime?            @db.Timestamptz
-  reviewedAt                                         DateTime?            @db.Timestamptz
+  reviewedAt                                        DateTime?            @db.Timestamptz
   reviewNote                                         String?
   publishedAt                                        DateTime?            @db.Timestamptz
   publishedReleaseId                                 String?
   expiresAt                                          DateTime?            @db.Timestamptz
   createdAt                                          DateTime             @default(now()) @db.Timestamptz
   updatedAt                                          DateTime             @updatedAt @db.Timestamptz
-  Release_ReleaseSession_baseReleaseIdToRelease      Release?             @relation("ReleaseSession_baseReleaseIdToRelease", fields: [baseReleaseId], references: [id])
-  Project                                            Project              @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  Release_ReleaseSession_publishedReleaseIdToRelease Release?             @relation("ReleaseSession_publishedReleaseIdToRelease", fields: [publishedReleaseId], references: [id])
+  baseRelease      Release? @relation("ReleaseSessionBaseRelease", fields: [baseReleaseId], references: [id])
+  project          Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  publishedRelease Release? @relation("ReleaseSessionPublishedRelease", fields: [publishedReleaseId], references: [id])
 
   @@index([projectId, createdAt])
   @@index([projectId, status])
@@ -243,10 +243,10 @@ model Translation {
   dueDate                            DateTime?           @db.Timestamptz
   priority                           TranslationPriority @default(MEDIUM)
   submitterId                        String?
-  Key                                Key                 @relation(fields: [keyId], references: [id])
-  Locale                             Locale              @relation(fields: [localeId], references: [id])
-  User_Translation_reviewerIdToUser  User?               @relation("Translation_reviewerIdToUser", fields: [reviewerId], references: [id])
-  User_Translation_submitterIdToUser User?               @relation("Translation_submitterIdToUser", fields: [submitterId], references: [id])
+  key                                Key                 @relation(fields: [keyId], references: [id])
+  locale                             Locale              @relation(fields: [localeId], references: [id])
+  reviewer  User?  @relation("TranslationReviewer", fields: [reviewerId], references: [id])
+  submitter User?  @relation("TranslationSubmitter", fields: [submitterId], references: [id])
 
   @@unique([keyId, localeId])
   @@index([priority, updatedAt])
@@ -266,13 +266,13 @@ model User {
   mobile                                    String?
   name                                      String?
   provider                                  String?
-  AuditLog                                  AuditLog[]
-  EnterpriseMember                          EnterpriseMember[]
-  ProjectMember                             ProjectMember[]
-  ProjectOwner                              ProjectOwner[]
-  Translation_Translation_reviewerIdToUser  Translation[]      @relation("Translation_reviewerIdToUser")
-  Translation_Translation_submitterIdToUser Translation[]      @relation("Translation_submitterIdToUser")
-  Project                                   Project[]          @relation("ProjectUsers")
+  auditLogs                                  AuditLog[]
+  enterpriseMembers                          EnterpriseMember[]
+  projectMembers                             ProjectMember[]
+  projectOwners                             ProjectOwner[]
+  reviewedTranslations  Translation[] @relation("TranslationReviewer")
+  submittedTranslations Translation[] @relation("TranslationSubmitter")
+  projects                                   Project[]          @relation("ProjectUsers")
 }
 
 enum AuditActorType {
@@ -339,8 +339,8 @@ model TranslationProvider {
   createdAt         DateTime @default(now()) @db.Timestamptz
   updatedAt         DateTime @updatedAt @db.Timestamptz
   
-  TranslationJob    TranslationJob[]
-  TranslationCost   TranslationCost[]
+  jobs  TranslationJob[]
+  costs TranslationCost[]
 
   @@index([type, isEnabled])
 }
@@ -361,7 +361,7 @@ model TranslationJob {
   createdAt         DateTime          @default(now()) @db.Timestamptz
   completedAt       DateTime?         @db.Timestamptz
   
-  Provider          TranslationProvider @relation(fields: [providerId], references: [id])
+  provider TranslationProvider @relation(fields: [providerId], references: [id])
 
   @@index([providerId, createdAt])
   @@index([projectId, status])
@@ -380,7 +380,7 @@ model TranslationCost {
   billingPeriod     String?  // 账单周期（如"2024-01"）
   createdAt         DateTime @default(now()) @db.Timestamptz
   
-  Provider          TranslationProvider @relation(fields: [providerId], references: [id])
+  provider TranslationProvider @relation(fields: [providerId], references: [id])
 
   @@index([providerId, billingPeriod])
   @@index([projectId, createdAt])

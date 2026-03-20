@@ -233,8 +233,8 @@ export class WorkspaceService {
     const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
     const monthlyContributions = await this.prisma.translation.count({
       where: {
-        Key: {
-          Namespace: {
+        key: {
+          namespace: {
             projectId,
           },
         },
@@ -307,7 +307,7 @@ export class WorkspaceService {
           status: 'IN_REVIEW',
         },
         include: {
-          Project: {
+          project: {
             select: {
               name: true,
             },

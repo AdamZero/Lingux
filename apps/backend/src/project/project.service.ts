@@ -101,13 +101,13 @@ export class ProjectService {
   }
 
   private toProjectResponse(project: {
-    ProjectLocale?: { enabled: boolean; Locale: unknown }[];
+    projectLocales?: { enabled: boolean; locale: unknown }[];
     [key: string]: unknown;
   }) {
-    const { ProjectLocale, ...rest } = project;
-    const locales = (ProjectLocale ?? [])
+    const { projectLocales, ...rest } = project;
+    const locales = (projectLocales ?? [])
       .filter((pl) => pl.enabled)
-      .map((pl) => pl.Locale);
+      .map((pl) => pl.locale);
     return { ...rest, locales };
   }
 
@@ -115,7 +115,7 @@ export class ProjectService {
     const project = await this.prisma.project.findUnique({
       where: { id: projectId },
       include: {
-        ProjectLocale: {
+        projectLocales: {
           where: {
             enabled: true,
           },
@@ -123,7 +123,7 @@ export class ProjectService {
             updatedAt: 'desc',
           },
           include: {
-            Locale: true,
+            locale: true,
           },
         },
       },
@@ -161,7 +161,7 @@ export class ProjectService {
         name: createProjectDto.name,
         description: createProjectDto.description,
         baseLocale,
-        ProjectLocale: {
+        projectLocales: {
           createMany: {
             data: enabledLocaleIds.map((localeId) => ({
               localeId,
@@ -172,7 +172,7 @@ export class ProjectService {
         },
       },
       include: {
-        ProjectLocale: {
+        projectLocales: {
           where: {
             enabled: true,
           },
@@ -180,7 +180,7 @@ export class ProjectService {
             updatedAt: 'desc',
           },
           include: {
-            Locale: true,
+            locale: true,
           },
         },
       },
@@ -194,7 +194,7 @@ export class ProjectService {
         updatedAt: 'desc',
       },
       include: {
-        ProjectLocale: {
+        projectLocales: {
           where: {
             enabled: true,
           },
@@ -202,7 +202,7 @@ export class ProjectService {
             updatedAt: 'desc',
           },
           include: {
-            Locale: true,
+            locale: true,
           },
         },
       },
@@ -226,7 +226,7 @@ export class ProjectService {
           where: { id },
           data: cleanProjectData,
           include: {
-            ProjectLocale: {
+            projectLocales: {
               where: {
                 enabled: true,
               },
@@ -234,7 +234,7 @@ export class ProjectService {
                 updatedAt: 'desc',
               },
               include: {
-                Locale: true,
+                locale: true,
               },
             },
           },
@@ -367,7 +367,7 @@ export class ProjectService {
       orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
       take: limit,
       include: {
-        User: {
+        user: {
           select: { id: true, username: true, role: true },
         },
       },
@@ -587,9 +587,9 @@ export class ProjectService {
     const project = await this.prisma.project.findUnique({
       where: { id: projectId },
       include: {
-        ProjectOwner: {
+        projectOwners: {
           include: {
-            User: {
+            user: {
               select: {
                 id: true,
                 username: true,
@@ -600,7 +600,7 @@ export class ProjectService {
             },
           },
         },
-        User: {
+        users: {
           select: {
             id: true,
             username: true,
@@ -616,11 +616,11 @@ export class ProjectService {
       throw new NotFoundException(`Project with ID ${projectId} not found`);
     }
 
-    const ownerIds = new Set(project.ProjectOwner.map((o) => o.userId));
+    const ownerIds = new Set(project.projectOwners.map((o) => o.userId));
 
     return {
-      owners: project.ProjectOwner.map((o) => o.User),
-      members: project.User.filter((u) => !ownerIds.has(u.id)),
+      owners: project.projectOwners.map((o) => o.user),
+      members: project.users.filter((u) => !ownerIds.has(u.id)),
     };
   }
 
@@ -628,7 +628,7 @@ export class ProjectService {
     // 检查项目是否存在
     const project = await this.prisma.project.findUnique({
       where: { id: projectId },
-      include: { ProjectOwner: true },
+      include: { projectOwners: true },
     });
     if (!project) {
       throw new NotFoundException(`Project with ID ${projectId} not found`);
@@ -638,7 +638,7 @@ export class ProjectService {
     const currentUser = await this.prisma.user.findUnique({
       where: { id: currentUserId },
     });
-    const isOwner = project.ProjectOwner.some(
+    const isOwner = project.projectOwners.some(
       (o) => o.userId === currentUserId,
     );
     if (!isOwner && currentUser?.role !== 'ADMIN') {
@@ -672,7 +672,7 @@ export class ProjectService {
     await this.prisma.project.update({
       where: { id: projectId },
       data: {
-        User: {
+        users: {
           connect: { id: userId },
         },
       },
@@ -685,7 +685,7 @@ export class ProjectService {
     // 检查项目是否存在
     const project = await this.prisma.project.findUnique({
       where: { id: projectId },
-      include: { ProjectOwner: true },
+      include: { projectOwners: true },
     });
     if (!project) {
       throw new NotFoundException(`Project with ID ${projectId} not found`);
@@ -695,7 +695,7 @@ export class ProjectService {
     const currentUser = await this.prisma.user.findUnique({
       where: { id: currentUserId },
     });
-    const isOwner = project.ProjectOwner.some(
+    const isOwner = project.projectOwners.some(
       (o) => o.userId === currentUserId,
     );
     if (!isOwner && currentUser?.role !== 'ADMIN') {
@@ -738,7 +738,7 @@ export class ProjectService {
     // 检查项目是否存在
     const project = await this.prisma.project.findUnique({
       where: { id: projectId },
-      include: { ProjectOwner: true },
+      include: { projectOwners: true },
     });
     if (!project) {
       throw new NotFoundException(`Project with ID ${projectId} not found`);
@@ -748,7 +748,7 @@ export class ProjectService {
     const currentUser = await this.prisma.user.findUnique({
       where: { id: currentUserId },
     });
-    const isOwner = project.ProjectOwner.some(
+    const isOwner = project.projectOwners.some(
       (o) => o.userId === currentUserId,
     );
     if (!isOwner && currentUser?.role !== 'ADMIN') {
@@ -769,7 +769,7 @@ export class ProjectService {
     const existingMember = await this.prisma.project.findFirst({
       where: {
         id: projectId,
-        User: { some: { id: userId } },
+        users: { some: { id: userId } },
       },
     });
     if (existingMember) {
@@ -780,7 +780,7 @@ export class ProjectService {
     await this.prisma.project.update({
       where: { id: projectId },
       data: {
-        User: {
+        users: {
           connect: { id: userId },
         },
       },
@@ -793,7 +793,7 @@ export class ProjectService {
     // 检查项目是否存在
     const project = await this.prisma.project.findUnique({
       where: { id: projectId },
-      include: { ProjectOwner: true },
+      include: { projectOwners: true },
     });
     if (!project) {
       throw new NotFoundException(`Project with ID ${projectId} not found`);
@@ -803,7 +803,7 @@ export class ProjectService {
     const currentUser = await this.prisma.user.findUnique({
       where: { id: currentUserId },
     });
-    const isOwner = project.ProjectOwner.some(
+    const isOwner = project.projectOwners.some(
       (o) => o.userId === currentUserId,
     );
     if (!isOwner && currentUser?.role !== 'ADMIN') {
@@ -813,7 +813,9 @@ export class ProjectService {
     }
 
     // 检查是否是 Owner（Owner 不能直接移除，需要先移除 Owner 身份）
-    const isTargetOwner = project.ProjectOwner.some((o) => o.userId === userId);
+    const isTargetOwner = project.projectOwners.some(
+      (o) => o.userId === userId,
+    );
     if (isTargetOwner) {
       throw new BadRequestException(
         'Cannot remove an owner. Please remove owner status first.',
@@ -824,7 +826,7 @@ export class ProjectService {
     await this.prisma.project.update({
       where: { id: projectId },
       data: {
-        User: {
+        users: {
           disconnect: { id: userId },
         },
       },
@@ -882,7 +884,7 @@ export class ProjectService {
     // 检查项目是否存在
     const project = await this.prisma.project.findUnique({
       where: { id: projectId },
-      include: { ProjectOwner: true },
+      include: { projectOwners: true },
     });
     if (!project) {
       throw new NotFoundException(`Project with ID ${projectId} not found`);
@@ -892,7 +894,7 @@ export class ProjectService {
     const currentUser = await this.prisma.user.findUnique({
       where: { id: currentUserId },
     });
-    const isOwner = project.ProjectOwner.some(
+    const isOwner = project.projectOwners.some(
       (o) => o.userId === currentUserId,
     );
     if (!isOwner && currentUser?.role !== 'ADMIN') {
@@ -914,9 +916,9 @@ export class ProjectService {
       where: { id: projectId },
       data: updateData,
       include: {
-        ProjectLocale: {
+        projectLocales: {
           where: { enabled: true },
-          include: { Locale: true },
+          include: { locale: true },
         },
       },
     });

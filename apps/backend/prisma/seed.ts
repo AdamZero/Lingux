@@ -435,7 +435,7 @@ async function createTestProjects(adminUserId: string, editorUserId?: string) {
         name: def.name,
         description: def.description,
         baseLocale: def.baseLocale,
-        User: {
+        users: {
           connect: editorUserId
             ? [{ id: adminUserId }, { id: editorUserId }]
             : [{ id: adminUserId }],
@@ -479,13 +479,13 @@ async function createProjectTestData(
   // 获取项目支持的语言
   const projectLocales = await prisma.projectLocale.findMany({
     where: { projectId: project.id },
-    include: { Locale: true },
+    include: { locale: true },
   });
 
-  const localeIds = projectLocales.map((pl) => pl.Locale.id);
+  const localeIds = projectLocales.map((pl) => pl.locale.id);
   const baseLocaleId = projectLocales.find(
-    (pl) => pl.Locale.code === project.baseLocale,
-  )?.Locale.id;
+    (pl) => pl.locale.code === project.baseLocale,
+  )?.locale.id;
 
   if (!baseLocaleId) {
     console.log(`    Base locale not found for project: ${project.name}`);
@@ -559,8 +559,8 @@ async function createProjectTestData(
 
         if (!existingTranslation) {
           const locale = projectLocales.find(
-            (pl) => pl.Locale.id === localeId,
-          )?.Locale;
+            (pl) => pl.locale.id === localeId,
+          )?.locale;
           const isBaseLocale = localeId === baseLocaleId;
 
           // 基础语言直接生成内容，其他语言根据概率设置不同状态

@@ -376,9 +376,9 @@ export class ReleaseService {
         id: true,
         baseLocale: true,
         currentReleaseId: true,
-        ProjectLocale: {
+        projectLocales: {
           where: { enabled: true },
-          include: { Locale: { select: { code: true } } },
+          include: { locale: { select: { code: true } } },
         },
       },
     });
@@ -386,8 +386,8 @@ export class ReleaseService {
       throw new NotFoundException(`Project with ID ${projectId} not found`);
     }
 
-    const enabledLocaleCodes = project.ProjectLocale.map(
-      (pl) => pl.Locale.code,
+    const enabledLocaleCodes = project.projectLocales.map(
+      (pl) => pl.locale.code,
     );
     const baseLocale = project.baseLocale || 'zh-CN';
     const enabledSet = new Set(enabledLocaleCodes);
@@ -485,29 +485,29 @@ export class ReleaseService {
 
     const whereKey: Prisma.KeyWhereInput =
       params.scope.type === 'all'
-        ? { Namespace: { projectId: params.projectId } }
+        ? { namespace: { projectId: params.projectId } }
         : params.scope.type === 'namespaces'
           ? {
               namespaceId: { in: params.scope.namespaceIds },
-              Namespace: { projectId: params.projectId },
+              namespace: { projectId: params.projectId },
             }
           : {
               id: { in: params.scope.keyIds },
-              Namespace: { projectId: params.projectId },
+              namespace: { projectId: params.projectId },
             };
 
     const keys = await this.prisma.key.findMany({
       where: whereKey,
       include: {
-        Namespace: { select: { id: true, name: true } },
-        Translation: {
+        namespace: { select: { id: true, name: true } },
+        translations: {
           where: {
-            Locale: {
+            locale: {
               code: { in: localeCodesForFetch },
             },
           },
           include: {
-            Locale: { select: { code: true } },
+            locale: { select: { code: true } },
           },
         },
       },
@@ -539,21 +539,21 @@ export class ReleaseService {
     );
 
     for (const key of params.keys) {
-      const namespaceName = key.Namespace.name;
-      const baseTranslation = key.Translation.find(
-        (t) => t.Locale.code === params.baseLocale,
+      const namespaceName = key.namespace.name;
+      const baseTranslation = key.translations.find(
+        (t) => t.locale.code === params.baseLocale,
       );
       const baseContent = baseTranslation?.content ?? '';
 
       for (const localeCode of params.localeCodes) {
-        const t = key.Translation.find((tr) => tr.Locale.code === localeCode);
+        const t = key.translations.find((tr) => tr.locale.code === localeCode);
         const content = t?.content ?? '';
 
         if (!t) {
           errors.push({
             localeCode,
             keyId: key.id,
-            namespaceId: key.Namespace.id,
+            namespaceId: key.namespace.id,
             keyName: key.name,
             namespaceName,
             reason: 'MISSING_TRANSLATION',
@@ -565,7 +565,7 @@ export class ReleaseService {
           errors.push({
             localeCode,
             keyId: key.id,
-            namespaceId: key.Namespace.id,
+            namespaceId: key.namespace.id,
             keyName: key.name,
             namespaceName,
             reason: 'EMPTY_CONTENT',
@@ -577,7 +577,7 @@ export class ReleaseService {
           errors.push({
             localeCode,
             keyId: key.id,
-            namespaceId: key.Namespace.id,
+            namespaceId: key.namespace.id,
             keyName: key.name,
             namespaceName,
             reason: 'ICU_INVALID',
@@ -595,7 +595,7 @@ export class ReleaseService {
             errors.push({
               localeCode,
               keyId: key.id,
-              namespaceId: key.Namespace.id,
+              namespaceId: key.namespace.id,
               keyName: key.name,
               namespaceName,
               reason: 'PLACEHOLDER_MISMATCH',

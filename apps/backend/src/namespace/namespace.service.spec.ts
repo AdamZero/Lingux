@@ -1,6 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { NamespaceService } from './namespace.service';
 import { PrismaService } from '../prisma.service';
+import { MachineTranslationService } from '../translation/services/machine-translation.service';
 import { NotFoundException } from '@nestjs/common';
 
 const mockPrismaService = {
@@ -13,6 +14,7 @@ const mockPrismaService = {
   },
   projectLocale: {
     upsert: jest.fn(),
+    findMany: jest.fn(),
   },
   project: {
     findUnique: jest.fn(),
@@ -21,6 +23,19 @@ const mockPrismaService = {
   locale: {
     findUnique: jest.fn(),
   },
+  translation: {
+    findUnique: jest.fn(),
+    upsert: jest.fn(),
+    create: jest.fn(),
+  },
+  key: {
+    findMany: jest.fn(),
+  },
+};
+
+const mockMachineTranslationService = {
+  getDefaultProvider: jest.fn(),
+  translate: jest.fn(),
 };
 
 describe('NamespaceService', () => {
@@ -32,6 +47,10 @@ describe('NamespaceService', () => {
       providers: [
         NamespaceService,
         { provide: PrismaService, useValue: mockPrismaService },
+        {
+          provide: MachineTranslationService,
+          useValue: mockMachineTranslationService,
+        },
       ],
     }).compile();
 

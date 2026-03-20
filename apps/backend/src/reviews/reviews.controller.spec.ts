@@ -72,7 +72,7 @@ describe('ReviewsController', () => {
 
       mockReviewsService.approveReview.mockResolvedValue(mockResult);
 
-      const mockReq = { user: { userId } };
+      const mockReq = { user: { id: userId } };
       const result = await controller.approveReview(id, mockReq as any);
 
       expect(service.approveReview).toHaveBeenCalledWith(id, userId);
@@ -90,7 +90,7 @@ describe('ReviewsController', () => {
 
       mockReviewsService.rejectReview.mockResolvedValue(mockResult);
 
-      const mockReq = { user: { userId } };
+      const mockReq = { user: { id: userId } };
       const result = await controller.rejectReview(
         id,
         mockReq as any,
@@ -115,7 +115,7 @@ describe('ReviewsController', () => {
 
       mockReviewsService.rejectReview.mockResolvedValue(mockResult);
 
-      const mockReq = { user: { userId } };
+      const mockReq = { user: { id: userId } };
       const result = await controller.rejectReview(id, mockReq as any, reason);
 
       expect(service.rejectReview).toHaveBeenCalledWith(

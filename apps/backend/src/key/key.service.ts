@@ -8,6 +8,7 @@ import { TranslationStatus } from '@prisma/client';
 import { CreateKeyDto } from './dto/create-key.dto';
 import { UpdateKeyDto } from './dto/update-key.dto';
 import { PrismaService } from '../prisma.service';
+import { keyWithTranslationsSelect } from '../prisma/helpers/select.helpers';
 import * as yaml from 'js-yaml';
 
 @Injectable()
@@ -35,18 +36,18 @@ export class KeyService {
         name: createKeyDto.name,
       },
       include: {
-        Namespace: {
+        namespace: {
           select: {
             id: true,
             name: true,
           },
         },
-        Translation: {
+        translations: {
           orderBy: {
             updatedAt: 'desc',
           },
           include: {
-            Locale: true,
+            locale: true,
           },
         },
       },
@@ -70,18 +71,17 @@ export class KeyService {
     return this.prisma.key.findMany({
       where: {
         namespaceId: namespaceId,
-        Namespace: { projectId },
+        namespace: { projectId },
       },
       orderBy: {
         updatedAt: 'desc',
       },
-      include: {
-        Translation: {
+      select: {
+        ...keyWithTranslationsSelect,
+        translations: {
+          ...keyWithTranslationsSelect.translations,
           orderBy: {
             updatedAt: 'desc',
-          },
-          include: {
-            Locale: true,
           },
         },
       },
@@ -97,14 +97,14 @@ export class KeyService {
     return this.prisma.key.findMany({
       where: {
         name: normalized,
-        Namespace: { projectId },
+        namespace: { projectId },
         ...(excludeKeyId ? { NOT: { id: excludeKeyId } } : {}),
       },
       orderBy: {
         updatedAt: 'desc',
       },
       include: {
-        Namespace: {
+        namespace: {
           select: {
             id: true,
             name: true,
@@ -112,7 +112,7 @@ export class KeyService {
         },
         _count: {
           select: {
-            Translation: true,
+            translations: true,
           },
         },
       },
@@ -137,7 +137,7 @@ export class KeyService {
       where: {
         id: targetKeyId,
         namespaceId,
-        Namespace: { projectId },
+        namespace: { projectId },
       },
     });
     if (!targetKey) {
@@ -147,7 +147,7 @@ export class KeyService {
     const sourceKey = await this.prisma.key.findFirst({
       where: {
         id: sourceKeyId,
-        Namespace: { projectId },
+        namespace: { projectId },
       },
     });
     if (!sourceKey) {
@@ -157,9 +157,6 @@ export class KeyService {
     const sourceTranslations = await this.prisma.translation.findMany({
       where: {
         keyId: sourceKeyId,
-        Key: {
-          Namespace: { projectId },
-        },
       },
       select: {
         localeId: true,
@@ -208,15 +205,15 @@ export class KeyService {
       where: {
         id,
         namespaceId,
-        Namespace: { projectId },
+        namespace: { projectId },
       },
       include: {
-        Translation: {
+        translations: {
           orderBy: {
             updatedAt: 'desc',
           },
           include: {
-            Locale: true,
+            locale: true,
           },
         },
       },
@@ -248,7 +245,7 @@ export class KeyService {
       where: {
         id,
         namespaceId,
-        Namespace: { projectId },
+        namespace: { projectId },
       },
       select: { id: true },
     });
@@ -287,12 +284,12 @@ export class KeyService {
     const keys = await this.prisma.key.findMany({
       where: {
         namespaceId,
-        Namespace: { projectId },
+        namespace: { projectId },
       },
       include: {
-        Translation: {
+        translations: {
           include: {
-            Locale: true,
+            locale: true,
           },
         },
       },
@@ -302,8 +299,8 @@ export class KeyService {
     const exportData: Record<string, Record<string, string>> = {};
     keys.forEach((key) => {
       const translations: Record<string, string> = {};
-      key.Translation.forEach((translation) => {
-        translations[translation.Locale.code] = translation.content;
+      key.translations.forEach((translation) => {
+        translations[translation.locale.code] = translation.content;
       });
       exportData[key.name] = translations;
     });

@@ -9,6 +9,22 @@ describe('WorkspaceService', () => {
   const mockPrisma = {
     project: {
       findFirst: jest.fn(),
+      findUnique: jest.fn(),
+    },
+    projectOwner: {
+      findUnique: jest.fn(),
+      count: jest.fn(),
+    },
+    projectMember: {
+      findUnique: jest.fn(),
+      count: jest.fn(),
+    },
+    releaseSession: {
+      findMany: jest.fn(),
+      count: jest.fn(),
+    },
+    release: {
+      count: jest.fn(),
     },
     translation: {
       findMany: jest.fn(),
@@ -40,77 +56,68 @@ describe('WorkspaceService', () => {
   });
 
   describe('getStats', () => {
-    it('should return workspace stats for user with EDIT permission', async () => {
+    it('should return workspace stats for admin user', async () => {
       const projectId = 'test-project-id';
       const userId = 'test-user-id';
 
-      const mockProject = {
-        id: projectId,
-        namespaces: [
-          {
-            id: 'ns-1',
-            keys: [
-              {
-                id: 'key-1',
-                translations: [{ id: 't1', status: 'PENDING' }],
-              },
-            ],
-          },
-        ],
-      };
+      // Mock getUserRole calls
+      mockPrisma.project.findUnique
+        .mockResolvedValueOnce({ id: projectId, accessMode: 'PUBLIC' }) // getUserRole
+        .mockResolvedValueOnce({ id: projectId, approvalEnabled: true }); // getAdminStats
+      mockPrisma.user.findUnique.mockResolvedValue({
+        id: userId,
+        role: 'ADMIN',
+      });
+      mockPrisma.projectOwner.findUnique.mockResolvedValue(null);
 
-      mockPrisma.project.findFirst.mockResolvedValue(mockProject);
-      mockPrisma.translation.count
-        .mockResolvedValueOnce(1) // reviewing count
-        .mockResolvedValueOnce(1); // approved count
+      // Mock getAdminStats calls
+      mockPrisma.releaseSession.count.mockResolvedValue(1);
+      mockPrisma.release.count.mockResolvedValue(2);
+      mockPrisma.projectMember.count.mockResolvedValue(3);
+      mockPrisma.projectOwner.count.mockResolvedValue(4);
 
       const result = await service.getStats(projectId, userId);
 
-      expect(prisma.project.findFirst).toHaveBeenCalledWith({
-        where: {
-          id: projectId,
-          users: {
-            some: {
-              id: userId,
-            },
-          },
-        },
-        include: {
-          namespaces: {
-            include: {
-              keys: {
-                include: {
-                  translations: {
-                    where: {
-                      status: 'PENDING',
-                    },
-                  },
-                },
-              },
-            },
-          },
-        },
-      });
-
       expect(result).toEqual({
-        pending: 1,
-        reviewing: 1,
-        approved: 1,
+        pendingApproval: 1,
+        myPendingRelease: 0,
+        monthlyReleases: 2,
+        memberCount: 7, // 3 + 4
       });
     });
 
-    it('should return zeros when user has no access', async () => {
+    it('should return stats for owner user', async () => {
       const projectId = 'test-project-id';
       const userId = 'test-user-id';
 
-      mockPrisma.project.findFirst.mockResolvedValue(null);
+      // Mock getUserRole calls
+      mockPrisma.project.findUnique
+        .mockResolvedValueOnce({ id: projectId, accessMode: 'PUBLIC' }) // getUserRole
+        .mockResolvedValueOnce({ id: projectId, approvalEnabled: true }); // getOwnerStats
+      mockPrisma.user.findUnique.mockResolvedValue({
+        id: userId,
+        role: 'EDITOR',
+      });
+      mockPrisma.projectOwner.findUnique.mockResolvedValue({
+        projectId,
+        userId,
+      });
+
+      // Mock getOwnerStats calls
+      mockPrisma.releaseSession.count
+        .mockResolvedValueOnce(1) // pendingApproval
+        .mockResolvedValueOnce(2); // myPendingRelease
+      mockPrisma.release.count.mockResolvedValue(3);
+      mockPrisma.projectMember.count.mockResolvedValue(4);
+      mockPrisma.projectOwner.count.mockResolvedValue(5);
 
       const result = await service.getStats(projectId, userId);
 
       expect(result).toEqual({
-        pending: 0,
-        reviewing: 0,
-        approved: 0,
+        pendingApproval: 1,
+        myPendingRelease: 2,
+        monthlyReleases: 3,
+        memberCount: 9, // 4 + 5
       });
     });
   });
@@ -120,10 +127,18 @@ describe('WorkspaceService', () => {
       const projectId = 'test-project-id';
       const userId = 'test-user-id';
 
+      // Mock getUserRole calls
+      mockPrisma.project.findUnique.mockResolvedValue({
+        id: projectId,
+        accessMode: 'PUBLIC',
+      });
       mockPrisma.user.findUnique.mockResolvedValue({
         id: userId,
         role: 'TRANSLATOR',
       });
+      mockPrisma.projectOwner.findUnique.mockResolvedValue(null);
+
+      // Mock getTranslatorTasks calls
       (mockPrisma.$transaction as jest.Mock).mockResolvedValue([[], 0]);
 
       const result = await service.getTasks(projectId, userId, 1, 20);

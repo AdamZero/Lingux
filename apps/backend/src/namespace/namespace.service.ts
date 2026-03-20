@@ -6,12 +6,16 @@ import {
 import { CreateNamespaceDto } from './dto/create-namespace.dto';
 import { UpdateNamespaceDto } from './dto/update-namespace.dto';
 import { PrismaService } from '../prisma.service';
+import { MachineTranslationService } from '../translation/services/machine-translation.service';
 import * as yaml from 'js-yaml';
 import * as XLSX from 'xlsx';
 
 @Injectable()
 export class NamespaceService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly machineTranslationService: MachineTranslationService,
+  ) {}
 
   async create(projectId: string, createNamespaceDto: CreateNamespaceDto) {
     const project = await this.prisma.project.findUnique({
@@ -19,12 +23,12 @@ export class NamespaceService {
       select: {
         id: true,
         baseLocale: true,
-        ProjectLocale: {
+        projectLocales: {
           where: {
             enabled: true,
           },
           select: {
-            Locale: {
+            locale: {
               select: {
                 code: true,
               },
@@ -38,8 +42,8 @@ export class NamespaceService {
     }
 
     const baseLocale = project.baseLocale || 'zh-CN';
-    const hasBaseLocale = project.ProjectLocale.some(
-      (pl) => pl.Locale.code === baseLocale,
+    const hasBaseLocale = project.projectLocales.some(
+      (pl) => pl.locale.code === baseLocale,
     );
 
     if (!hasBaseLocale) {
@@ -167,11 +171,11 @@ export class NamespaceService {
         projectId,
       },
       include: {
-        Key: {
+        keys: {
           include: {
-            Translation: {
+            translations: {
               include: {
-                Locale: true,
+                locale: true,
               },
             },
           },
@@ -196,10 +200,10 @@ export class NamespaceService {
     for (const namespace of namespaces) {
       const namespaceData: Record<string, Record<string, string>> = {};
 
-      for (const key of namespace.Key) {
+      for (const key of namespace.keys) {
         const translations: Record<string, string> = {};
-        for (const translation of key.Translation) {
-          translations[translation.Locale.code] = translation.content;
+        for (const translation of key.translations) {
+          translations[translation.locale.code] = translation.content;
         }
         namespaceData[key.name] = translations;
       }
@@ -319,5 +323,181 @@ export class NamespaceService {
     // Generate buffer using array type then convert to Buffer
     const arrayBuffer = XLSX.write(wb, { type: 'array', bookType: 'xlsx' });
     return Buffer.from(arrayBuffer);
+  }
+
+  /**
+   * 一键翻译命名空间 - 自动翻译所有缺失的翻译
+   */
+  async translateNamespace(
+    projectId: string,
+    namespaceId: string,
+  ): Promise<{
+    totalKeys: number;
+    translatedKeys: number;
+    failedKeys: number;
+    details: Array<{
+      keyId: string;
+      keyName: string;
+      localeCode: string;
+      success: boolean;
+      error?: string;
+    }>;
+  }> {
+    // 验证命名空间存在
+    const namespace = await this.prisma.namespace.findFirst({
+      where: { id: namespaceId, projectId },
+      include: {
+        project: {
+          select: { baseLocale: true },
+        },
+      },
+    });
+    if (!namespace) {
+      throw new NotFoundException(
+        `Namespace with ID ${namespaceId} not found in project ${projectId}`,
+      );
+    }
+
+    // 获取源语言（项目基准语言）
+    const sourceLocaleCode = namespace.project.baseLocale || 'zh-CN';
+
+    // 获取项目的所有启用语言
+    const projectLocales = await this.prisma.projectLocale.findMany({
+      where: { projectId, enabled: true },
+      include: { locale: true },
+    });
+
+    // 目标语言 = 除源语言外的所有启用语言
+    const targetLocales = projectLocales
+      .map((pl) => pl.locale)
+      .filter((l) => l.code !== sourceLocaleCode);
+
+    if (targetLocales.length === 0) {
+      throw new BadRequestException('No target locales available');
+    }
+
+    // 获取命名空间下的所有词条及其翻译
+    const keys = await this.prisma.key.findMany({
+      where: { namespaceId },
+      include: {
+        translations: {
+          include: { locale: true },
+        },
+      },
+    });
+
+    if (keys.length === 0) {
+      return { totalKeys: 0, translatedKeys: 0, failedKeys: 0, details: [] };
+    }
+
+    // 获取默认供应商
+    const defaultProvider =
+      await this.machineTranslationService.getDefaultProvider();
+    if (!defaultProvider) {
+      throw new BadRequestException(
+        'No default translation provider configured',
+      );
+    }
+
+    const details: Array<{
+      keyId: string;
+      keyName: string;
+      localeCode: string;
+      success: boolean;
+      error?: string;
+    }> = [];
+    let translatedCount = 0;
+    let failedCount = 0;
+
+    for (const key of keys) {
+      // 找到源语言翻译
+      const sourceTranslation = key.translations.find(
+        (t) => t.locale.code === sourceLocaleCode,
+      );
+
+      if (!sourceTranslation) {
+        // 源语言没有翻译，跳过
+        for (const targetLocale of targetLocales) {
+          details.push({
+            keyId: key.id,
+            keyName: key.name,
+            localeCode: targetLocale.code,
+            success: false,
+            error: `No source translation in ${sourceLocaleCode}`,
+          });
+          failedCount++;
+        }
+        continue;
+      }
+
+      // 检查每个目标语言是否已有翻译
+      for (const targetLocale of targetLocales) {
+        const existingTranslation = key.translations.find(
+          (t) => t.locale.code === targetLocale.code,
+        );
+
+        // 如果已有翻译且不为空，跳过
+        if (existingTranslation?.content?.trim()) {
+          continue;
+        }
+
+        // 需要翻译
+        try {
+          const result = await this.machineTranslationService.translate(
+            defaultProvider.id,
+            sourceTranslation.content,
+            {
+              sourceLanguage: sourceLocaleCode,
+              targetLanguage: targetLocale.code,
+            },
+          );
+
+          // 保存翻译到数据库
+          await this.prisma.translation.upsert({
+            where: {
+              keyId_localeId: {
+                keyId: key.id,
+                localeId: targetLocale.id,
+              },
+            },
+            create: {
+              keyId: key.id,
+              localeId: targetLocale.id,
+              content: result.translatedText,
+              status: 'PENDING',
+              isLlmTranslated: true,
+            },
+            update: {
+              content: result.translatedText,
+              isLlmTranslated: true,
+            },
+          });
+
+          details.push({
+            keyId: key.id,
+            keyName: key.name,
+            localeCode: targetLocale.code,
+            success: true,
+          });
+          translatedCount++;
+        } catch (error) {
+          details.push({
+            keyId: key.id,
+            keyName: key.name,
+            localeCode: targetLocale.code,
+            success: false,
+            error: error instanceof Error ? error.message : 'Unknown error',
+          });
+          failedCount++;
+        }
+      }
+    }
+
+    return {
+      totalKeys: keys.length,
+      translatedKeys: translatedCount,
+      failedKeys: failedCount,
+      details,
+    };
   }
 }

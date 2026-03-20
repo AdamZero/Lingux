@@ -56,6 +56,7 @@ describe('AuthService', () => {
       };
 
       prismaService.user.findUnique.mockResolvedValue(existingUser);
+      prismaService.user.update.mockResolvedValue(existingUser);
 
       const result = await authService.validateUser({
         externalId: 'external_123',
@@ -204,6 +205,7 @@ describe('AuthService', () => {
       };
 
       prismaService.user.findUnique.mockResolvedValue(user);
+      prismaService.user.update.mockResolvedValue(user);
       enterpriseService.createOrGetEnterprise.mockResolvedValue(enterprise);
       enterpriseService.getEnterpriseMembers.mockResolvedValue([]);
 
@@ -252,6 +254,7 @@ describe('AuthService', () => {
       };
 
       prismaService.user.findUnique.mockResolvedValue(user);
+      prismaService.user.update.mockResolvedValue(user);
       enterpriseService.createOrGetEnterprise.mockResolvedValue(enterprise);
       enterpriseService.getEnterpriseMembers.mockResolvedValue([
         { id: '1', userId: '5', enterpriseId: 'ent_1', role: 'admin' },

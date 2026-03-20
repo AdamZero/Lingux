@@ -5,7 +5,6 @@ import {
   Body,
   Patch,
   Param,
-  Delete,
   HttpCode,
   HttpStatus,
   Query,
@@ -16,6 +15,7 @@ import type { Response } from 'express';
 import { NamespaceService } from './namespace.service';
 import { CreateNamespaceDto } from './dto/create-namespace.dto';
 import { UpdateNamespaceDto } from './dto/update-namespace.dto';
+import { Delete } from '@nestjs/common';
 
 @Controller('projects/:projectId/namespaces')
 export class NamespaceController {
@@ -106,5 +106,16 @@ export class NamespaceController {
     @Param('namespaceId') id: string,
   ) {
     return this.namespaceService.remove(projectId, id);
+  }
+
+  /**
+   * 一键翻译命名空间 - 自动翻译所有缺失的翻译
+   */
+  @Post(':namespaceId/translate')
+  async translateNamespace(
+    @Param('projectId') projectId: string,
+    @Param('namespaceId') namespaceId: string,
+  ) {
+    return this.namespaceService.translateNamespace(projectId, namespaceId);
   }
 }

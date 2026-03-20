@@ -1,16 +1,24 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { AuthController } from './auth.controller';
 import { AuthService } from './auth.service';
+import { FeishuService } from './services/feishu.service';
+import { PrismaService } from '../prisma.service';
 import { PassportModule } from '@nestjs/passport';
 import { JwtModule } from '@nestjs/jwt';
-import { EnterpriseModule } from '../enterprise/enterprise.module';
-import { PrismaModule } from '../prisma.module';
 import { WinstonLoggerService } from '../common/logger/logger.service';
 
 const mockAuthService = {
   validateUser: jest.fn(),
   login: jest.fn(),
 };
+
+const mockFeishuService = {
+  buildAuthUrl: jest.fn(),
+  getAccessToken: jest.fn(),
+  getUserInfo: jest.fn(),
+};
+
+const mockPrismaService = {};
 
 const mockLoggerService = {
   log: jest.fn(),
@@ -30,14 +38,20 @@ describe('AuthController', () => {
           secret: 'test_secret',
           signOptions: { expiresIn: '60s' },
         }),
-        EnterpriseModule,
-        PrismaModule,
       ],
       controllers: [AuthController],
       providers: [
         {
           provide: AuthService,
           useValue: mockAuthService,
+        },
+        {
+          provide: FeishuService,
+          useValue: mockFeishuService,
+        },
+        {
+          provide: PrismaService,
+          useValue: mockPrismaService,
         },
         {
           provide: WinstonLoggerService,
@@ -58,6 +72,7 @@ describe('AuthController', () => {
       const user = {
         id: '1',
         username: 'feishu_user',
+        name: 'Test User',
         role: 'EDITOR',
       };
 
@@ -66,39 +81,56 @@ describe('AuthController', () => {
         user: user,
       };
 
+      // Mock FeishuService
+      mockFeishuService.getAccessToken.mockResolvedValue({
+        accessToken: 'test-access-token',
+        openId: 'external_123',
+      });
+      mockFeishuService.getUserInfo.mockResolvedValue({
+        name: 'Test User',
+        email: 'test@example.com',
+        avatar: 'https://example.com/avatar.png',
+        mobile: '1234567890',
+      });
+
       mockAuthService.validateUser.mockResolvedValue(user);
       mockAuthService.login.mockResolvedValue(loginResult);
 
       const req = {
-        user: {
-          externalId: 'external_123',
-          provider: 'feishu',
-          enterpriseInfo: {
-            name: 'Test Enterprise',
-            externalId: 'ent_123',
-            domain: 'test.com',
-          },
-        },
+        query: { code: 'test-code' },
       };
 
       const res = {
         redirect: jest.fn(),
+        status: jest.fn().mockReturnThis(),
+        send: jest.fn(),
       };
+
+      process.env.FEISHU_CLIENT_ID = 'test-client-id';
+      process.env.FEISHU_CLIENT_SECRET = 'test-client-secret';
+      process.env.FRONTEND_URL = 'http://localhost:8080';
 
       await authController.feishuCallback(req as any, res as any);
 
-      expect(mockAuthService.validateUser).toHaveBeenCalledWith(
-        'external_123',
-        'feishu',
-        {
-          name: 'Test Enterprise',
-          externalId: 'ent_123',
-          domain: 'test.com',
-        },
+      expect(mockFeishuService.getAccessToken).toHaveBeenCalledWith(
+        'test-code',
+        'test-client-id',
+        'test-client-secret',
       );
-      expect(mockAuthService.login).toHaveBeenCalledWith(user);
+      expect(mockAuthService.validateUser).toHaveBeenCalledWith({
+        externalId: 'external_123',
+        provider: 'feishu',
+        name: 'Test User',
+        email: 'test@example.com',
+        avatar: 'https://example.com/avatar.png',
+        mobile: '1234567890',
+      });
+      expect(mockAuthService.login).toHaveBeenCalledWith({
+        ...user,
+        name: user.name ?? undefined,
+      });
       expect(res.redirect).toHaveBeenCalledWith(
-        'http://localhost:8080/login?token=test_token',
+        'http://localhost:8080/login#token=test_token&user={"id":"1","username":"feishu_user","name":"Test User","role":"EDITOR"}',
       );
     });
   });
@@ -116,42 +148,34 @@ describe('AuthController', () => {
         user: user,
       };
 
-      mockAuthService.validateUser.mockResolvedValue(user);
       mockAuthService.login.mockResolvedValue(loginResult);
 
       const req = {
         user: {
-          externalId: 'external_456',
-          provider: 'qixin',
-          enterpriseInfo: {
-            name: 'Qixin Enterprise',
-            externalId: 'ent_456',
-          },
+          id: '1',
+          username: 'qixin_user',
+          role: 'EDITOR',
         },
       };
 
       const res = {
         redirect: jest.fn(),
+        status: jest.fn().mockReturnThis(),
+        send: jest.fn(),
       };
+
+      process.env.FRONTEND_URL = 'http://localhost:8080';
 
       await authController.qixinCallback(req as any, res as any);
 
-      expect(mockAuthService.validateUser).toHaveBeenCalledWith(
-        'external_456',
-        'qixin',
-        {
-          name: 'Qixin Enterprise',
-          externalId: 'ent_456',
-        },
-      );
-      expect(mockAuthService.login).toHaveBeenCalledWith(user);
+      expect(mockAuthService.login).toHaveBeenCalledWith(req.user);
       expect(res.redirect).toHaveBeenCalledWith(
-        'http://localhost:8080/login?token=test_token',
+        'http://localhost:8080/login#token=test_token&user={"id":"1","username":"qixin_user","role":"EDITOR"}',
       );
     });
   });
 
-  describe('dingtalkCallback', () => {
+  describe('dingTalkCallback', () => {
     it('should redirect with token when authentication succeeds', async () => {
       const user = {
         id: '1',
@@ -164,37 +188,29 @@ describe('AuthController', () => {
         user: user,
       };
 
-      mockAuthService.validateUser.mockResolvedValue(user);
       mockAuthService.login.mockResolvedValue(loginResult);
 
       const req = {
         user: {
-          externalId: 'external_789',
-          provider: 'dingtalk',
-          enterpriseInfo: {
-            name: 'DingTalk Enterprise',
-            externalId: 'ent_789',
-          },
+          id: '1',
+          username: 'dingtalk_user',
+          role: 'EDITOR',
         },
       };
 
       const res = {
         redirect: jest.fn(),
+        status: jest.fn().mockReturnThis(),
+        send: jest.fn(),
       };
+
+      process.env.FRONTEND_URL = 'http://localhost:8080';
 
       await authController.dingTalkCallback(req as any, res as any);
 
-      expect(mockAuthService.validateUser).toHaveBeenCalledWith(
-        'external_789',
-        'dingtalk',
-        {
-          name: 'DingTalk Enterprise',
-          externalId: 'ent_789',
-        },
-      );
-      expect(mockAuthService.login).toHaveBeenCalledWith(user);
+      expect(mockAuthService.login).toHaveBeenCalledWith(req.user);
       expect(res.redirect).toHaveBeenCalledWith(
-        'http://localhost:8080/login?token=test_token',
+        'http://localhost:8080/login#token=test_token&user={"id":"1","username":"dingtalk_user","role":"EDITOR"}',
       );
     });
   });
