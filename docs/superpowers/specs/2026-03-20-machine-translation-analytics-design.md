@@ -270,11 +270,12 @@ interface TranslationJobListResponse {
     projectName: string | null;// 项目名称
     status: string;
     sourceLanguage: string;
-    targetLanguage: string;
-    totalKeys: number;         // 翻译词条总数（从 Items 聚合）
-    successCount: number;      // 成功数
-    failedCount: number;       // 失败数
-    characterCount: number;    // 字符数
+    targetLanguages: string[]; // ❗修改：目标语言数组
+    totalKeys: number;         // 总词条数
+    translatedKeys: number;    // ❗修改：已翻译词条数
+    successCount: number;      // 成功词条数
+    failedCount: number;       // 失败词条数
+    characterCount: number;    // 总字符数
     createdAt: string;
     completedAt: string | null;
   }[];
@@ -390,9 +391,10 @@ interface TranslationJobDetailResponse {
   };
   status: string;
   sourceLanguage: string;
-  targetLanguage: string;
+  targetLanguages: string[];  // ❗修改：目标语言数组
+  totalKeys: number;
+  translatedKeys: number;
   characterCount: number;
-  tokenCount?: number;
   error?: string;
   createdAt: string;
   completedAt?: string;
@@ -400,10 +402,15 @@ interface TranslationJobDetailResponse {
     id: string;
     keyId: string;
     keyName: string;
+    namespaceName?: string;
     sourceContent: string;
-    translatedContent: string | null;
-    status: string;
-    errorMessage?: string | null;
+    translations: {  // ❗修改：多语言翻译结果
+      targetLanguage: string;
+      translatedContent: string | null;
+      status: string;
+      errorMessage?: string | null;
+      characterCount: number;
+    }[];
   }[];
 }
 ```
@@ -546,13 +553,14 @@ async getMonthlyStats(
 ```typescript
 interface CreateTranslationJobDto {
   providerId?: string;
-  texts: string[];
   sourceLanguage: string;
-  targetLanguage: string;
+  targetLanguages: string[];  // ❗修改：目标语言数组
   projectId?: string;
-  items?: {  // 新增：词条关联信息
+  items: {  // 词条列表
     keyId: string;
-    text: string;
+    keyName: string;
+    namespaceName?: string;
+    sourceContent: string;
   }[];
 }
 ```
@@ -573,12 +581,16 @@ async createTranslationJob(
   @Body() dto: CreateTranslationJobDto,
   @User() user: { id: string },  // 从 JWT 获取当前用户
 ) {
-  const { providerId, texts, sourceLanguage, targetLanguage, projectId, items } = dto;
+  const { providerId, sourceLanguage, targetLanguages, projectId, items } = dto;
 
   // 使用默认供应商（如果未指定）
   const effectiveProviderId = providerId || await this.getDefaultProviderId();
 
-  const totalCharacters = texts.reduce((sum, text) => sum + text.length, 0);
+  // 计算总字符数
+  const totalCharacters = items.reduce(
+    (sum, item) => sum + item.sourceContent.length,
+    0
+  );
 
   // 创建翻译任务
   const job = await this.prisma.translationJob.create({
@@ -588,22 +600,23 @@ async createTranslationJob(
       userId: user.id,  // 记录发起人
       status: TranslationJobStatus.PENDING,
       sourceLanguage,
-      targetLanguage,
+      targetLanguages,  // ❗修改：目标语言数组
+      totalKeys: items.length,  // ❗新增：总词条数
+      translatedKeys: 0,
       characterCount: totalCharacters,
     },
   });
 
-  // 创建翻译任务明细（如果提供了 items）
-  if (items && items.length > 0) {
-    await this.prisma.translationJobItem.createMany({
-      data: items.map((item) => ({
-        jobId: job.id,
-        keyId: item.keyId,
-        keyName: '', // 可从 Key 表查询填充
-        sourceContent: item.text,
-      })),
-    });
-  }
+  // 创建翻译任务明细
+  await this.prisma.translationJobItem.createMany({
+    data: items.map((item) => ({
+      jobId: job.id,
+      keyId: item.keyId,
+      keyName: item.keyName,
+      namespaceName: item.namespaceName,
+      sourceContent: item.sourceContent,
+    })),
+  });
 
   // 异步执行翻译
   this.executeTranslationJob(job.id).catch((error) => {
@@ -622,12 +635,20 @@ async createTranslationJob(
 
 ### 3.5 执行翻译任务（增强版）
 
+**核心逻辑**：对每个目标语言执行批量翻译
+
 **实现要点**:
 ```typescript
 private async executeTranslationJob(jobId: string): Promise<void> {
   const job = await this.prisma.translationJob.findUnique({
     where: { id: jobId },
-    include: { Items: true },
+    include: { 
+      Items: {
+        include: {
+          translations: true,  // 包含已有的翻译结果
+        },
+      },
+    },
   });
 
   if (!job) {
@@ -641,48 +662,76 @@ private async executeTranslationJob(jobId: string): Promise<void> {
   });
 
   try {
-    // 从 Items 获取原文
-    const texts = job.Items.map((item) => item.sourceContent);
-    
-    const result = await this.translateBatch(job.providerId, texts, {
-      sourceLanguage: job.sourceLanguage,
-      targetLanguage: job.targetLanguage,
-    });
+    // 对每个目标语言执行翻译
+    let totalSuccess = 0;
+    let totalFailed = 0;
 
-    // 更新每个 Item 的状态和结果
-    for (let i = 0; i < job.Items.length; i++) {
-      const item = job.Items[i];
-      const translation = result.translations[i];
+    for (const targetLanguage of job.targetLanguages) {
+      const texts = job.Items.map((item) => item.sourceContent);
       
-      await this.prisma.translationJobItem.update({
-        where: { id: item.id },
-        data: {
-          translatedContent: translation.translatedText,
-          status: translation.error ? 'FAILED' : 'SUCCESS',
-          errorMessage: translation.error || null,
-        },
+      // 执行批量翻译
+      const result = await this.translateBatch(job.providerId, texts, {
+        sourceLanguage: job.sourceLanguage,
+        targetLanguage,
       });
+
+      // 为每个 Item 创建翻译结果
+      for (let i = 0; i < job.Items.length; i++) {
+        const item = job.Items[i];
+        const translation = result.translations[i];
+        
+        // 创建或更新翻译结果
+        await this.prisma.translationJobItemTranslation.upsert({
+          where: {
+            itemId_targetLanguage: {
+              itemId: item.id,
+              targetLanguage,
+            },
+          },
+          update: {
+            translatedContent: translation.translatedText,
+            status: translation.error ? 'FAILED' : 'SUCCESS',
+            errorMessage: translation.error || null,
+            characterCount: translation.translatedText?.length || 0,
+          },
+          create: {
+            itemId: item.id,
+            targetLanguage,
+            translatedContent: translation.translatedText,
+            status: translation.error ? 'FAILED' : 'SUCCESS',
+            errorMessage: translation.error || null,
+            characterCount: translation.translatedText?.length || 0,
+          },
+        });
+
+        // 统计成功/失败数
+        if (translation.error) {
+          totalFailed++;
+        } else {
+          totalSuccess++;
+        }
+      }
+
+      // 记录翻译成本
+      await this.recordTranslationCost(job.providerId, result.totalCharacters);
     }
 
     // 更新任务状态
-    const hasErrors = result.translations.some((t) => t.error);
-    const allErrors = result.translations.every((t) => t.error);
+    const hasFailures = totalFailed > 0;
+    const allFailures = totalSuccess === 0 && totalFailed > 0;
 
     await this.prisma.translationJob.update({
       where: { id: jobId },
       data: {
-        status: allErrors 
+        status: allFailures 
           ? TranslationJobStatus.FAILED 
-          : hasErrors 
+          : hasFailures 
             ? TranslationJobStatus.PARTIAL 
             : TranslationJobStatus.COMPLETED,
-        results: result.translations.map((t) => t.translatedText),
+        translatedKeys: totalSuccess,  // ❗更新已翻译词条数
         completedAt: new Date(),
       },
     });
-
-    // 记录翻译成本
-    await this.recordTranslationCost(job.providerId, result.totalCharacters);
   } catch (error) {
     // 更新任务为失败
     await this.prisma.translationJob.update({
@@ -694,14 +743,29 @@ private async executeTranslationJob(jobId: string): Promise<void> {
       },
     });
 
-    // 更新所有 Items 为失败
-    await this.prisma.translationJobItem.updateMany({
-      where: { jobId },
-      data: {
-        status: 'FAILED',
-        errorMessage: error instanceof Error ? error.message : String(error),
-      },
-    });
+    // 更新所有 Items 的翻译结果为失败
+    for (const targetLanguage of job.targetLanguages) {
+      for (const item of job.Items) {
+        await this.prisma.translationJobItemTranslation.upsert({
+          where: {
+            itemId_targetLanguage: {
+              itemId: item.id,
+              targetLanguage,
+            },
+          },
+          update: {
+            status: 'FAILED',
+            errorMessage: error instanceof Error ? error.message : String(error),
+          },
+          create: {
+            itemId: item.id,
+            targetLanguage,
+            status: 'FAILED',
+            errorMessage: error instanceof Error ? error.message : String(error),
+          },
+        });
+      }
+    }
   }
 }
 ```
@@ -1206,15 +1270,171 @@ async getMonthlyStats(year: number, month: number) {
 
 ---
 
-## 八、安全考虑
+## 八、并发控制
 
-### 8.1 权限控制
+### 8.1 并发场景
+
+**场景 1：两个人同时翻译同一个词条到同一个语言**
+```
+用户 A: 翻译词条 "welcome.title" → 英文
+用户 B: 翻译词条 "welcome.title" → 英文
+时间：同时
+```
+
+**问题**：
+- 两个任务都会创建 `TranslationJobItemTranslation`
+- **唯一约束冲突** (`itemId` + `targetLanguage`)
+
+**场景 2：两个人同时翻译同一个词条到不同语言**
+```
+用户 A: 翻译词条 "welcome.title" → 英文
+用户 B: 翻译词条 "welcome.title" → 日文
+时间：同时
+```
+
+**无冲突** ✅ - 因为 `targetLanguage` 不同
+
+### 8.2 解决方案
+
+**推荐方案：乐观锁 + 前端防重**
+
+#### 后端：乐观锁策略
+
+**创建任务时检查**：
+```typescript
+async createTranslationJob(dto: CreateTranslationJobDto, user: User) {
+  const items = [];
+  
+  for (const itemDto of dto.items) {
+    // 检查是否已有成功的翻译
+    const existing = await this.prisma.translationJobItemTranslation.findFirst({
+      where: {
+        itemId: itemDto.item.id,
+        targetLanguage: { in: dto.targetLanguages },
+        status: 'SUCCESS',
+      },
+    });
+    
+    if (existing) {
+      // 选项 1: 跳过（默认）
+      continue;
+      
+      // 选项 2: 抛出冲突错误
+      // throw new ConflictException('翻译已存在');
+      
+      // 选项 3: 强制覆盖（需要管理员权限）
+      // if (!user.isAdmin) {
+      //   throw new ConflictException('翻译已存在');
+      // }
+    }
+    
+    items.push(itemDto);
+  }
+  
+  // 如果没有可翻译的内容，抛出错误
+  if (items.length === 0) {
+    throw new BadRequestException('没有可翻译的内容');
+  }
+  
+  // 创建任务...
+}
+```
+
+**执行翻译时使用 upsert**：
+```typescript
+// 使用 upsert 避免唯一约束冲突
+await this.prisma.translationJobItemTranslation.upsert({
+  where: {
+    itemId_targetLanguage: {
+      itemId: item.id,
+      targetLanguage,
+    },
+  },
+  update: {
+    translatedContent: translation.translatedText,
+    status: translation.error ? 'FAILED' : 'SUCCESS',
+    errorMessage: translation.error || null,
+    characterCount: translation.translatedText?.length || 0,
+  },
+  create: {
+    itemId: item.id,
+    targetLanguage,
+    translatedContent: translation.translatedText,
+    status: translation.error ? 'FAILED' : 'SUCCESS',
+    errorMessage: translation.error || null,
+    characterCount: translation.translatedText?.length || 0,
+  },
+});
+```
+
+**策略选择**：
+- 如果已有翻译且成功 → **保留先完成的**（upsert 的 update 分支）
+- 如果已有翻译但失败 → **覆盖**（允许重试）
+- 如果翻译中 → **后完成的覆盖**（乐观锁策略）
+
+#### 前端：防重策略
+
+**检查词条是否正在翻译**：
+```typescript
+// src/hooks/useKeyTranslationStatus.ts
+export const useKeyTranslationStatus = (keyId: string) => {
+  return useQuery({
+    queryKey: ['key-translating', keyId],
+    queryFn: async () => {
+      const jobs = await getTranslationJobs({
+        status: 'PROCESSING',
+        // 检查包含该词条的任务
+      });
+      return jobs.items.some(job => 
+        job.items.some(item => item.keyId === keyId)
+      );
+    },
+    refetchInterval: 2000, // 每 2 秒轮询一次
+  });
+};
+```
+
+**禁用翻译按钮**：
+```typescript
+// 在翻译按钮组件中
+const { data: isTranslating } = useKeyTranslationStatus(key.id);
+
+<Button
+  onClick={handleTranslate}
+  disabled={isTranslating}
+  loading={isTranslating}
+>
+  {isTranslating ? '翻译中...' : '机器翻译'}
+</Button>
+```
+
+### 8.3 错误处理
+
+**冲突错误**：
+```typescript
+// 全局错误处理
+if (error instanceof ConflictException) {
+  message.warning('该词条已有翻译，如需覆盖请先删除现有翻译');
+}
+
+if (error instanceof BadRequestException && 
+    error.message === '没有可翻译的内容') {
+  message.info('所有词条都已有翻译');
+}
+```
+
+---
+
+## 九、安全考虑
+
+### 9.1 权限控制
 
 - 仅管理员和翻译角色可以查看任务列表
 - 用户只能查看自己发起的任务（非管理员）
 - 删除供应商需要管理员权限
+- 强制覆盖翻译需要管理员权限
 
-### 8.2 数据脱敏
+### 9.2 数据脱敏
 
 - 用户头像等敏感信息需要脱敏处理
 - API 密钥等敏感信息不在响应中返回
