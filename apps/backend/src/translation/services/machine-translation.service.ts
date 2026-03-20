@@ -281,6 +281,84 @@ export class MachineTranslationService {
   }
 
   /**
+   * 获取翻译任务列表
+   */
+  async getTranslationJobs(dto: any) {
+    const {
+      page = 1,
+      pageSize = 20,
+      userId,
+      providerId,
+      projectId,
+      status,
+      startDate,
+      endDate,
+    } = dto;
+
+    const where: Prisma.TranslationJobWhereInput = {};
+
+    if (userId) where.userId = userId;
+    if (providerId) where.providerId = providerId;
+    if (projectId) where.projectId = projectId;
+    if (status) where.status = status;
+    if (startDate || endDate) {
+      where.createdAt = {
+        ...(startDate && { gte: new Date(startDate) }),
+        ...(endDate && { lte: new Date(endDate) }),
+      };
+    }
+
+    const [items, total] = await Promise.all([
+      this.prisma.translationJob.findMany({
+        where,
+        include: {
+          provider: { select: { name: true, type: true } },
+          user: { select: { name: true, avatar: true } },
+          project: { select: { name: true } },
+          items: {
+            select: {
+              status: true,
+              translations: { select: { status: true } },
+            },
+          },
+        },
+        orderBy: { createdAt: 'desc' },
+        skip: (page - 1) * pageSize,
+        take: pageSize,
+      }),
+      this.prisma.translationJob.count({ where }),
+    ]);
+
+    const formattedItems = items.map((job) => {
+      const successCount = job.items.reduce((sum, item) => {
+        return sum + item.translations.filter((t) => t.status === 'SUCCESS').length;
+      }, 0);
+      const failedCount = job.items.reduce((sum, item) => {
+        return sum + item.translations.filter((t) => t.status === 'FAILED').length;
+      }, 0);
+
+      return {
+        ...job,
+        providerName: job.provider.name,
+        providerType: job.provider.type,
+        userName: job.user?.name || null,
+        userAvatar: job.user?.avatar || null,
+        projectName: job.project?.name || null,
+        totalKeys: job.items.length,
+        successCount,
+        failedCount,
+      };
+    });
+
+    return {
+      items: formattedItems,
+      total,
+      page,
+      pageSize,
+    };
+  }
+
+  /**
    * 创建翻译供应商
    */
   async createProvider(data: CreateProviderData): Promise<ProviderResponse> {

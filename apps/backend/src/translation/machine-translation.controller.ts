@@ -13,6 +13,7 @@ import { AuthGuard } from '@nestjs/passport';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { MachineTranslationService } from './services/machine-translation.service';
+import { GetTranslationJobsDto } from './dto/get-translation-jobs.dto';
 import {
   IsString,
   IsBoolean,
@@ -291,6 +292,14 @@ export class MachineTranslationController {
       sourceTexts: dto.texts,
       ...result,
     };
+  }
+
+  /**
+   * 获取翻译任务列表
+   */
+  @Get('jobs')
+  async getTranslationJobs(@Query() dto: GetTranslationJobsDto) {
+    return this.machineTranslationService.getTranslationJobs(dto);
   }
 
   /**
