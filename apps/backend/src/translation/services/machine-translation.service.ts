@@ -1,4 +1,4 @@
-import { Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { Injectable, Logger, NotFoundException, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../../prisma.service';
 import { Prisma } from '@prisma/client';
 import { EncryptionService } from './encryption.service';
@@ -181,26 +181,67 @@ export class MachineTranslationService {
    */
   async createTranslationJob(
     providerId: string,
-    texts: string[],
     sourceLanguage: string,
-    targetLanguage: string,
+    targetLanguages: string[],
+    items: {
+      keyId: string;
+      keyName: string;
+      namespaceName?: string;
+      sourceContent: string;
+    }[],
     projectId?: string,
+    userId?: string,
   ): Promise<string> {
     const { provider } = await this.getAdapter(providerId);
 
-    const totalCharacters = texts.reduce((sum, text) => sum + text.length, 0);
+    const totalCharacters = items.reduce(
+      (sum, item) => sum + item.sourceContent.length,
+      0,
+    );
 
-    // 创建翻译任务记录
+    // 并发控制：检查是否已有成功的翻译
+    const filteredItems = [];
+    for (const item of items) {
+      const existing = await this.prisma.translationJobItemTranslation.findFirst({
+        where: {
+          keyId: item.keyId,
+          targetLanguage: { in: targetLanguages },
+          status: 'SUCCESS',
+        },
+      });
+
+      if (!existing) {
+        filteredItems.push(item);
+      }
+    }
+
+    if (filteredItems.length === 0) {
+      throw new BadRequestException('没有可翻译的内容');
+    }
+
     const job = await this.prisma.translationJob.create({
       data: {
         providerId: provider.id,
         projectId,
+        userId,
         status: TranslationJobStatus.PENDING,
         sourceLanguage,
-        targetLanguage,
-        texts,
+        targetLanguages,
+        totalKeys: filteredItems.length,
+        translatedKeys: 0,
         characterCount: totalCharacters,
       },
+    });
+
+    // 创建翻译任务明细
+    await this.prisma.translationJobItem.createMany({
+      data: filteredItems.map((item) => ({
+        jobId: job.id,
+        keyId: item.keyId,
+        keyName: item.keyName,
+        namespaceName: item.namespaceName,
+        sourceContent: item.sourceContent,
+      })),
     });
 
     // 异步执行翻译
@@ -217,6 +258,7 @@ export class MachineTranslationService {
   private async executeTranslationJob(jobId: string): Promise<void> {
     const job = await this.prisma.translationJob.findUnique({
       where: { id: jobId },
+      include: { items: true },
     });
 
     if (!job) {
@@ -230,17 +272,70 @@ export class MachineTranslationService {
     });
 
     try {
-      const result = await this.translateBatch(job.providerId, job.texts, {
-        sourceLanguage: job.sourceLanguage,
-        targetLanguage: job.targetLanguage,
-      });
+      let totalSuccess = 0;
+      let totalFailed = 0;
 
-      // 更新任务为完成
+      // 对每个目标语言执行翻译
+      for (const targetLanguage of job.targetLanguages) {
+        const texts = job.items.map((item) => item.sourceContent);
+
+        const result = await this.translateBatch(job.providerId, texts, {
+          sourceLanguage: job.sourceLanguage,
+          targetLanguage,
+        });
+
+        // 为每个 item 创建翻译结果
+        for (let i = 0; i < job.items.length; i++) {
+          const item = job.items[i];
+          const translation = result.translations[i];
+
+          await this.prisma.translationJobItemTranslation.upsert({
+            where: {
+              itemId_targetLanguage: {
+                itemId: item.id,
+                targetLanguage,
+              },
+            },
+            update: {
+              translatedContent: translation.translatedText,
+              status: translation.error ? 'FAILED' : 'SUCCESS',
+              errorMessage: translation.error || null,
+              characterCount: translation.translatedText?.length || 0,
+            },
+            create: {
+              itemId: item.id,
+              targetLanguage,
+              translatedContent: translation.translatedText,
+              status: translation.error ? 'FAILED' : 'SUCCESS',
+              errorMessage: translation.error || null,
+              characterCount: translation.translatedText?.length || 0,
+            },
+          });
+
+          if (translation.error) {
+            totalFailed++;
+          } else {
+            totalSuccess++;
+          }
+        }
+
+        // 记录翻译成本
+        await this.recordTranslationCost(job.providerId, result.totalCharacters);
+      }
+
+      // 更新任务状态
+      const hasFailures = totalFailed > 0;
+      const allFailures = totalSuccess === 0 && totalFailed > 0;
+
       await this.prisma.translationJob.update({
         where: { id: jobId },
         data: {
-          status: TranslationJobStatus.COMPLETED,
-          results: result.translations.map((t) => t.translatedText),
+          status: allFailures
+            ? TranslationJobStatus.FAILED
+            : hasFailures
+              ? TranslationJobStatus.PARTIAL
+              : TranslationJobStatus.COMPLETED,
+          translatedKeys: totalSuccess,
           completedAt: new Date(),
         },
       });
