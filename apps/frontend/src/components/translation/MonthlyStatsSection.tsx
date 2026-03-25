@@ -5,7 +5,7 @@ import { StatCard } from './StatCard';
 import { ProviderStatCard } from './ProviderStatCard';
 import {
   FieldStringOutlined,
-  TaskOutlined,
+  FileTextOutlined,
   AppstoreOutlined,
 } from '@ant-design/icons';
 
@@ -49,7 +49,7 @@ export const MonthlyStatsSection: React.FC = () => {
           <StatCard
             title="总任务数"
             value={stats.totalJobs}
-            icon={<TaskOutlined />}
+            icon={<FileTextOutlined />}
           />
         </Col>
         <Col xs={24} sm={8}>

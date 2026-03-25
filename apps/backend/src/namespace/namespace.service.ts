@@ -7,6 +7,7 @@ import { CreateNamespaceDto } from './dto/create-namespace.dto';
 import { UpdateNamespaceDto } from './dto/update-namespace.dto';
 import { PrismaService } from '../prisma.service';
 import { MachineTranslationService } from '../translation/services/machine-translation.service';
+import { TranslationJobManager } from '../translation/translation-job-manager';
 import * as yaml from 'js-yaml';
 import * as XLSX from 'xlsx';
 
@@ -326,40 +327,43 @@ export class NamespaceService {
   }
 
   /**
-   * 一键翻译命名空间 - 自动翻译所有缺失的翻译
+   * 一键翻译 - 创建异步翻译任务
+   * 如果传 namespaceIds，则翻译这些命名空间；否则翻译整个项目
    */
-  async translateNamespace(
+  async translate(
     projectId: string,
-    namespaceId: string,
+    namespaceIds?: string[],
+    userId?: string,
   ): Promise<{
+    jobId: string;
+    status: string;
     totalKeys: number;
-    translatedKeys: number;
-    failedKeys: number;
-    details: Array<{
-      keyId: string;
-      keyName: string;
-      localeCode: string;
-      success: boolean;
-      error?: string;
-    }>;
+    type: 'namespace' | 'project';
+    namespaceCount: number;
   }> {
-    // 验证命名空间存在
-    const namespace = await this.prisma.namespace.findFirst({
-      where: { id: namespaceId, projectId },
-      include: {
-        project: {
-          select: { baseLocale: true },
-        },
-      },
-    });
-    if (!namespace) {
-      throw new NotFoundException(
-        `Namespace with ID ${namespaceId} not found in project ${projectId}`,
+    // 确定翻译范围
+    const isProjectLevel = !namespaceIds || namespaceIds.length === 0;
+    const concurrencyKey = isProjectLevel ? projectId : namespaceIds!.join(',');
+
+    // 并发控制：检查是否已有进行中的翻译任务
+    if (TranslationJobManager.isProcessing(concurrencyKey)) {
+      const existingJobId = TranslationJobManager.getJobId(concurrencyKey);
+      throw new BadRequestException(
+        `该${isProjectLevel ? '项目' : '命名空间'}正在翻译中，任务ID: ${existingJobId}`,
       );
     }
 
+    // 获取项目信息
+    const project = await this.prisma.project.findUnique({
+      where: { id: projectId },
+      select: { baseLocale: true },
+    });
+    if (!project) {
+      throw new NotFoundException(`Project with ID ${projectId} not found`);
+    }
+
     // 获取源语言（项目基准语言）
-    const sourceLocaleCode = namespace.project.baseLocale || 'zh-CN';
+    const sourceLocaleCode = project.baseLocale || 'zh-CN';
 
     // 获取项目的所有启用语言
     const projectLocales = await this.prisma.projectLocale.findMany({
@@ -376,19 +380,35 @@ export class NamespaceService {
       throw new BadRequestException('No target locales available');
     }
 
-    // 获取命名空间下的所有词条及其翻译
+    // 构建查询条件
+    const keyWhereClause: any = {
+      namespace: {
+        projectId,
+      },
+    };
+    if (namespaceIds && namespaceIds.length > 0) {
+      keyWhereClause.namespace.id = { in: namespaceIds };
+    }
+
+    // 获取词条及其翻译
     const keys = await this.prisma.key.findMany({
-      where: { namespaceId },
+      where: keyWhereClause,
       include: {
         translations: {
           include: { locale: true },
         },
+        namespace: true,
       },
     });
 
     if (keys.length === 0) {
-      return { totalKeys: 0, translatedKeys: 0, failedKeys: 0, details: [] };
+      throw new BadRequestException(
+        isProjectLevel ? '该项目下没有词条' : '指定的命名空间下没有词条',
+      );
     }
+
+    // 统计实际涉及的命名空间数量
+    const actualNamespaceIds = new Set(keys.map((k) => k.namespace.id));
 
     // 获取默认供应商
     const defaultProvider =
@@ -399,15 +419,13 @@ export class NamespaceService {
       );
     }
 
-    const details: Array<{
+    // 收集需要翻译的词条
+    const items: Array<{
       keyId: string;
       keyName: string;
-      localeCode: string;
-      success: boolean;
-      error?: string;
+      namespaceName?: string;
+      sourceContent: string;
     }> = [];
-    let translatedCount = 0;
-    let failedCount = 0;
 
     for (const key of keys) {
       // 找到源语言翻译
@@ -416,17 +434,6 @@ export class NamespaceService {
       );
 
       if (!sourceTranslation) {
-        // 源语言没有翻译，跳过
-        for (const targetLocale of targetLocales) {
-          details.push({
-            keyId: key.id,
-            keyName: key.name,
-            localeCode: targetLocale.code,
-            success: false,
-            error: `No source translation in ${sourceLocaleCode}`,
-          });
-          failedCount++;
-        }
         continue;
       }
 
@@ -442,62 +449,39 @@ export class NamespaceService {
         }
 
         // 需要翻译
-        try {
-          const result = await this.machineTranslationService.translate(
-            defaultProvider.id,
-            sourceTranslation.content,
-            {
-              sourceLanguage: sourceLocaleCode,
-              targetLanguage: targetLocale.code,
-            },
-          );
-
-          // 保存翻译到数据库
-          await this.prisma.translation.upsert({
-            where: {
-              keyId_localeId: {
-                keyId: key.id,
-                localeId: targetLocale.id,
-              },
-            },
-            create: {
-              keyId: key.id,
-              localeId: targetLocale.id,
-              content: result.translatedText,
-              status: 'PENDING',
-              isLlmTranslated: true,
-            },
-            update: {
-              content: result.translatedText,
-              isLlmTranslated: true,
-            },
-          });
-
-          details.push({
-            keyId: key.id,
-            keyName: key.name,
-            localeCode: targetLocale.code,
-            success: true,
-          });
-          translatedCount++;
-        } catch (error) {
-          details.push({
-            keyId: key.id,
-            keyName: key.name,
-            localeCode: targetLocale.code,
-            success: false,
-            error: error instanceof Error ? error.message : 'Unknown error',
-          });
-          failedCount++;
-        }
+        items.push({
+          keyId: key.id,
+          keyName: key.name,
+          namespaceName: key.namespace.name,
+          sourceContent: sourceTranslation.content,
+        });
       }
     }
 
+    if (items.length === 0) {
+      throw new BadRequestException('没有需要翻译的内容');
+    }
+
+    // 创建翻译任务
+    const jobId = await this.machineTranslationService.createTranslationJob(
+      defaultProvider.id,
+      sourceLocaleCode,
+      targetLocales.map((l) => l.code),
+      items,
+      projectId,
+      userId,
+      concurrencyKey, // 传递用于并发控制
+    );
+
+    // 记录到并发控制 Map
+    TranslationJobManager.startProcessing(concurrencyKey, jobId);
+
     return {
-      totalKeys: keys.length,
-      translatedKeys: translatedCount,
-      failedKeys: failedCount,
-      details,
+      jobId,
+      status: 'PENDING',
+      totalKeys: items.length,
+      type: isProjectLevel ? 'project' : 'namespace',
+      namespaceCount: actualNamespaceIds.size,
     };
   }
 }

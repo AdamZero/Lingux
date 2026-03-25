@@ -44,6 +44,8 @@ import {
 } from "@/api/machine-translation";
 import type { TranslationProvider } from "@/api/machine-translation";
 import { ProviderModal } from "@/components/translation/ProviderModal";
+import { MonthlyStatsSection } from "@/components/translation/MonthlyStatsSection";
+import { TranslationJobList } from "@/components/translation/TranslationJobList";
 
 const { Title, Text } = Typography;
 const { Option } = Select;
@@ -378,6 +380,12 @@ const MachineTranslationSettingsPage: React.FC = () => {
           </Card>
         </Col>
       </Row>
+
+      {/* 月度统计 */}
+      <MonthlyStatsSection />
+
+      {/* 翻译任务列表 */}
+      <TranslationJobList />
 
       {/* 供应商列表 */}
       <Card

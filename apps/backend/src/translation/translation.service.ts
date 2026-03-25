@@ -534,12 +534,7 @@ export class TranslationService {
     const results = await Promise.all(
       translations.map(async (t) => {
         try {
-          const existing = await this.findOne(
-            projectId,
-            namespaceId,
-            keyId,
-            t.localeCode,
-          );
+          await this.findOne(projectId, namespaceId, keyId, t.localeCode);
           return await this.update(
             projectId,
             namespaceId,

@@ -8,6 +8,8 @@ import {
   Param,
   Query,
   UseGuards,
+  UseInterceptors,
+  Res,
 } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
 import { RolesGuard } from '../auth/guards/roles.guard';
@@ -24,6 +26,9 @@ import {
   IsArray,
   IsIn,
 } from 'class-validator';
+import { CacheInterceptor } from '../common/cache/cache.interceptor';
+import { Cache } from '../common/cache/cache.decorator';
+import type { Response } from 'express';
 
 class TranslateRequestDto {
   @IsString()
@@ -164,71 +169,6 @@ export class MachineTranslationController {
   }
 
   /**
-   * 获取默认供应商
-   */
-  @Get('default')
-  async getDefaultProvider() {
-    const provider = await this.machineTranslationService.getDefaultProvider();
-    if (!provider) {
-      return { message: 'No default provider configured' };
-    }
-    return provider;
-  }
-
-  /**
-   * 获取供应商详情
-   */
-  @Get(':id')
-  async getProviderInfo(@Param('id') providerId: string) {
-    return this.machineTranslationService.getProviderInfo(providerId);
-  }
-
-  /**
-   * 检查供应商健康状态
-   */
-  @Get(':id/health')
-  async checkProviderHealth(@Param('id') providerId: string) {
-    const isHealthy =
-      await this.machineTranslationService.checkProviderHealth(providerId);
-    return {
-      providerId,
-      status: isHealthy ? 'healthy' : 'unhealthy',
-    };
-  }
-
-  /**
-   * 删除翻译供应商
-   */
-  @Delete(':id')
-  @Roles('ADMIN')
-  async deleteProvider(@Param('id') providerId: string) {
-    await this.machineTranslationService.deleteProvider(providerId);
-    return { message: 'Provider deleted successfully' };
-  }
-
-  /**
-   * 更新翻译供应商
-   */
-  @Put(':id')
-  @Roles('ADMIN')
-  async updateProvider(
-    @Param('id') providerId: string,
-    @Body() dto: Partial<CreateProviderDto>,
-  ) {
-    return this.machineTranslationService.updateProvider(providerId, dto);
-  }
-
-  /**
-   * 设置默认供应商
-   */
-  @Put(':id/default')
-  @Roles('ADMIN')
-  async setDefaultProvider(@Param('id') providerId: string) {
-    await this.machineTranslationService.setDefaultProvider(providerId);
-    return { message: 'Default provider set successfully' };
-  }
-
-  /**
    * 执行单个文本翻译
    */
   @Post('translate')
@@ -295,9 +235,24 @@ export class MachineTranslationController {
   }
 
   /**
+   * 获取月度统计（必须在 :id 之前定义，避免被误匹配）
+   */
+  @Get('monthly-stats')
+  @UseInterceptors(CacheInterceptor)
+  @Cache('translation:monthly-stats', 300000) // 5 分钟缓存
+  async getMonthlyStats(
+    @Query('year') year?: number,
+    @Query('month') month?: number,
+  ) {
+    return this.machineTranslationService.getMonthlyStats(year, month);
+  }
+
+  /**
    * 获取翻译任务列表
    */
   @Get('jobs')
+  @UseInterceptors(CacheInterceptor)
+  @Cache('translation:jobs:list', 60000) // 1 分钟缓存
   async getTranslationJobs(@Query() dto: GetTranslationJobsDto) {
     return this.machineTranslationService.getTranslationJobs(dto);
   }
@@ -311,14 +266,25 @@ export class MachineTranslationController {
   }
 
   /**
-   * 获取月度统计
+   * SSE 实时获取翻译任务进度
    */
-  @Get('monthly-stats')
-  async getMonthlyStats(
-    @Query('year') year?: number,
-    @Query('month') month?: number,
-  ) {
-    return this.machineTranslationService.getMonthlyStats(year, month);
+  @Get('jobs/:id/stream')
+  async streamTranslationJob(@Param('id') id: string, @Res() res: Response) {
+    // 设置 SSE 响应头
+    res.setHeader('Content-Type', 'text/event-stream');
+    res.setHeader('Cache-Control', 'no-cache');
+    res.setHeader('Connection', 'keep-alive');
+
+    // 注册 SSE 连接
+    this.machineTranslationService.registerSSEConnection(id, res);
+
+    // 发送初始连接成功事件
+    res.write(`data: ${JSON.stringify({ type: 'connected', jobId: id })}\n\n`);
+
+    // 当客户端断开连接时清理
+    res.on('close', () => {
+      this.machineTranslationService.unregisterSSEConnection(id, res);
+    });
   }
 
   /**
@@ -339,9 +305,13 @@ export class MachineTranslationController {
 
     const jobId = await this.machineTranslationService.createTranslationJob(
       providerId,
-      dto.texts,
       dto.sourceLanguage,
-      dto.targetLanguage,
+      [dto.targetLanguage],
+      dto.texts.map((text) => ({
+        keyId: 'mock-key-id',
+        keyName: 'mock-key-name',
+        sourceContent: text,
+      })),
       dto.projectId,
     );
 
@@ -350,14 +320,6 @@ export class MachineTranslationController {
       status: 'PENDING',
       message: 'Translation job created successfully',
     };
-  }
-
-  /**
-   * 获取翻译任务状态
-   */
-  @Get('jobs/:id')
-  async getTranslationJob(@Param('id') jobId: string) {
-    return this.machineTranslationService.getTranslationJob(jobId);
   }
 
   /**
@@ -373,5 +335,70 @@ export class MachineTranslationController {
       providerId,
       billingPeriod,
     );
+  }
+
+  /**
+   * 获取默认供应商
+   */
+  @Get('default')
+  async getDefaultProvider() {
+    const provider = await this.machineTranslationService.getDefaultProvider();
+    if (!provider) {
+      return { message: 'No default provider configured' };
+    }
+    return provider;
+  }
+
+  /**
+   * 获取供应商详情
+   */
+  @Get(':id')
+  async getProviderInfo(@Param('id') providerId: string) {
+    return this.machineTranslationService.getProviderInfo(providerId);
+  }
+
+  /**
+   * 检查供应商健康状态
+   */
+  @Get(':id/health')
+  async checkProviderHealth(@Param('id') providerId: string) {
+    const isHealthy =
+      await this.machineTranslationService.checkProviderHealth(providerId);
+    return {
+      providerId,
+      status: isHealthy ? 'healthy' : 'unhealthy',
+    };
+  }
+
+  /**
+   * 删除翻译供应商
+   */
+  @Delete(':id')
+  @Roles('ADMIN')
+  async deleteProvider(@Param('id') providerId: string) {
+    await this.machineTranslationService.deleteProvider(providerId);
+    return { message: 'Provider deleted successfully' };
+  }
+
+  /**
+   * 更新翻译供应商
+   */
+  @Put(':id')
+  @Roles('ADMIN')
+  async updateProvider(
+    @Param('id') providerId: string,
+    @Body() dto: Partial<CreateProviderDto>,
+  ) {
+    return this.machineTranslationService.updateProvider(providerId, dto);
+  }
+
+  /**
+   * 设置默认供应商
+   */
+  @Put(':id/default')
+  @Roles('ADMIN')
+  async setDefaultProvider(@Param('id') providerId: string) {
+    await this.machineTranslationService.setDefaultProvider(providerId);
+    return { message: 'Default provider set successfully' };
   }
 }

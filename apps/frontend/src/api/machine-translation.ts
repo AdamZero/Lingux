@@ -278,3 +278,12 @@ export const getMonthlyStats = async (
 ): Promise<MonthlyStats> => {
   return apiClient.get('/translation-providers/monthly-stats', { params });
 };
+
+// 导出所有类型（确保 TypeScript 正确识别）
+export type {
+  TranslationJobItem,
+  TranslationJobDetail,
+  TranslationJobListItem,
+  TranslationJobListResponse,
+  MonthlyStats,
+};

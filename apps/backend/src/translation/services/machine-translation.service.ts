@@ -1,8 +1,14 @@
-import { Injectable, Logger, NotFoundException, BadRequestException } from '@nestjs/common';
+import {
+  Injectable,
+  Logger,
+  NotFoundException,
+  BadRequestException,
+} from '@nestjs/common';
 import { PrismaService } from '../../prisma.service';
 import { Prisma } from '@prisma/client';
 import { EncryptionService } from './encryption.service';
 import { WinstonLoggerService } from '../../common/logger/logger.service';
+import type { Response } from 'express';
 import {
   ITranslationAdapter,
   TranslateOptions,
@@ -70,6 +76,8 @@ export interface ProviderResponse {
 export class MachineTranslationService {
   private readonly logger = new Logger(MachineTranslationService.name);
   private readonly adapters = new Map<string, ITranslationAdapter>();
+  // SSE 连接管理：jobId -> Response[]
+  private readonly sseConnections = new Map<string, Set<Response>>();
 
   constructor(
     private readonly prisma: PrismaService,
@@ -83,6 +91,51 @@ export class MachineTranslationService {
     this.registerAdapter('MOCK', new MockTranslateAdapter());
     this.registerAdapter('TENCENT', new TencentTranslateAdapter(winstonLogger));
     this.registerAdapter('BAIDU', new BaiduTranslateAdapter());
+  }
+
+  /**
+   * 注册 SSE 连接
+   */
+  registerSSEConnection(jobId: string, res: Response): void {
+    if (!this.sseConnections.has(jobId)) {
+      this.sseConnections.set(jobId, new Set());
+    }
+    this.sseConnections.get(jobId)!.add(res);
+    this.logger.debug(`SSE connection registered for job ${jobId}`);
+  }
+
+  /**
+   * 注销 SSE 连接
+   */
+  unregisterSSEConnection(jobId: string, res: Response): void {
+    const connections = this.sseConnections.get(jobId);
+    if (connections) {
+      connections.delete(res);
+      if (connections.size === 0) {
+        this.sseConnections.delete(jobId);
+      }
+      this.logger.debug(`SSE connection unregistered for job ${jobId}`);
+    }
+  }
+
+  /**
+   * 推送进度到所有连接的客户端
+   */
+  private pushProgress(jobId: string, data: unknown): void {
+    const connections = this.sseConnections.get(jobId);
+    if (!connections || connections.size === 0) {
+      return;
+    }
+
+    const message = `data: ${JSON.stringify(data)}\n\n`;
+    connections.forEach((res) => {
+      try {
+        res.write(message);
+      } catch (error) {
+        // 连接可能已断开，忽略错误
+        this.logger.debug(`Failed to push progress to client for job ${jobId}`);
+      }
+    });
   }
 
   /**
@@ -191,6 +244,7 @@ export class MachineTranslationService {
     }[],
     projectId?: string,
     userId?: string,
+    namespaceId?: string, // 用于并发控制
   ): Promise<string> {
     const { provider } = await this.getAdapter(providerId);
 
@@ -200,15 +254,18 @@ export class MachineTranslationService {
     );
 
     // 并发控制：检查是否已有成功的翻译
-    const filteredItems = [];
+    const filteredItems: typeof items = [];
     for (const item of items) {
-      const existing = await this.prisma.translationJobItemTranslation.findFirst({
-        where: {
-          keyId: item.keyId,
-          targetLanguage: { in: targetLanguages },
-          status: 'SUCCESS',
-        },
-      });
+      const existing =
+        await this.prisma.translationJobItemTranslation.findFirst({
+          where: {
+            item: {
+              keyId: item.keyId,
+            },
+            targetLanguage: { in: targetLanguages },
+            status: 'SUCCESS',
+          },
+        });
 
       if (!existing) {
         filteredItems.push(item);
@@ -245,7 +302,7 @@ export class MachineTranslationService {
     });
 
     // 异步执行翻译
-    this.executeTranslationJob(job.id).catch((error) => {
+    this.executeTranslationJob(job.id, namespaceId).catch((error) => {
       this.logger.error(`Translation job ${job.id} failed:`, error);
     });
 
@@ -255,7 +312,10 @@ export class MachineTranslationService {
   /**
    * 执行翻译任务
    */
-  private async executeTranslationJob(jobId: string): Promise<void> {
+  private async executeTranslationJob(
+    jobId: string,
+    namespaceId?: string,
+  ): Promise<void> {
     const job = await this.prisma.translationJob.findUnique({
       where: { id: jobId },
       include: { items: true },
@@ -271,9 +331,18 @@ export class MachineTranslationService {
       data: { status: TranslationJobStatus.PROCESSING },
     });
 
+    // 推送开始事件
+    this.pushProgress(jobId, {
+      type: 'started',
+      totalKeys: job.totalKeys,
+      targetLanguages: job.targetLanguages,
+    });
+
     try {
       let totalSuccess = 0;
-      let totalFailed = 0;
+      const totalFailed = 0;
+      let processedCount = 0;
+      const totalItems = job.items.length * job.targetLanguages.length;
 
       // 对每个目标语言执行翻译
       for (const targetLanguage of job.targetLanguages) {
@@ -298,57 +367,91 @@ export class MachineTranslationService {
             },
             update: {
               translatedContent: translation.translatedText,
-              status: translation.error ? 'FAILED' : 'SUCCESS',
-              errorMessage: translation.error || null,
+              status: 'SUCCESS',
               characterCount: translation.translatedText?.length || 0,
             },
             create: {
               itemId: item.id,
               targetLanguage,
               translatedContent: translation.translatedText,
-              status: translation.error ? 'FAILED' : 'SUCCESS',
-              errorMessage: translation.error || null,
+              status: 'SUCCESS',
               characterCount: translation.translatedText?.length || 0,
             },
           });
 
-          if (translation.error) {
-            totalFailed++;
-          } else {
-            totalSuccess++;
+          totalSuccess++;
+          processedCount++;
+
+          // 每处理 10 个词条推送一次进度
+          if (processedCount % 10 === 0 || processedCount === totalItems) {
+            this.pushProgress(jobId, {
+              type: 'progress',
+              processed: processedCount,
+              total: totalItems,
+              percentage: Math.round((processedCount / totalItems) * 100),
+            });
           }
         }
 
         // 记录翻译成本
-        await this.recordTranslationCost(job.providerId, result.totalCharacters);
+        await this.recordTranslationCost(
+          job.providerId,
+          result.totalCharacters,
+        );
       }
 
       // 更新任务状态
       const hasFailures = totalFailed > 0;
       const allFailures = totalSuccess === 0 && totalFailed > 0;
+      const finalStatus = allFailures
+        ? TranslationJobStatus.FAILED
+        : hasFailures
+          ? TranslationJobStatus.PARTIAL
+          : TranslationJobStatus.COMPLETED;
 
       await this.prisma.translationJob.update({
         where: { id: jobId },
         data: {
-          status: allFailures
-            ? TranslationJobStatus.FAILED
-            : hasFailures
-              ? TranslationJobStatus.PARTIAL
-              : TranslationJobStatus.COMPLETED,
+          status: finalStatus,
           translatedKeys: totalSuccess,
           completedAt: new Date(),
         },
       });
+
+      // 推送完成事件
+      this.pushProgress(jobId, {
+        type: 'completed',
+        status: finalStatus,
+        totalKeys: job.totalKeys,
+        translatedKeys: totalSuccess,
+        failedKeys: totalFailed,
+      });
     } catch (error) {
+      const errorMessage =
+        error instanceof Error ? error.message : String(error);
+
       // 更新任务为失败
       await this.prisma.translationJob.update({
         where: { id: jobId },
         data: {
           status: TranslationJobStatus.FAILED,
-          error: error instanceof Error ? error.message : String(error),
+          error: errorMessage,
           completedAt: new Date(),
         },
       });
+
+      // 推送错误事件
+      this.pushProgress(jobId, {
+        type: 'error',
+        message: errorMessage,
+      });
+    } finally {
+      // 清理并发控制
+      if (namespaceId) {
+        const { TranslationJobManager } =
+          await import('../translation-job-manager.js');
+        TranslationJobManager.finishProcessing(namespaceId);
+      }
     }
   }
 
@@ -403,17 +506,16 @@ export class MachineTranslationService {
       };
     }
 
-    const [items, total] = await Promise.all([
+    const [jobs, total] = await Promise.all([
       this.prisma.translationJob.findMany({
         where,
         include: {
           provider: { select: { name: true, type: true } },
           user: { select: { name: true, avatar: true } },
           project: { select: { name: true } },
-          items: {
+          _count: {
             select: {
-              status: true,
-              translations: { select: { status: true } },
+              items: true,
             },
           },
         },
@@ -424,26 +526,17 @@ export class MachineTranslationService {
       this.prisma.translationJob.count({ where }),
     ]);
 
-    const formattedItems = items.map((job) => {
-      const successCount = job.items.reduce((sum, item) => {
-        return sum + item.translations.filter((t) => t.status === 'SUCCESS').length;
-      }, 0);
-      const failedCount = job.items.reduce((sum, item) => {
-        return sum + item.translations.filter((t) => t.status === 'FAILED').length;
-      }, 0);
-
-      return {
-        ...job,
-        providerName: job.provider.name,
-        providerType: job.provider.type,
-        userName: job.user?.name || null,
-        userAvatar: job.user?.avatar || null,
-        projectName: job.project?.name || null,
-        totalKeys: job.items.length,
-        successCount,
-        failedCount,
-      };
-    });
+    const formattedItems = jobs.map((job) => ({
+      ...job,
+      providerName: job.provider.name,
+      providerType: job.provider.type,
+      userName: job.user?.name || null,
+      userAvatar: job.user?.avatar || null,
+      projectName: job.project?.name || null,
+      totalKeys: job._count.items,
+      successCount: 0,
+      failedCount: 0,
+    }));
 
     return {
       items: formattedItems,
@@ -486,8 +579,19 @@ export class MachineTranslationService {
    */
   async getMonthlyStats(year?: number, month?: number) {
     const now = new Date();
-    const targetYear = year ?? now.getFullYear();
-    const targetMonth = month ?? now.getMonth() + 1;
+    // 确保 year 和 month 是数字类型（处理 URL query 参数可能是字符串的情况）
+    const targetYear = year ? Number(year) : now.getFullYear();
+    const targetMonth = month ? Number(month) : now.getMonth() + 1;
+
+    // 验证日期是否有效
+    if (
+      isNaN(targetYear) ||
+      isNaN(targetMonth) ||
+      targetMonth < 1 ||
+      targetMonth > 12
+    ) {
+      throw new Error('Invalid year or month parameter');
+    }
 
     const startDate = new Date(targetYear, targetMonth - 1, 1);
     const endDate = new Date(targetYear, targetMonth, 0);
@@ -527,9 +631,10 @@ export class MachineTranslationService {
         providerType: provider?.type || 'Unknown',
         characterCount,
         jobCount: stat._count,
-        percentage: totalCharacters > 0
-          ? Math.round((characterCount / totalCharacters) * 100 * 100) / 100
-          : 0,
+        percentage:
+          totalCharacters > 0
+            ? Math.round((characterCount / totalCharacters) * 100 * 100) / 100
+            : 0,
       };
     });
 

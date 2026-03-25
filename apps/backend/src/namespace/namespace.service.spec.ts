@@ -2,7 +2,8 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { NamespaceService } from './namespace.service';
 import { PrismaService } from '../prisma.service';
 import { MachineTranslationService } from '../translation/services/machine-translation.service';
-import { NotFoundException } from '@nestjs/common';
+import { NotFoundException, BadRequestException } from '@nestjs/common';
+import { TranslationJobManager } from '../translation/translation-job-manager';
 
 const mockPrismaService = {
   namespace: {
@@ -35,7 +36,7 @@ const mockPrismaService = {
 
 const mockMachineTranslationService = {
   getDefaultProvider: jest.fn(),
-  translate: jest.fn(),
+  createTranslationJob: jest.fn(),
 };
 
 describe('NamespaceService', () => {
@@ -296,6 +297,235 @@ describe('NamespaceService', () => {
         'all',
       );
       expect(Buffer.isBuffer(result)).toBe(true);
+    });
+  });
+
+  describe('translate', () => {
+    const projectId = 'proj-1';
+    const userId = 'user-1';
+
+    beforeEach(() => {
+      // 清理并发控制状态
+      TranslationJobManager.finishProcessing(projectId);
+      TranslationJobManager.finishProcessing('ns-1');
+    });
+
+    it('should create translation job for entire project', async () => {
+      prisma.project.findUnique.mockResolvedValue({
+        id: projectId,
+        baseLocale: 'zh-CN',
+      });
+      prisma.projectLocale.findMany.mockResolvedValue([
+        { locale: { id: 'loc-1', code: 'zh-CN' } },
+        { locale: { id: 'loc-2', code: 'en-US' } },
+      ]);
+      prisma.key.findMany.mockResolvedValue([
+        {
+          id: 'key-1',
+          name: 'hello',
+          namespace: { id: 'ns-1', name: 'common' },
+          translations: [
+            { locale: { code: 'zh-CN' }, content: '你好' },
+          ],
+        },
+      ]);
+      mockMachineTranslationService.getDefaultProvider.mockResolvedValue({
+        id: 'provider-1',
+        name: 'Test Provider',
+      });
+      mockMachineTranslationService.createTranslationJob.mockResolvedValue(
+        'job-1',
+      );
+
+      const result = await service.translate(projectId, undefined, userId);
+
+      expect(result).toEqual({
+        jobId: 'job-1',
+        status: 'PENDING',
+        totalKeys: 1,
+        type: 'project',
+        namespaceCount: 1,
+      });
+      expect(mockMachineTranslationService.createTranslationJob).toHaveBeenCalled();
+    });
+
+    it('should create translation job for specific namespaces', async () => {
+      const namespaceIds = ['ns-1', 'ns-2'];
+
+      prisma.project.findUnique.mockResolvedValue({
+        id: projectId,
+        baseLocale: 'zh-CN',
+      });
+      prisma.projectLocale.findMany.mockResolvedValue([
+        { locale: { id: 'loc-1', code: 'zh-CN' } },
+        { locale: { id: 'loc-2', code: 'en-US' } },
+      ]);
+      prisma.key.findMany.mockResolvedValue([
+        {
+          id: 'key-1',
+          name: 'hello',
+          namespace: { id: 'ns-1', name: 'common' },
+          translations: [
+            { locale: { code: 'zh-CN' }, content: '你好' },
+          ],
+        },
+        {
+          id: 'key-2',
+          name: 'world',
+          namespace: { id: 'ns-2', name: 'home' },
+          translations: [
+            { locale: { code: 'zh-CN' }, content: '世界' },
+          ],
+        },
+      ]);
+      mockMachineTranslationService.getDefaultProvider.mockResolvedValue({
+        id: 'provider-1',
+        name: 'Test Provider',
+      });
+      mockMachineTranslationService.createTranslationJob.mockResolvedValue(
+        'job-1',
+      );
+
+      const result = await service.translate(projectId, namespaceIds, userId);
+
+      expect(result).toEqual({
+        jobId: 'job-1',
+        status: 'PENDING',
+        totalKeys: 2,
+        type: 'namespace',
+        namespaceCount: 2,
+      });
+    });
+
+    it('should throw NotFoundException if project not found', async () => {
+      prisma.project.findUnique.mockResolvedValue(null);
+
+      await expect(
+        service.translate(projectId, undefined, userId),
+      ).rejects.toThrow(NotFoundException);
+    });
+
+    it('should throw BadRequestException if no target locales', async () => {
+      prisma.project.findUnique.mockResolvedValue({
+        id: projectId,
+        baseLocale: 'zh-CN',
+      });
+      prisma.projectLocale.findMany.mockResolvedValue([
+        { locale: { id: 'loc-1', code: 'zh-CN' } },
+      ]);
+
+      await expect(
+        service.translate(projectId, undefined, userId),
+      ).rejects.toThrow(BadRequestException);
+    });
+
+    it('should throw BadRequestException if no keys found', async () => {
+      prisma.project.findUnique.mockResolvedValue({
+        id: projectId,
+        baseLocale: 'zh-CN',
+      });
+      prisma.projectLocale.findMany.mockResolvedValue([
+        { locale: { id: 'loc-1', code: 'zh-CN' } },
+        { locale: { id: 'loc-2', code: 'en-US' } },
+      ]);
+      prisma.key.findMany.mockResolvedValue([]);
+
+      await expect(
+        service.translate(projectId, undefined, userId),
+      ).rejects.toThrow(BadRequestException);
+    });
+
+    it('should throw BadRequestException if no default provider', async () => {
+      prisma.project.findUnique.mockResolvedValue({
+        id: projectId,
+        baseLocale: 'zh-CN',
+      });
+      prisma.projectLocale.findMany.mockResolvedValue([
+        { locale: { id: 'loc-1', code: 'zh-CN' } },
+        { locale: { id: 'loc-2', code: 'en-US' } },
+      ]);
+      prisma.key.findMany.mockResolvedValue([
+        {
+          id: 'key-1',
+          name: 'hello',
+          namespace: { id: 'ns-1', name: 'common' },
+          translations: [
+            { locale: { code: 'zh-CN' }, content: '你好' },
+          ],
+        },
+      ]);
+      mockMachineTranslationService.getDefaultProvider.mockResolvedValue(null);
+
+      await expect(
+        service.translate(projectId, undefined, userId),
+      ).rejects.toThrow(BadRequestException);
+    });
+
+    it('should throw BadRequestException if no items to translate', async () => {
+      prisma.project.findUnique.mockResolvedValue({
+        id: projectId,
+        baseLocale: 'zh-CN',
+      });
+      prisma.projectLocale.findMany.mockResolvedValue([
+        { locale: { id: 'loc-1', code: 'zh-CN' } },
+        { locale: { id: 'loc-2', code: 'en-US' } },
+      ]);
+      prisma.key.findMany.mockResolvedValue([
+        {
+          id: 'key-1',
+          name: 'hello',
+          namespace: { id: 'ns-1', name: 'common' },
+          translations: [
+            { locale: { code: 'zh-CN' }, content: '你好' },
+            { locale: { code: 'en-US' }, content: 'Hello' },
+          ],
+        },
+      ]);
+      mockMachineTranslationService.getDefaultProvider.mockResolvedValue({
+        id: 'provider-1',
+        name: 'Test Provider',
+      });
+
+      await expect(
+        service.translate(projectId, undefined, userId),
+      ).rejects.toThrow(BadRequestException);
+    });
+
+    it('should throw BadRequestException if concurrent translation', async () => {
+      // 先启动一个翻译任务
+      prisma.project.findUnique.mockResolvedValue({
+        id: projectId,
+        baseLocale: 'zh-CN',
+      });
+      prisma.projectLocale.findMany.mockResolvedValue([
+        { locale: { id: 'loc-1', code: 'zh-CN' } },
+        { locale: { id: 'loc-2', code: 'en-US' } },
+      ]);
+      prisma.key.findMany.mockResolvedValue([
+        {
+          id: 'key-1',
+          name: 'hello',
+          namespace: { id: 'ns-1', name: 'common' },
+          translations: [
+            { locale: { code: 'zh-CN' }, content: '你好' },
+          ],
+        },
+      ]);
+      mockMachineTranslationService.getDefaultProvider.mockResolvedValue({
+        id: 'provider-1',
+        name: 'Test Provider',
+      });
+      mockMachineTranslationService.createTranslationJob.mockResolvedValue(
+        'job-1',
+      );
+
+      // 第一次调用成功
+      await service.translate(projectId, undefined, userId);
+
+      // 第二次调用应该失败（并发控制）
+      await expect(
+        service.translate(projectId, undefined, userId),
+      ).rejects.toThrow(BadRequestException);
     });
   });
 });

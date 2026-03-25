@@ -183,6 +183,9 @@ export class BaiduTranslateAdapter implements ITranslationAdapter {
   }
 
   private mapLanguageCode(code: string): string {
+    // 先截取 - 前一部分，处理 zh-CN、ja-JP 等格式
+    const baseCode = code.split('-')[0].toLowerCase();
+
     const mappings: Record<string, string> = {
       zh: 'zh',
       en: 'en',
@@ -213,6 +216,6 @@ export class BaiduTranslateAdapter implements ITranslationAdapter {
       cs: 'cs',
       auto: 'auto',
     };
-    return mappings[code] || code;
+    return mappings[baseCode] || baseCode;
   }
 }

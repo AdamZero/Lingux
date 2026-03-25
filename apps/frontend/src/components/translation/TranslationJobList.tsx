@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import { Card, Table, Tag, Space, Typography, Avatar, Button, Drawer } from 'antd';
 import { useQuery } from '@tanstack/react-query';
-import { getTranslationJobs, getTranslationJobDetail, TranslationJobListItem } from '@/api/machine-translation';
+import { getTranslationJobs, getTranslationJobDetail } from '@/api/machine-translation';
+import type { TranslationJobListItem } from '@/api/machine-translation';
 import type { ColumnsType } from 'antd/es/table';
 import dayjs from 'dayjs';
 import relativeTime from 'dayjs/plugin/relativeTime';

@@ -137,8 +137,18 @@ export const TranslationDrawer: React.FC<TranslationDrawerProps> = ({
   // 获取缺失翻译的目标语言
   const getMissingTranslations = () => {
     const translations = editingKey?.translations || [];
+    const formValues = form.getFieldsValue();
+    
     return locales.filter((locale) => {
       if (locale.code === baseLocale) return false;
+      
+      // 优先检查表单的当前值（用户可能刚删除或输入）
+      const formValue = formValues[locale.code];
+      if (formValue !== undefined && formValue !== null && formValue !== '') {
+        return false; // 表单中有值，不算缺失
+      }
+      
+      // 如果表单中没有值，检查 translations 数组
       const translation = translations.find(
         (t) => t.locale.code === locale.code,
       );

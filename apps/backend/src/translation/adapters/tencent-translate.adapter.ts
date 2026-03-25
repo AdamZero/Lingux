@@ -106,10 +106,14 @@ export class TencentTranslateAdapter implements ITranslationAdapter {
     this.assertInitialized();
     this.validateText(text);
 
+    // 腾讯 API 需要简化的语言代码（截取 - 前一部分）
+    const sourceLang = (options.sourceLanguage || 'auto').split('-')[0];
+    const targetLang = options.targetLanguage.split('-')[0];
+
     const requestParams = {
       SourceText: text,
-      Source: options.sourceLanguage || 'auto',
-      Target: options.targetLanguage,
+      Source: sourceLang,
+      Target: targetLang,
       ProjectId: 0,
     };
 

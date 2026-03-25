@@ -10,11 +10,13 @@ import {
   Query,
   BadRequestException,
   Res,
+  Req,
 } from '@nestjs/common';
-import type { Response } from 'express';
+import type { Response, Request } from 'express';
 import { NamespaceService } from './namespace.service';
 import { CreateNamespaceDto } from './dto/create-namespace.dto';
 import { UpdateNamespaceDto } from './dto/update-namespace.dto';
+import { TranslateNamespaceDto } from './dto/translate-namespace.dto';
 import { Delete } from '@nestjs/common';
 
 @Controller('projects/:projectId/namespaces')
@@ -109,13 +111,17 @@ export class NamespaceController {
   }
 
   /**
-   * 一键翻译命名空间 - 自动翻译所有缺失的翻译
+   * 一键翻译 - 创建异步翻译任务
+   * 如果传 namespaceIds，则翻译这些命名空间；否则翻译整个项目
    */
-  @Post(':namespaceId/translate')
-  async translateNamespace(
+  @Post('translate')
+  async translate(
     @Param('projectId') projectId: string,
-    @Param('namespaceId') namespaceId: string,
+    @Body() dto: TranslateNamespaceDto,
+    @Req() req: Request,
   ) {
-    return this.namespaceService.translateNamespace(projectId, namespaceId);
+    // 从 JWT 中获取用户 ID
+    const userId = (req as any).user?.id;
+    return this.namespaceService.translate(projectId, dto.namespaceIds, userId);
   }
 }
