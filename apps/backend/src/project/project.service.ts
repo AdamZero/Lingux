@@ -215,16 +215,33 @@ export class ProjectService {
   }
 
   async update(id: string, updateProjectDto: UpdateProjectDto) {
-    const { localeIds, ...projectData } = updateProjectDto;
+    const {
+      localeIds,
+      autoTranslateEnabled,
+      autoTranslateProviderId,
+      ...projectData
+    } = updateProjectDto;
     const cleanProjectData = Object.fromEntries(
       Object.entries(projectData).filter(([, value]) => value !== undefined),
     ) as typeof projectData;
+
+    // 构建自动翻译配置
+    const autoTranslateData: any = {};
+    if (autoTranslateEnabled !== undefined) {
+      autoTranslateData.autoTranslateEnabled = autoTranslateEnabled;
+    }
+    if (autoTranslateProviderId !== undefined) {
+      autoTranslateData.autoTranslateProviderId = autoTranslateProviderId;
+    }
 
     if (!localeIds) {
       try {
         const project = await this.prisma.project.update({
           where: { id },
-          data: cleanProjectData,
+          data: {
+            ...cleanProjectData,
+            ...autoTranslateData,
+          },
           include: {
             projectLocales: {
               where: {
@@ -253,10 +270,18 @@ export class ProjectService {
       throw new NotFoundException(`Project with ID ${id} not found`);
     }
 
-    if (Object.keys(cleanProjectData).length > 0) {
+    // 更新项目数据和自动翻译配置
+    const updateData: any = { ...cleanProjectData };
+    if (Object.keys(autoTranslateData).length > 0) {
+      updateData.autoTranslateEnabled = autoTranslateData.autoTranslateEnabled;
+      updateData.autoTranslateProviderId =
+        autoTranslateData.autoTranslateProviderId;
+    }
+
+    if (Object.keys(updateData).length > 0) {
       await this.prisma.project.update({
         where: { id },
-        data: cleanProjectData,
+        data: updateData,
       });
     }
 

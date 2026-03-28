@@ -121,6 +121,8 @@ model Project {
   currentReleaseId                          String?          @unique
   approvalEnabled                           Boolean          @default(false)
   accessMode                                String           @default("PUBLIC")
+  autoTranslateEnabled                      Boolean          @default(false)
+  autoTranslateProviderId                   String?          @db.VarChar(255)
   namespaces                                Namespace[]
   currentRelease Release? @relation("ProjectCurrentRelease", fields: [currentReleaseId], references: [id])
   projectLocales                            ProjectLocale[]

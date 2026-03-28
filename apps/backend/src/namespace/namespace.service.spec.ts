@@ -324,9 +324,7 @@ describe('NamespaceService', () => {
           id: 'key-1',
           name: 'hello',
           namespace: { id: 'ns-1', name: 'common' },
-          translations: [
-            { locale: { code: 'zh-CN' }, content: '你好' },
-          ],
+          translations: [{ locale: { code: 'zh-CN' }, content: '你好' }],
         },
       ]);
       mockMachineTranslationService.getDefaultProvider.mockResolvedValue({
@@ -346,7 +344,9 @@ describe('NamespaceService', () => {
         type: 'project',
         namespaceCount: 1,
       });
-      expect(mockMachineTranslationService.createTranslationJob).toHaveBeenCalled();
+      expect(
+        mockMachineTranslationService.createTranslationJob,
+      ).toHaveBeenCalled();
     });
 
     it('should create translation job for specific namespaces', async () => {
@@ -365,17 +365,13 @@ describe('NamespaceService', () => {
           id: 'key-1',
           name: 'hello',
           namespace: { id: 'ns-1', name: 'common' },
-          translations: [
-            { locale: { code: 'zh-CN' }, content: '你好' },
-          ],
+          translations: [{ locale: { code: 'zh-CN' }, content: '你好' }],
         },
         {
           id: 'key-2',
           name: 'world',
           namespace: { id: 'ns-2', name: 'home' },
-          translations: [
-            { locale: { code: 'zh-CN' }, content: '世界' },
-          ],
+          translations: [{ locale: { code: 'zh-CN' }, content: '世界' }],
         },
       ]);
       mockMachineTranslationService.getDefaultProvider.mockResolvedValue({
@@ -449,9 +445,7 @@ describe('NamespaceService', () => {
           id: 'key-1',
           name: 'hello',
           namespace: { id: 'ns-1', name: 'common' },
-          translations: [
-            { locale: { code: 'zh-CN' }, content: '你好' },
-          ],
+          translations: [{ locale: { code: 'zh-CN' }, content: '你好' }],
         },
       ]);
       mockMachineTranslationService.getDefaultProvider.mockResolvedValue(null);
@@ -506,9 +500,7 @@ describe('NamespaceService', () => {
           id: 'key-1',
           name: 'hello',
           namespace: { id: 'ns-1', name: 'common' },
-          translations: [
-            { locale: { code: 'zh-CN' }, content: '你好' },
-          ],
+          translations: [{ locale: { code: 'zh-CN' }, content: '你好' }],
         },
       ]);
       mockMachineTranslationService.getDefaultProvider.mockResolvedValue({

@@ -11,8 +11,9 @@ import {
   Input,
   App as AntdApp,
   Select,
+  Switch,
 } from "antd";
-import { PlusOutlined, EditOutlined, DeleteOutlined } from "@ant-design/icons";
+import { PlusOutlined, EditOutlined, DeleteOutlined, ThunderboltOutlined } from "@ant-design/icons";
 import apiClient from "@/api/client";
 
 const { Title } = Typography;
@@ -24,6 +25,7 @@ interface Project {
   createdAt: string;
   baseLocale: string;
   locales: Locale[];
+  autoTranslateEnabled?: boolean;
 }
 
 import { useNavigate } from "react-router-dom";
@@ -89,6 +91,7 @@ const ProjectPage: React.FC = () => {
       name: string;
       description?: string;
       localeIds?: string[];
+      autoTranslateEnabled?: boolean;
     }) => {
       if (!editingProject) {
         throw new Error("No project selected for update");
@@ -195,10 +198,35 @@ const ProjectPage: React.FC = () => {
       key: "description",
     },
     {
+      title: "自动翻译",
+      key: "autoTranslate",
+      render: (_: unknown, record: Project) => (
+        <Switch
+          checked={record.autoTranslateEnabled}
+          onChange={(checked) => {
+            // 只更新自动翻译配置，不修改其他字段
+            apiClient.patch(`/projects/${record.id}`, {
+              autoTranslateEnabled: checked,
+            }).then(() => {
+              message.success(checked ? '已启用自动翻译' : '已关闭自动翻译');
+              queryClient.invalidateQueries({ queryKey: ['projects'] });
+            }).catch((error: unknown) => {
+              const err = error as { response?: { data?: { message?: string } } };
+              message.error(err.response?.data?.message || '更新失败');
+            });
+          }}
+          checkedChildren={<ThunderboltOutlined />}
+          unCheckedChildren={<ThunderboltOutlined />}
+        />
+      ),
+    },
+    {
       title: "Created At",
       dataIndex: "createdAt",
       key: "createdAt",
       render: (date: string) => new Date(date).toLocaleString(),
+      defaultSortOrder: 'descend',
+      sorter: (a: Project, b: Project) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime(),
     },
     {
       title: "Actions",

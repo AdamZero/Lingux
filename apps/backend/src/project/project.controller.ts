@@ -13,6 +13,7 @@ import {
   UseInterceptors,
   BadRequestException,
   Request,
+  Put,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { ProjectService } from './project.service';
@@ -172,5 +173,30 @@ export class ProjectController {
     @Request() req: { user: { id: string } },
   ) {
     return this.projectService.getMyRole(projectId, req.user.id);
+  }
+
+  @Put(':projectId/auto-translate-config')
+  async updateAutoTranslateConfig(
+    @Param('projectId') projectId: string,
+    @Body()
+    body: {
+      autoTranslateEnabled?: boolean;
+      autoTranslateProviderId?: string;
+    },
+    @Request() req: { user: { id: string } },
+  ) {
+    return this.projectService.update(projectId, {
+      autoTranslateEnabled: body.autoTranslateEnabled,
+      autoTranslateProviderId: body.autoTranslateProviderId,
+    });
+  }
+
+  @Get(':projectId/auto-translate-config')
+  async getAutoTranslateConfig(@Param('projectId') projectId: string) {
+    const project = await this.projectService.findOne(projectId);
+    return {
+      autoTranslateEnabled: (project as any).autoTranslateEnabled || false,
+      autoTranslateProviderId: (project as any).autoTranslateProviderId || null,
+    };
   }
 }

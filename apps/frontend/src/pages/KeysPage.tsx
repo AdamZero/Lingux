@@ -13,12 +13,17 @@ import {
   App as AntdApp,
   Checkbox,
   List,
+  Row,
+  Col,
+  Divider,
 } from "antd";
 import {
   PlusOutlined,
   UploadOutlined,
   DownloadOutlined,
   InboxOutlined,
+  DownOutlined,
+  SettingOutlined,
 } from "@ant-design/icons";
 import { NamespaceTranslateButton } from "@/components/translation/NamespaceTranslateButton";
 import apiClient from "@/api/client";
@@ -120,6 +125,9 @@ const KeysPage: React.FC = () => {
   const [namespaceForm] = Form.useForm();
   const [keyForm] = Form.useForm();
   const [importForm] = Form.useForm();
+  const [batchKeys, setBatchKeys] = useState<Array<{ name: string; description?: string; type?: string; baseContent?: string }>>([
+    { name: '', description: '', type: 'TEXT', baseContent: '' },
+  ]);
 
   const isRecord = (value: unknown): value is Record<string, unknown> =>
     typeof value === "object" && value !== null;
@@ -245,6 +253,35 @@ const KeysPage: React.FC = () => {
           message.error("词条已存在");
         }
       }
+    },
+  });
+
+  const createBatchKeyMutation = useMutation({
+    mutationFn: (values: { keys: Array<{ name: string; description?: string; type?: string }> }) =>
+      apiClient.post(
+        `/projects/${projectId}/namespaces/${selectedNamespaceId}/keys/batch`,
+        values,
+      ),
+    onSuccess: async () => {
+      message.success("词条批量创建成功");
+      setIsKeyModalOpen(false);
+      setIsBatchMode(false);
+      setBatchKeys([{ name: '', description: '', type: 'TEXT' }]);
+      // 刷新数据（不等待，失败不影响主流程）
+      Promise.all([
+        queryClient.refetchQueries({
+          queryKey: ["keys", projectId, selectedNamespaceId],
+        }),
+        queryClient.refetchQueries({
+          queryKey: ["namespaces", projectId],
+        }),
+      ]).catch((err) => {
+        console.error('Failed to refetch:', err);
+      });
+    },
+    onError: (error: unknown) => {
+      const err = error as { response?: { data?: { message?: string } } };
+      message.error(err.response?.data?.message || "批量创建失败");
     },
   });
 
@@ -615,14 +652,14 @@ const KeysPage: React.FC = () => {
                 导入
               </Button>
               <Button
-            type="primary"
-            size="small"
-            icon={<PlusOutlined />}
-            disabled={!selectedNamespaceId}
-            onClick={() => setIsKeyModalOpen(true)}
-          >
-            新建词条
-          </Button>
+                type="primary"
+                size="small"
+                icon={<PlusOutlined />}
+                disabled={!selectedNamespaceId}
+                onClick={() => setIsKeyModalOpen(true)}
+              >
+                新建词条
+              </Button>
           {selectedNamespace && (
             <NamespaceTranslateButton
               projectId={projectId}
@@ -704,41 +741,140 @@ const KeysPage: React.FC = () => {
       <Modal
         title="新建词条"
         open={isKeyModalOpen}
-        onOk={() => keyForm.submit()}
-        onCancel={() => setIsKeyModalOpen(false)}
-        confirmLoading={createKeyMutation.isPending}
+        onOk={() => {
+          // 检查是否有空词条
+          const hasEmptyName = batchKeys.some(k => !k.name.trim());
+          if (hasEmptyName) {
+            message.error('请填写所有词条的名称，或删除空词条');
+            return;
+          }
+          
+          // 检查默认语言内容是否为空
+          const hasEmptyBaseContent = batchKeys.some(k => !k.baseContent?.trim());
+          if (hasEmptyBaseContent) {
+            message.error('请填写所有词条的默认语言内容，或删除空词条');
+            return;
+          }
+          
+          const validKeys = batchKeys.filter(k => k.name.trim() && k.baseContent?.trim());
+          if (validKeys.length === 0) {
+            message.warning('请至少填写一个词条');
+            return;
+          }
+          createBatchKeyMutation.mutate({ keys: validKeys });
+        }}
+        onCancel={() => {
+          setIsKeyModalOpen(false);
+          setBatchKeys([{ name: '', description: '', type: 'TEXT', baseContent: '' }]);
+          keyForm.resetFields();
+        }}
+        confirmLoading={createBatchKeyMutation.isPending}
+        width={900}
       >
-        <Form
-          form={keyForm}
-          layout="vertical"
-          onFinish={(values) => createKeyMutation.mutate(values)}
-          initialValues={{ type: "TEXT" }}
+        <div style={{ maxHeight: '550px', overflowY: 'auto', paddingRight: 8 }}>
+          {batchKeys.map((key, index) => (
+            <div key={index}>
+              {index > 0 && <Divider style={{ margin: '12px 0' }} />}
+              
+              <div style={{ position: 'relative', marginBottom: 8 }}>
+                {/* 右上角删除按钮 */}
+                {batchKeys.length > 1 && (
+                  <Button
+                    danger
+                    type="link"
+                    size="small"
+                    style={{ position: 'absolute', right: 0, top: 0, zIndex: 1 }}
+                    onClick={() => {
+                      if (batchKeys.length === 1) {
+                        message.warning('至少保留一个词条');
+                        return;
+                      }
+                      setBatchKeys(batchKeys.filter((_, i) => i !== index));
+                    }}
+                  >
+                    删除
+                  </Button>
+                )}
+                
+                {/* 两行布局 */}
+                <Space direction="vertical" size="small" style={{ width: '100%' }}>
+                  {/* 第一行：名称 + 描述 + 类型 */}
+                  <Row gutter={8}>
+                    <Col span={8}>
+                      <Input
+                        size="small"
+                        placeholder="词条名称 *"
+                        value={key.name}
+                        onChange={(e) => {
+                          const newKeys = [...batchKeys];
+                          newKeys[index].name = e.target.value;
+                          setBatchKeys(newKeys);
+                        }}
+                        status={key.name.trim() ? undefined : 'error'}
+                      />
+                    </Col>
+                    <Col span={8}>
+                      <Input
+                        size="small"
+                        placeholder="描述"
+                        value={key.description}
+                        onChange={(e) => {
+                          const newKeys = [...batchKeys];
+                          newKeys[index].description = e.target.value;
+                          setBatchKeys(newKeys);
+                        }}
+                      />
+                    </Col>
+                    <Col span={8}>
+                      <Select
+                        size="small"
+                        value={key.type}
+                        onChange={(value) => {
+                          const newKeys = [...batchKeys];
+                          newKeys[index].type = value;
+                          setBatchKeys(newKeys);
+                        }}
+                        style={{ width: '100%' }}
+                      >
+                        <Option value="TEXT">文本</Option>
+                        <Option value="RICH_TEXT">富文本</Option>
+                        <Option value="ASSET">资源</Option>
+                      </Select>
+                    </Col>
+                  </Row>
+                  
+                  {/* 第二行：默认语言内容 */}
+                  <Row>
+                    <Col span={24}>
+                      <Input
+                        size="small"
+                        placeholder={`默认语言内容 (${project?.baseLocale || "基础语言"}) *`}
+                        value={key.baseContent}
+                        onChange={(e) => {
+                          const newKeys = [...batchKeys];
+                          newKeys[index].baseContent = e.target.value;
+                          setBatchKeys(newKeys);
+                        }}
+                        status={key.baseContent?.trim() ? undefined : 'error'}
+                      />
+                    </Col>
+                  </Row>
+                </Space>
+              </div>
+            </div>
+          ))}
+        </div>
+        
+        <Divider style={{ margin: '12px 0' }} />
+        
+        <Button 
+          onClick={() => setBatchKeys([...batchKeys, { name: '', description: '', type: 'TEXT', baseContent: '' }])} 
+          icon={<PlusOutlined />} 
+          block
+          size="small"
         >
-          <Form.Item
-            name="name"
-            label="词条名称"
-            rules={[{ required: true, message: "请输入词条名称" }]}
-          >
-            <Input placeholder="例如: button.submit" />
-          </Form.Item>
-          <Form.Item name="description" label="描述">
-            <Input.TextArea rows={2} />
-          </Form.Item>
-          <Form.Item name="type" label="类型">
-            <Select>
-              <Option value="TEXT">文本</Option>
-              <Option value="RICH_TEXT">富文本</Option>
-              <Option value="ASSET">资源</Option>
-            </Select>
-          </Form.Item>
-          <Form.Item
-            name="baseContent"
-            label={`默认语言 (${project?.baseLocale || "基础语言"})`}
-            rules={[{ required: true, message: "请输入默认语言内容" }]}
-          >
-            <Input.TextArea rows={3} placeholder="输入默认语言文本" />
-          </Form.Item>
-        </Form>
+          添加词条
+        </Button>
       </Modal>
 
       <Modal

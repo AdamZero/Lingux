@@ -6,6 +6,7 @@ import {
   TranslationStatus,
   TranslationPriority,
   KeyType,
+  TranslationProviderType,
 } from '@prisma/client';
 import { PrismaPg } from '@prisma/adapter-pg';
 

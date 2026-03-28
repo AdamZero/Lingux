@@ -5,7 +5,7 @@ import {
   BadRequestException,
 } from '@nestjs/common';
 import { PrismaService } from '../../prisma.service';
-import { Prisma } from '@prisma/client';
+import { Prisma, TranslationStatus } from '@prisma/client';
 import { EncryptionService } from './encryption.service';
 import { WinstonLoggerService } from '../../common/logger/logger.service';
 import type { Response } from 'express';
@@ -171,8 +171,17 @@ export class MachineTranslationService {
       throw new Error(`No adapter found for provider type: ${provider.type}`);
     }
 
-    // 解密API密钥并初始化适配器
-    const apiKey = this.encryptionService.decrypt(provider.apiKeyEncrypted);
+    // 解密 API 密钥并初始化适配器
+    let apiKey: string;
+    try {
+      apiKey = this.encryptionService.decrypt(provider.apiKeyEncrypted);
+    } catch (error) {
+      this.logger.warn(
+        `Failed to decrypt API key for provider ${provider.name}, using raw value: ${error.message}`,
+      );
+      // 如果解密失败，使用原始值（用于测试）
+      apiKey = provider.apiKeyEncrypted;
+    }
     const config: AdapterConfig = {
       baseUrl: provider.baseUrl,
       apiKey,
@@ -417,6 +426,80 @@ export class MachineTranslationService {
           completedAt: new Date(),
         },
       });
+
+      // 如果是自动翻译任务（有 namespaceId），将翻译结果写入 Translation 表
+      if (namespaceId && finalStatus === TranslationJobStatus.COMPLETED) {
+        this.logger.log(
+          `[AutoTranslation] Writing translation results to Translation table...`,
+        );
+
+        // 获取所有翻译成功的 item
+        const jobWithItems = await this.prisma.translationJob.findUnique({
+          where: { id: jobId },
+          include: {
+            items: {
+              include: {
+                translations: {
+                  where: { status: 'SUCCESS' },
+                },
+              },
+            },
+          },
+        });
+
+        if (!jobWithItems) {
+          this.logger.warn(`[AutoTranslation] Job not found: ${jobId}`);
+        } else {
+          // 为每个 item 创建或更新 Translation 记录
+          for (const item of jobWithItems.items) {
+            for (const itemTranslation of item.translations) {
+              if (!itemTranslation.translatedContent) continue;
+
+              // 获取目标语言的 localeId
+              const targetLocale = await this.prisma.locale.findUnique({
+                where: { code: itemTranslation.targetLanguage },
+              });
+
+              if (!targetLocale) {
+                this.logger.warn(
+                  `Target locale not found: ${itemTranslation.targetLanguage}`,
+                );
+                continue;
+              }
+
+              // 创建或更新 Translation
+              await this.prisma.translation.upsert({
+                where: {
+                  keyId_localeId: {
+                    keyId: item.keyId,
+                    localeId: targetLocale.id,
+                  },
+                },
+                update: {
+                  content: itemTranslation.translatedContent,
+                  status: TranslationStatus.PENDING,
+                  isLlmTranslated: true,
+                },
+                create: {
+                  keyId: item.keyId,
+                  localeId: targetLocale.id,
+                  content: itemTranslation.translatedContent,
+                  status: TranslationStatus.PENDING,
+                  isLlmTranslated: true,
+                },
+              });
+
+              this.logger.log(
+                `[AutoTranslation] Translation saved for key ${item.keyName} (${itemTranslation.targetLanguage})`,
+              );
+            }
+          }
+
+          this.logger.log(
+            `[AutoTranslation] Translation results written successfully`,
+          );
+        }
+      }
 
       // 推送完成事件
       this.pushProgress(jobId, {

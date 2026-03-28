@@ -1,4 +1,4 @@
-import { IsString, IsOptional, IsArray } from 'class-validator';
+import { IsString, IsOptional, IsArray, IsBoolean } from 'class-validator';
 
 export class UpdateProjectDto {
   @IsString()
@@ -13,4 +13,12 @@ export class UpdateProjectDto {
   @IsString({ each: true })
   @IsOptional()
   localeIds?: string[];
+
+  @IsBoolean()
+  @IsOptional()
+  autoTranslateEnabled?: boolean;
+
+  @IsString()
+  @IsOptional()
+  autoTranslateProviderId?: string;
 }
