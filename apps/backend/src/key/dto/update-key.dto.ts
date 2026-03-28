@@ -1,17 +1,4 @@
 import { PartialType } from '@nestjs/mapped-types';
-import { CreateKeyDto, KeyType } from './create-key.dto';
-import { IsString, IsOptional, IsEnum } from 'class-validator';
+import { CreateKeyDto } from './create-key.dto';
 
-export class UpdateKeyDto extends PartialType(CreateKeyDto) {
-  @IsString()
-  @IsOptional()
-  name?: string;
-
-  @IsString()
-  @IsOptional()
-  description?: string;
-
-  @IsEnum(KeyType)
-  @IsOptional()
-  type?: KeyType;
-}
+export class UpdateKeyDto extends PartialType(CreateKeyDto) {}
