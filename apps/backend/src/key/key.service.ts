@@ -103,6 +103,12 @@ export class KeyService {
     }>,
     userId?: string,
   ) {
+    // 校验批量操作数量限制
+    const MAX_BATCH_SIZE = 1000;
+    if (keys.length > MAX_BATCH_SIZE) {
+      throw new BadRequestException(`Maximum ${MAX_BATCH_SIZE} keys allowed per batch`);
+    }
+
     // 校验必填字段
     const emptyName = keys.find((k) => !k.name?.trim());
     if (emptyName) {
@@ -149,58 +155,64 @@ export class KeyService {
     });
 
     // 批量创建 Keys 和基础语言的 Translations（在一个事务中）
-    const createdKeys = await this.prisma.$transaction(async (tx) => {
-      // 创建所有 Keys
-      const newKeys = await Promise.all(
-        keys.map((keyDto) =>
-          tx.key.create({
-            data: {
-              name: keyDto.name,
-              description: keyDto.description,
-              type: keyDto.type || KeyType.TEXT,
-              namespaceId,
-            },
-          }),
-        ),
-      );
+    const createdKeys = await this.prisma.$transaction(
+      async (tx) => {
+        // 创建所有 Keys
+        const newKeys = await Promise.all(
+          keys.map((keyDto) =>
+            tx.key.create({
+              data: {
+                name: keyDto.name,
+                description: keyDto.description,
+                type: keyDto.type || KeyType.TEXT,
+                namespaceId,
+              },
+            }),
+          ),
+        );
 
-      // 为每个 Key 创建基础语言的 Translation
-      if (project?.baseLocale) {
-        const baseLocale = await tx.locale.findUnique({
-          where: { code: project.baseLocale },
-        });
+        // 为每个 Key 创建基础语言的 Translation
+        if (project?.baseLocale) {
+          const baseLocale = await tx.locale.findUnique({
+            where: { code: project.baseLocale },
+          });
 
-        if (baseLocale) {
-          for (let index = 0; index < newKeys.length; index++) {
-            const key = newKeys[index];
-            const baseContent = keys[index].baseContent?.trim();
+          if (baseLocale) {
+            for (let index = 0; index < newKeys.length; index++) {
+              const key = newKeys[index];
+              const baseContent = keys[index].baseContent?.trim();
 
-            if (baseContent) {
-              await tx.translation.upsert({
-                where: {
-                  keyId_localeId: {
+              if (baseContent) {
+                await tx.translation.upsert({
+                  where: {
+                    keyId_localeId: {
+                      keyId: key.id,
+                      localeId: baseLocale.id,
+                    },
+                  },
+                  update: {
+                    content: baseContent,
+                    status: TranslationStatus.APPROVED,
+                  },
+                  create: {
                     keyId: key.id,
                     localeId: baseLocale.id,
+                    content: baseContent,
+                    status: TranslationStatus.APPROVED,
                   },
-                },
-                update: {
-                  content: baseContent,
-                  status: TranslationStatus.APPROVED,
-                },
-                create: {
-                  keyId: key.id,
-                  localeId: baseLocale.id,
-                  content: baseContent,
-                  status: TranslationStatus.APPROVED,
-                },
-              });
+                });
+              }
             }
           }
         }
-      }
 
-      return newKeys;
-    });
+        return newKeys;
+      },
+      {
+        maxWait: 5000,
+        timeout: 10000,
+      },
+    );
 
     // 触发自动翻译（使用 baseContent）- 异步执行，不阻塞主流程
     this.triggerAutoTranslation(
@@ -587,6 +599,9 @@ export class KeyService {
     format: 'json' | 'yaml' = 'json',
     mode: 'fillMissing' | 'overwrite' = 'fillMissing',
   ) {
+    // 校验导入数量限制
+    const MAX_IMPORT_KEYS = 1000;
+
     // Verify project and namespace relationship
     const namespace = await this.prisma.namespace.findFirst({
       where: { id: namespaceId, projectId },
@@ -619,81 +634,93 @@ export class KeyService {
       throw new BadRequestException('Invalid import data format');
     }
 
+    // 校验导入数量限制
+    const totalKeys = Object.keys(importData).length;
+    if (totalKeys > MAX_IMPORT_KEYS) {
+      throw new BadRequestException(`Maximum ${MAX_IMPORT_KEYS} keys allowed per import`);
+    }
+
     // Process each key and translation
     let createdKeys = 0;
     let updatedTranslations = 0;
     let createdTranslations = 0;
     let skippedTranslations = 0;
 
-    await this.prisma.$transaction(async (tx) => {
-      for (const [keyName, translations] of Object.entries(importData)) {
-        // Check if key exists
-        let key = await tx.key.findFirst({
-          where: {
-            namespaceId,
-            name: keyName,
-          },
-        });
-
-        if (!key) {
-          // Create new key
-          key = await tx.key.create({
-            data: {
-              name: keyName,
-              namespaceId,
-              type: 'TEXT', // Default type
-            },
-          });
-          createdKeys++;
-        }
-
-        // Process translations
-        for (const [localeCode, content] of Object.entries(translations)) {
-          // Find locale
-          const locale = await tx.locale.findUnique({
-            where: { code: localeCode },
-          });
-          if (!locale) {
-            continue; // Skip unknown locales
-          }
-
-          // Check if translation exists
-          const existingTranslation = await tx.translation.findUnique({
+    await this.prisma.$transaction(
+      async (tx) => {
+        for (const [keyName, translations] of Object.entries(importData)) {
+          // Check if key exists
+          let key = await tx.key.findFirst({
             where: {
-              keyId_localeId: { keyId: key.id, localeId: locale.id },
+              namespaceId,
+              name: keyName,
             },
           });
 
-          if (!existingTranslation) {
-            // Create new translation
-            await tx.translation.create({
+          if (!key) {
+            // Create new key
+            key = await tx.key.create({
               data: {
-                keyId: key.id,
-                localeId: locale.id,
-                content,
-                status: TranslationStatus.PENDING,
+                name: keyName,
+                namespaceId,
+                type: KeyType.TEXT,
               },
             });
-            createdTranslations++;
-          } else if (mode === 'overwrite') {
-            // Update existing translation
-            await tx.translation.update({
+            createdKeys++;
+          }
+
+          // Process translations
+          for (const [localeCode, content] of Object.entries(translations)) {
+            // Find locale
+            const locale = await tx.locale.findUnique({
+              where: { code: localeCode },
+            });
+            if (!locale) {
+              continue; // Skip unknown locales
+            }
+
+            // Check if translation exists
+            const existingTranslation = await tx.translation.findUnique({
               where: {
                 keyId_localeId: { keyId: key.id, localeId: locale.id },
               },
-              data: {
-                content,
-                status: TranslationStatus.PENDING,
-              },
             });
-            updatedTranslations++;
-          } else {
-            // Skip if fillMissing mode and translation exists
-            skippedTranslations++;
+
+            if (!existingTranslation) {
+              // Create new translation
+              await tx.translation.create({
+                data: {
+                  keyId: key.id,
+                  localeId: locale.id,
+                  content,
+                  status: TranslationStatus.PENDING,
+                },
+              });
+              createdTranslations++;
+            } else if (mode === 'overwrite') {
+              // Update existing translation
+              await tx.translation.update({
+                where: {
+                  keyId_localeId: { keyId: key.id, localeId: locale.id },
+                },
+                data: {
+                  content,
+                  status: TranslationStatus.PENDING,
+                },
+              });
+              updatedTranslations++;
+            } else {
+              // Skip if fillMissing mode and translation exists
+              skippedTranslations++;
+            }
           }
         }
-      }
-    });
+      },
+      {
+        maxWait: 5000,
+        timeout: 10000,
+      },
+    );
 
     return {
       createdKeys,
