@@ -22,8 +22,6 @@ import {
   UploadOutlined,
   DownloadOutlined,
   InboxOutlined,
-  DownOutlined,
-  SettingOutlined,
 } from "@ant-design/icons";
 import { NamespaceTranslateButton } from "@/components/translation/NamespaceTranslateButton";
 import apiClient from "@/api/client";
@@ -125,9 +123,14 @@ const KeysPage: React.FC = () => {
   const [namespaceForm] = Form.useForm();
   const [keyForm] = Form.useForm();
   const [importForm] = Form.useForm();
-  const [batchKeys, setBatchKeys] = useState<Array<{ name: string; description?: string; type?: string; baseContent?: string }>>([
-    { name: '', description: '', type: 'TEXT', baseContent: '' },
-  ]);
+  const [batchKeys, setBatchKeys] = useState<
+    Array<{
+      name: string;
+      description?: string;
+      type?: string;
+      baseContent?: string;
+    }>
+  >([{ name: "", description: "", type: "TEXT", baseContent: "" }]);
 
   const isRecord = (value: unknown): value is Record<string, unknown> =>
     typeof value === "object" && value !== null;
@@ -191,7 +194,7 @@ const KeysPage: React.FC = () => {
     },
   });
 
-  const createKeyMutation = useMutation({
+  useMutation({
     mutationFn: (values: {
       name: string;
       description?: string;
@@ -257,7 +260,9 @@ const KeysPage: React.FC = () => {
   });
 
   const createBatchKeyMutation = useMutation({
-    mutationFn: (values: { keys: Array<{ name: string; description?: string; type?: string }> }) =>
+    mutationFn: (values: {
+      keys: Array<{ name: string; description?: string; type?: string }>;
+    }) =>
       apiClient.post(
         `/projects/${projectId}/namespaces/${selectedNamespaceId}/keys/batch`,
         values,
@@ -266,7 +271,7 @@ const KeysPage: React.FC = () => {
       message.success("词条批量创建成功");
       setIsKeyModalOpen(false);
       setIsBatchMode(false);
-      setBatchKeys([{ name: '', description: '', type: 'TEXT' }]);
+      setBatchKeys([{ name: "", description: "", type: "TEXT" }]);
       // 刷新数据（不等待，失败不影响主流程）
       Promise.all([
         queryClient.refetchQueries({
@@ -276,7 +281,7 @@ const KeysPage: React.FC = () => {
           queryKey: ["namespaces", projectId],
         }),
       ]).catch((err) => {
-        console.error('Failed to refetch:', err);
+        console.error("Failed to refetch:", err);
       });
     },
     onError: (error: unknown) => {
@@ -660,21 +665,21 @@ const KeysPage: React.FC = () => {
               >
                 新建词条
               </Button>
-          {selectedNamespace && (
-            <NamespaceTranslateButton
-              projectId={projectId}
-              namespaceId={selectedNamespace.id}
-              namespaceName={selectedNamespace.name}
-              onSuccess={() => {
-                queryClient.invalidateQueries({
-                  queryKey: ["keys", projectId, selectedNamespaceId],
-                });
-              }}
-            />
-          )}
-        </Space>
-      }
-    />
+              {selectedNamespace && (
+                <NamespaceTranslateButton
+                  projectId={projectId}
+                  namespaceId={selectedNamespace.id}
+                  namespaceName={selectedNamespace.name}
+                  onSuccess={() => {
+                    queryClient.invalidateQueries({
+                      queryKey: ["keys", projectId, selectedNamespaceId],
+                    });
+                  }}
+                />
+              )}
+            </Space>
+          }
+        />
 
         <FilterBar
           searchValue={searchKeyword}
@@ -743,50 +748,61 @@ const KeysPage: React.FC = () => {
         open={isKeyModalOpen}
         onOk={() => {
           // 检查是否有空词条
-          const hasEmptyName = batchKeys.some(k => !k.name.trim());
+          const hasEmptyName = batchKeys.some((k) => !k.name.trim());
           if (hasEmptyName) {
-            message.error('请填写所有词条的名称，或删除空词条');
+            message.error("请填写所有词条的名称，或删除空词条");
             return;
           }
-          
+
           // 检查默认语言内容是否为空
-          const hasEmptyBaseContent = batchKeys.some(k => !k.baseContent?.trim());
+          const hasEmptyBaseContent = batchKeys.some(
+            (k) => !k.baseContent?.trim(),
+          );
           if (hasEmptyBaseContent) {
-            message.error('请填写所有词条的默认语言内容，或删除空词条');
+            message.error("请填写所有词条的默认语言内容，或删除空词条");
             return;
           }
-          
-          const validKeys = batchKeys.filter(k => k.name.trim() && k.baseContent?.trim());
+
+          const validKeys = batchKeys.filter(
+            (k) => k.name.trim() && k.baseContent?.trim(),
+          );
           if (validKeys.length === 0) {
-            message.warning('请至少填写一个词条');
+            message.warning("请至少填写一个词条");
             return;
           }
           createBatchKeyMutation.mutate({ keys: validKeys });
         }}
         onCancel={() => {
           setIsKeyModalOpen(false);
-          setBatchKeys([{ name: '', description: '', type: 'TEXT', baseContent: '' }]);
+          setBatchKeys([
+            { name: "", description: "", type: "TEXT", baseContent: "" },
+          ]);
           keyForm.resetFields();
         }}
         confirmLoading={createBatchKeyMutation.isPending}
         width={900}
       >
-        <div style={{ maxHeight: '550px', overflowY: 'auto', paddingRight: 8 }}>
+        <div style={{ maxHeight: "550px", overflowY: "auto", paddingRight: 8 }}>
           {batchKeys.map((key, index) => (
             <div key={index}>
-              {index > 0 && <Divider style={{ margin: '12px 0' }} />}
-              
-              <div style={{ position: 'relative', marginBottom: 8 }}>
+              {index > 0 && <Divider style={{ margin: "12px 0" }} />}
+
+              <div style={{ position: "relative", marginBottom: 8 }}>
                 {/* 右上角删除按钮 */}
                 {batchKeys.length > 1 && (
                   <Button
                     danger
                     type="link"
                     size="small"
-                    style={{ position: 'absolute', right: 0, top: 0, zIndex: 1 }}
+                    style={{
+                      position: "absolute",
+                      right: 0,
+                      top: 0,
+                      zIndex: 1,
+                    }}
                     onClick={() => {
                       if (batchKeys.length === 1) {
-                        message.warning('至少保留一个词条');
+                        message.warning("至少保留一个词条");
                         return;
                       }
                       setBatchKeys(batchKeys.filter((_, i) => i !== index));
@@ -795,9 +811,13 @@ const KeysPage: React.FC = () => {
                     删除
                   </Button>
                 )}
-                
+
                 {/* 两行布局 */}
-                <Space direction="vertical" size="small" style={{ width: '100%' }}>
+                <Space
+                  direction="vertical"
+                  size="small"
+                  style={{ width: "100%" }}
+                >
                   {/* 第一行：名称 + 描述 + 类型 */}
                   <Row gutter={8}>
                     <Col span={8}>
@@ -810,7 +830,7 @@ const KeysPage: React.FC = () => {
                           newKeys[index].name = e.target.value;
                           setBatchKeys(newKeys);
                         }}
-                        status={key.name.trim() ? undefined : 'error'}
+                        status={key.name.trim() ? undefined : "error"}
                       />
                     </Col>
                     <Col span={8}>
@@ -834,7 +854,7 @@ const KeysPage: React.FC = () => {
                           newKeys[index].type = value;
                           setBatchKeys(newKeys);
                         }}
-                        style={{ width: '100%' }}
+                        style={{ width: "100%" }}
                       >
                         <Option value="TEXT">文本</Option>
                         <Option value="RICH_TEXT">富文本</Option>
@@ -842,7 +862,7 @@ const KeysPage: React.FC = () => {
                       </Select>
                     </Col>
                   </Row>
-                  
+
                   {/* 第二行：默认语言内容 */}
                   <Row>
                     <Col span={24}>
@@ -855,7 +875,7 @@ const KeysPage: React.FC = () => {
                           newKeys[index].baseContent = e.target.value;
                           setBatchKeys(newKeys);
                         }}
-                        status={key.baseContent?.trim() ? undefined : 'error'}
+                        status={key.baseContent?.trim() ? undefined : "error"}
                       />
                     </Col>
                   </Row>
@@ -864,12 +884,17 @@ const KeysPage: React.FC = () => {
             </div>
           ))}
         </div>
-        
-        <Divider style={{ margin: '12px 0' }} />
-        
-        <Button 
-          onClick={() => setBatchKeys([...batchKeys, { name: '', description: '', type: 'TEXT', baseContent: '' }])} 
-          icon={<PlusOutlined />} 
+
+        <Divider style={{ margin: "12px 0" }} />
+
+        <Button
+          onClick={() =>
+            setBatchKeys([
+              ...batchKeys,
+              { name: "", description: "", type: "TEXT", baseContent: "" },
+            ])
+          }
+          icon={<PlusOutlined />}
           block
           size="small"
         >

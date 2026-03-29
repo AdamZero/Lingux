@@ -93,10 +93,18 @@ export const getProviderInfo = async (providerId: string) => {
   return apiClient.get(`/translation-providers/${providerId}`);
 };
 
+export interface ProviderHealthCheckResult {
+  providerId: string;
+  isHealthy: boolean;
+  status: "HEALTHY" | "UNHEALTHY" | "ERROR" | "UNKNOWN";
+  checkedAt: string;
+  error?: string;
+}
+
 // 检查供应商健康状态
 export const checkProviderHealth = async (
   providerId: string,
-): Promise<{ providerId: string; status: string }> => {
+): Promise<ProviderHealthCheckResult> => {
   return apiClient.get(`/translation-providers/${providerId}/health`);
 };
 
@@ -250,19 +258,17 @@ export interface MonthlyStats {
 }
 
 // 获取翻译任务列表
-export const getTranslationJobs = async (
-  params?: {
-    page?: number;
-    pageSize?: number;
-    userId?: string;
-    providerId?: string;
-    projectId?: string;
-    status?: string;
-    startDate?: string;
-    endDate?: string;
-  },
-): Promise<TranslationJobListResponse> => {
-  return apiClient.get('/translation-providers/jobs', { params });
+export const getTranslationJobs = async (params?: {
+  page?: number;
+  pageSize?: number;
+  userId?: string;
+  providerId?: string;
+  projectId?: string;
+  status?: string;
+  startDate?: string;
+  endDate?: string;
+}): Promise<TranslationJobListResponse> => {
+  return apiClient.get("/translation-providers/jobs", { params });
 };
 
 // 获取翻译任务详情
@@ -273,10 +279,11 @@ export const getTranslationJobDetail = async (
 };
 
 // 获取月度统计
-export const getMonthlyStats = async (
-  params?: { year?: number; month?: number },
-): Promise<MonthlyStats> => {
-  return apiClient.get('/translation-providers/monthly-stats', { params });
+export const getMonthlyStats = async (params?: {
+  year?: number;
+  month?: number;
+}): Promise<MonthlyStats> => {
+  return apiClient.get("/translation-providers/monthly-stats", { params });
 };
 
 // 导出所有类型（确保 TypeScript 正确识别）

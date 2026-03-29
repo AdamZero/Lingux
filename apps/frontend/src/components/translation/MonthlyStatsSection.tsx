@@ -1,17 +1,21 @@
-import { Card, Row, Col, Divider, Typography, Skeleton, Empty } from 'antd';
-import { useQuery } from '@tanstack/react-query';
-import { getMonthlyStats } from '@/api/machine-translation';
-import { StatCard } from './StatCard';
-import { ProviderStatCard } from './ProviderStatCard';
+import { Card, Row, Col, Divider, Typography, Skeleton, Empty } from "antd";
+import { useQuery } from "@tanstack/react-query";
+import { getMonthlyStats } from "@/api/machine-translation";
+import { StatCard } from "./StatCard";
+import { ProviderStatCard } from "./ProviderStatCard";
 import {
   FieldStringOutlined,
   FileTextOutlined,
   AppstoreOutlined,
-} from '@ant-design/icons';
+} from "@ant-design/icons";
 
 export const MonthlyStatsSection: React.FC = () => {
-  const { data: stats, isLoading, refetch } = useQuery({
-    queryKey: ['translation-monthly-stats'],
+  const {
+    data: stats,
+    isLoading,
+    refetch,
+  } = useQuery({
+    queryKey: ["translation-monthly-stats"],
     queryFn: () => getMonthlyStats(),
     refetchInterval: 300000, // 5 分钟刷新一次
   });
@@ -32,7 +36,11 @@ export const MonthlyStatsSection: React.FC = () => {
     <Card
       title="📊 本月翻译统计"
       extra={
-        <Typography.Text type="secondary" onClick={() => refetch()} style={{ cursor: 'pointer' }}>
+        <Typography.Text
+          type="secondary"
+          onClick={() => refetch()}
+          style={{ cursor: "pointer" }}
+        >
           刷新
         </Typography.Text>
       }

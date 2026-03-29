@@ -1,4 +1,4 @@
-import { Card, Progress, Typography, Tag } from 'antd';
+import { Card, Progress, Typography, Tag } from "antd";
 
 interface ProviderStatCardProps {
   provider: {
@@ -17,9 +17,9 @@ export const ProviderStatCard: React.FC<ProviderStatCardProps> = ({
     <Card>
       <div
         style={{
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
           marginBottom: 16,
         }}
       >
@@ -33,15 +33,15 @@ export const ProviderStatCard: React.FC<ProviderStatCardProps> = ({
         percent={provider.percentage}
         format={() => `${provider.percentage}%`}
         strokeColor={{
-          '0%': '#4F46E5',
-          '100%': '#818CF8',
+          "0%": "#4F46E5",
+          "100%": "#818CF8",
         }}
       />
 
       <div
         style={{
-          display: 'flex',
-          justifyContent: 'space-between',
+          display: "flex",
+          justifyContent: "space-between",
           marginTop: 16,
           fontSize: 14,
         }}

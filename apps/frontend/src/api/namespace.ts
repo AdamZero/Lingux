@@ -10,16 +10,11 @@ export interface Namespace {
 }
 
 export interface TranslateNamespaceResult {
+  jobId: string;
+  status: string;
   totalKeys: number;
-  translatedKeys: number;
-  failedKeys: number;
-  details: Array<{
-    keyId: string;
-    keyName: string;
-    localeCode: string;
-    success: boolean;
-    error?: string;
-  }>;
+  type: "namespace" | "project";
+  namespaceCount: number;
 }
 
 // 获取项目下的所有命名空间
@@ -29,12 +24,12 @@ export const getNamespaces = async (
   return apiClient.get(`/projects/${projectId}/namespaces`);
 };
 
-// 一键翻译命名空间 - 自动翻译所有缺失的翻译
+// 一键翻译命名空间 - 创建异步翻译任务
 export const translateNamespace = async (
   projectId: string,
   namespaceId: string,
 ): Promise<TranslateNamespaceResult> => {
-  return apiClient.post(
-    `/projects/${projectId}/namespaces/${namespaceId}/translate`,
-  );
+  return apiClient.post(`/projects/${projectId}/namespaces/translate`, {
+    namespaceIds: [namespaceId],
+  });
 };

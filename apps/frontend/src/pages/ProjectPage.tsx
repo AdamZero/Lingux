@@ -12,11 +12,33 @@ import {
   App as AntdApp,
   Select,
   Switch,
+  Avatar,
+  Tooltip,
 } from "antd";
-import { PlusOutlined, EditOutlined, DeleteOutlined, ThunderboltOutlined } from "@ant-design/icons";
+import {
+  PlusOutlined,
+  EditOutlined,
+  DeleteOutlined,
+  ThunderboltOutlined,
+} from "@ant-design/icons";
 import apiClient from "@/api/client";
+import { useAppStore } from "@/store/useAppStore";
 
 const { Title } = Typography;
+
+// 用户角色常量
+const USER_ROLE = {
+  ADMIN: "ADMIN",
+  EDITOR: "EDITOR",
+  REVIEWER: "REVIEWER",
+} as const;
+
+interface User {
+  id: string;
+  username: string;
+  name?: string;
+  avatar?: string;
+}
 
 interface Project {
   id: string;
@@ -26,6 +48,7 @@ interface Project {
   baseLocale: string;
   locales: Locale[];
   autoTranslateEnabled?: boolean;
+  owners: User[];
 }
 
 import { useNavigate } from "react-router-dom";
@@ -40,9 +63,17 @@ const ProjectPage: React.FC = () => {
   const navigate = useNavigate();
   const { message } = AntdApp.useApp();
   const queryClient = useQueryClient();
+  const { user } = useAppStore();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingProject, setEditingProject] = useState<Project | null>(null);
   const [form] = Form.useForm();
+
+  const isAdmin = user?.role === USER_ROLE.ADMIN;
+
+  const canManageProject = (project: Project) => {
+    if (isAdmin) return true;
+    return project.owners?.some((owner) => owner.id === user?.id);
+  };
 
   const { data: allLocales = [], isLoading: isLocalesLoading } = useQuery<
     Locale[]
@@ -124,6 +155,28 @@ const ProjectPage: React.FC = () => {
     },
   });
 
+  // 自动翻译开关 mutation
+  const updateAutoTranslateMutation = useMutation({
+    mutationFn: ({
+      projectId,
+      enabled,
+    }: {
+      projectId: string;
+      enabled: boolean;
+    }) =>
+      apiClient.patch(`/projects/${projectId}`, {
+        autoTranslateEnabled: enabled,
+      }),
+    onSuccess: (_, variables) => {
+      message.success(variables.enabled ? "已启用自动翻译" : "已关闭自动翻译");
+      queryClient.invalidateQueries({ queryKey: ["projects"] });
+    },
+    onError: (error: unknown) => {
+      const err = error as { response?: { data?: { message?: string } } };
+      message.error(err.response?.data?.message || "更新失败");
+    },
+  });
+
   const handleSubmit = (values: {
     name: string;
     description?: string;
@@ -193,9 +246,26 @@ const ProjectPage: React.FC = () => {
       ),
     },
     {
+      title: "Owner",
+      key: "owners",
+      render: (_: unknown, record: Project) => (
+        <Avatar.Group maxCount={3} size="small">
+          {record.owners?.map((owner) => (
+            <Tooltip key={owner.id} title={owner.name || owner.username}>
+              <Avatar src={owner.avatar}>
+                {(owner.name || owner.username)?.charAt(0).toUpperCase()}
+              </Avatar>
+            </Tooltip>
+          ))}
+        </Avatar.Group>
+      ),
+    },
+    {
       title: "Description",
       dataIndex: "description",
       key: "description",
+      ellipsis: true,
+      width: 200,
     },
     {
       title: "自动翻译",
@@ -203,16 +273,17 @@ const ProjectPage: React.FC = () => {
       render: (_: unknown, record: Project) => (
         <Switch
           checked={record.autoTranslateEnabled}
+          disabled={
+            !canManageProject(record) || updateAutoTranslateMutation.isPending
+          }
+          loading={
+            updateAutoTranslateMutation.variables?.projectId === record.id &&
+            updateAutoTranslateMutation.isPending
+          }
           onChange={(checked) => {
-            // 只更新自动翻译配置，不修改其他字段
-            apiClient.patch(`/projects/${record.id}`, {
-              autoTranslateEnabled: checked,
-            }).then(() => {
-              message.success(checked ? '已启用自动翻译' : '已关闭自动翻译');
-              queryClient.invalidateQueries({ queryKey: ['projects'] });
-            }).catch((error: unknown) => {
-              const err = error as { response?: { data?: { message?: string } } };
-              message.error(err.response?.data?.message || '更新失败');
+            updateAutoTranslateMutation.mutate({
+              projectId: record.id,
+              enabled: checked,
             });
           }}
           checkedChildren={<ThunderboltOutlined />}
@@ -225,8 +296,9 @@ const ProjectPage: React.FC = () => {
       dataIndex: "createdAt",
       key: "createdAt",
       render: (date: string) => new Date(date).toLocaleString(),
-      defaultSortOrder: 'descend',
-      sorter: (a: Project, b: Project) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime(),
+      defaultSortOrder: "descend",
+      sorter: (a: Project, b: Project) =>
+        new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime(),
     },
     {
       title: "Actions",

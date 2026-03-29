@@ -205,9 +205,24 @@ export class ProjectService {
             locale: true,
           },
         },
+        projectOwners: {
+          include: {
+            user: {
+              select: {
+                id: true,
+                username: true,
+                name: true,
+                avatar: true,
+              },
+            },
+          },
+        },
       },
     });
-    return projects.map((p) => this.toProjectResponse(p));
+    return projects.map((p) => ({
+      ...this.toProjectResponse(p),
+      owners: p.projectOwners.map((o) => o.user),
+    }));
   }
 
   async findOne(id: string) {
@@ -226,7 +241,11 @@ export class ProjectService {
     ) as typeof projectData;
 
     // 构建自动翻译配置
-    const autoTranslateData: any = {};
+    interface AutoTranslateData {
+      autoTranslateEnabled?: boolean;
+      autoTranslateProviderId?: string;
+    }
+    const autoTranslateData: AutoTranslateData = {};
     if (autoTranslateEnabled !== undefined) {
       autoTranslateData.autoTranslateEnabled = autoTranslateEnabled;
     }
@@ -271,7 +290,13 @@ export class ProjectService {
     }
 
     // 更新项目数据和自动翻译配置
-    const updateData: any = { ...cleanProjectData };
+    interface UpdateProjectData {
+      name?: string;
+      description?: string;
+      autoTranslateEnabled?: boolean;
+      autoTranslateProviderId?: string;
+    }
+    const updateData: UpdateProjectData = { ...cleanProjectData };
     if (Object.keys(autoTranslateData).length > 0) {
       updateData.autoTranslateEnabled = autoTranslateData.autoTranslateEnabled;
       updateData.autoTranslateProviderId =

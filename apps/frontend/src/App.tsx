@@ -8,6 +8,7 @@ import KeysPage from "@/pages/KeysPage";
 import LoginPage from "@/pages/LoginPage";
 import DashboardPage from "@/pages/DashboardPage";
 import ReleaseCenter from "@/pages/ReleaseCenter";
+import PublicReleasePage from "@/pages/PublicReleasePage";
 import MachineTranslationSettingsPage from "@/pages/MachineTranslationSettingsPage";
 import {
   useAppStore,
@@ -143,6 +144,11 @@ const App: React.FC = () => {
           <BrowserRouter>
             <Routes>
               <Route path="/login" element={<LoginPage />} />
+              {/* 发布详情页（独立页面，不带 Header 和 Aside） */}
+              <Route
+                path="/releases/:releaseId"
+                element={<PublicReleasePage />}
+              />
               <Route
                 path="/"
                 element={

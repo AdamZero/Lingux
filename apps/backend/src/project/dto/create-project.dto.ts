@@ -4,6 +4,7 @@ import {
   IsNotEmpty,
   IsArray,
   IsBoolean,
+  MaxLength,
 } from 'class-validator';
 
 export class CreateProjectDto {
@@ -13,6 +14,7 @@ export class CreateProjectDto {
 
   @IsString()
   @IsOptional()
+  @MaxLength(50, { message: 'Description must not exceed 50 characters' })
   description?: string;
 
   @IsString()

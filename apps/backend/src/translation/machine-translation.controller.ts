@@ -362,11 +362,14 @@ export class MachineTranslationController {
    */
   @Get(':id/health')
   async checkProviderHealth(@Param('id') providerId: string) {
-    const isHealthy =
+    const result =
       await this.machineTranslationService.checkProviderHealth(providerId);
     return {
       providerId,
-      status: isHealthy ? 'healthy' : 'unhealthy',
+      isHealthy: result.isHealthy,
+      status: result.status,
+      checkedAt: result.checkedAt,
+      error: result.error,
     };
   }
 

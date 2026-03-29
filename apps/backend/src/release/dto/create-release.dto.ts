@@ -61,3 +61,8 @@ export class RollbackReleaseDto {
   @IsOptional()
   toReleaseId?: string;
 }
+
+export class ForceCreateSessionDto extends CreateReleaseDto {
+  @IsString()
+  reason!: string;
+}

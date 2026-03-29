@@ -208,6 +208,7 @@ model ReleaseSession {
   id                                                 String               @id @default(cuid())
   projectId                                          String
   status                                             ReleaseSessionStatus @default(DRAFT)
+  createdBy                                          String?
   baseReleaseId                                      String?
   scope                                              Json
   localeCodes                                        String[]
@@ -222,6 +223,9 @@ model ReleaseSession {
   publishedAt                                        DateTime?            @db.Timestamptz
   publishedReleaseId                                 String?
   expiresAt                                          DateTime?            @db.Timestamptz
+  archivedAt                                         DateTime?            @db.Timestamptz
+  archivedBy                                         String?
+  archivedReason                                     String?
   createdAt                                          DateTime             @default(now()) @db.Timestamptz
   updatedAt                                          DateTime             @updatedAt @db.Timestamptz
   baseRelease      Release? @relation("ReleaseSessionBaseRelease", fields: [baseReleaseId], references: [id])
@@ -230,6 +234,8 @@ model ReleaseSession {
 
   @@index([projectId, createdAt])
   @@index([projectId, status])
+  @@index([projectId, status, createdBy])
+  @@index([projectId, archivedAt])
 }
 
 model Translation {
@@ -329,25 +335,29 @@ enum UserRole {
 
 // 翻译供应商配置
 model TranslationProvider {
-  id                String   @id @default(cuid())
-  name              String   // 显示名称
+  id                String                    @id @default(cuid())
+  name              String                    // 显示名称
   type              TranslationProviderType
-  baseUrl           String   // API基础地址
-  apiKeyEncrypted   String   // 加密的API Key
-  config            Json     // 额外配置参数
-  isEnabled         Boolean  @default(true)
-  isDefault         Boolean  @default(false)  // 默认供应商
-  rateLimitPerMin   Int      @default(60)     // 每分钟请求限制
-  maxCharsPerReq    Int      @default(5000)   // 单次最大字符数
-  maxTextsPerReq    Int      @default(100)    // 单次最大文本数
-  timeoutMs         Int      @default(30000)  // 请求超时
-  createdAt         DateTime @default(now()) @db.Timestamptz
-  updatedAt         DateTime @updatedAt @db.Timestamptz
-  
+  baseUrl           String                    // API基础地址
+  apiKeyEncrypted   String                    // 加密的API Key
+  config            Json                      // 额外配置参数
+  isEnabled         Boolean                   @default(true)
+  isDefault         Boolean                   @default(false)  // 默认供应商
+  rateLimitPerMin   Int                       @default(60)     // 每分钟请求限制
+  maxCharsPerReq    Int                       @default(5000)   // 单次最大字符数
+  maxTextsPerReq    Int                       @default(100)    // 单次最大文本数
+  timeoutMs         Int                       @default(30000)  // 请求超时
+  healthStatus      TranslationProviderHealthStatus @default(UNKNOWN) // 健康检查状态
+  healthCheckedAt   DateTime?                 @db.Timestamptz  // 最后检查时间
+  healthError       String?                   // 健康检查错误信息
+  createdAt         DateTime                  @default(now()) @db.Timestamptz
+  updatedAt         DateTime                  @updatedAt @db.Timestamptz
+
   jobs  TranslationJob[]
   costs TranslationCost[]
 
   @@index([type, isEnabled])
+  @@index([healthStatus])
 }
 
 // 翻译任务
@@ -453,4 +463,11 @@ enum TranslationJobStatus {
   COMPLETED
   FAILED
   PARTIAL  // 部分成功（批量翻译中部分失败）
+}
+
+enum TranslationProviderHealthStatus {
+  UNKNOWN     // 未知/未检查
+  HEALTHY     // 健康
+  UNHEALTHY   // 不健康（检查失败）
+  ERROR       // 错误（调用异常）
 }

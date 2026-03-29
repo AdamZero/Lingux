@@ -117,7 +117,7 @@ export const TranslationDrawer: React.FC<TranslationDrawerProps> = ({
         form.setFieldsValue(initialValues);
       }, 0);
     }
-  }, [editingKey?.id, open, form]);
+  }, [editingKey, editingKey?.id, open, form]);
 
   if (!editingKey) return null;
 
@@ -138,16 +138,16 @@ export const TranslationDrawer: React.FC<TranslationDrawerProps> = ({
   const getMissingTranslations = () => {
     const translations = editingKey?.translations || [];
     const formValues = form.getFieldsValue();
-    
+
     return locales.filter((locale) => {
       if (locale.code === baseLocale) return false;
-      
+
       // 优先检查表单的当前值（用户可能刚删除或输入）
       const formValue = formValues[locale.code];
-      if (formValue !== undefined && formValue !== null && formValue !== '') {
+      if (formValue !== undefined && formValue !== null && formValue !== "") {
         return false; // 表单中有值，不算缺失
       }
-      
+
       // 如果表单中没有值，检查 translations 数组
       const translation = translations.find(
         (t) => t.locale.code === locale.code,
@@ -305,11 +305,11 @@ export const TranslationDrawer: React.FC<TranslationDrawerProps> = ({
         onFinish={(values) => {
           // 验证所有语言都有值
           const missingLocales = locales.filter(
-            (locale) => !values[locale.code]?.trim()
+            (locale) => !values[locale.code]?.trim(),
           );
           if (missingLocales.length > 0) {
             message.error(
-              `以下语言缺少翻译: ${missingLocales.map((l) => l.code).join(", ")}`
+              `以下语言缺少翻译: ${missingLocales.map((l) => l.code).join(", ")}`,
             );
             return;
           }

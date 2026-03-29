@@ -51,6 +51,11 @@ export type CreateReleaseResponse = {
   currentReleaseId: string;
 };
 
+export type ReleaseSessionUser = {
+  id: string;
+  name: string;
+};
+
 export type ReleaseSession = {
   id: string;
   status: ReleaseSessionStatus;
@@ -61,6 +66,8 @@ export type ReleaseSession = {
   baseJson: string;
   nextJson: string;
   validationErrors?: ReleaseValidationError[] | null;
+  createdBy?: string;
+  createdByUser?: ReleaseSessionUser;
 };
 
 export type GetActiveReleaseSessionResponse = {

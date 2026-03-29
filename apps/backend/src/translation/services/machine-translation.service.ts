@@ -27,6 +27,7 @@ import {
   TranslationProviderType,
   TranslationJobStatus,
   TranslationProvider,
+  TranslationProviderHealthStatus,
 } from '@prisma/client';
 
 // 翻译供应商创建参数接口
@@ -915,14 +916,67 @@ export class MachineTranslationService {
 
   /**
    * 检查供应商健康状态
+   * 只在 healthStatus 发生变化时才更新数据库
    */
-  async checkProviderHealth(providerId: string): Promise<boolean> {
+  async checkProviderHealth(providerId: string): Promise<{
+    isHealthy: boolean;
+    status: TranslationProviderHealthStatus;
+    checkedAt: Date;
+    error?: string;
+  }> {
+    const provider = await this.prisma.translationProvider.findUnique({
+      where: { id: providerId },
+    });
+
+    if (!provider) {
+      throw new NotFoundException(
+        `Translation provider ${providerId} not found`,
+      );
+    }
+
+    let isHealthy = false;
+    let healthStatus: TranslationProviderHealthStatus;
+    let errorMessage: string | null = null;
+
     try {
       const { adapter } = await this.getAdapter(providerId);
-      return await adapter.healthCheck();
-    } catch {
-      return false;
+      isHealthy = await adapter.healthCheck();
+
+      if (isHealthy) {
+        healthStatus = TranslationProviderHealthStatus.HEALTHY;
+      } else {
+        healthStatus = TranslationProviderHealthStatus.UNHEALTHY;
+        errorMessage = 'Health check returned false';
+      }
+    } catch (error) {
+      isHealthy = false;
+      healthStatus = TranslationProviderHealthStatus.ERROR;
+      errorMessage = error instanceof Error ? error.message : String(error);
     }
+
+    const now = new Date();
+
+    // 只有状态发生变化时才更新数据库
+    if (provider.healthStatus !== healthStatus) {
+      await this.prisma.translationProvider.update({
+        where: { id: providerId },
+        data: {
+          healthStatus,
+          healthCheckedAt: now,
+          healthError: errorMessage,
+        },
+      });
+      this.logger.log(
+        `Provider ${provider.name} health status changed: ${provider.healthStatus} -> ${healthStatus}`,
+      );
+    }
+
+    return {
+      isHealthy,
+      status: healthStatus,
+      checkedAt: provider.healthCheckedAt || now,
+      error: errorMessage || undefined,
+    };
   }
 
   /**

@@ -4,8 +4,6 @@ import {
   Button,
   Card,
   Drawer,
-  Input,
-  Modal,
   Select,
   Space,
   Table,
@@ -17,12 +15,8 @@ import { createTwoFilesPatch } from "diff";
 import { Diff, Hunk, parseDiff } from "react-diff-view";
 import "react-diff-view/style/index.css";
 import {
-  approveReleaseSession,
   getActiveReleaseSession,
   getReleaseSession,
-  publishReleaseSession,
-  rejectReleaseSession,
-  submitReleaseSession,
   previewRelease,
 } from "@/api/releases";
 import type {
@@ -32,7 +26,6 @@ import type {
   PreviewReleasePayload,
   ReleaseSession,
   ReleaseSessionLockedError,
-  ValidationFailedError,
 } from "@/types/release";
 
 type LocaleOption = { code: string; name: string };
@@ -244,107 +237,6 @@ const PublishDrawer: React.FC<Props> = (props) => {
     },
   });
 
-  const submitMutation = useMutation({
-    mutationFn: async (sessionId: string) =>
-      submitReleaseSession(props.projectId, sessionId),
-    onSuccess: async () => {
-      if (!preview) {
-        return;
-      }
-      await loadSession(preview.sessionId);
-      message.success("已提交审核");
-    },
-    onError: (error: unknown) => {
-      const { status, data } = extractApiError(error);
-      if (
-        status === 422 &&
-        isRecord(data) &&
-        data.code === "VALIDATION_FAILED" &&
-        Array.isArray(data.errors)
-      ) {
-        const d = data as unknown as ValidationFailedError;
-        setPreview((prev) =>
-          prev
-            ? {
-                ...prev,
-                canPublish: false,
-                errors: d.errors,
-              }
-            : prev,
-        );
-        message.error("校验失败，请先修复翻译后再提交审核");
-        return;
-      }
-      message.error("提交失败");
-    },
-  });
-
-  const approveMutation = useMutation({
-    mutationFn: async (sessionId: string) =>
-      approveReleaseSession(props.projectId, sessionId),
-    onSuccess: async () => {
-      if (!preview) {
-        return;
-      }
-      await loadSession(preview.sessionId);
-      message.success("已审核通过");
-    },
-    onError: () => {
-      message.error("审核失败");
-    },
-  });
-
-  const rejectMutation = useMutation({
-    mutationFn: async (params: { sessionId: string; reason: string }) =>
-      rejectReleaseSession(props.projectId, params.sessionId, {
-        reason: params.reason,
-      }),
-    onSuccess: async () => {
-      if (!preview) {
-        return;
-      }
-      await loadSession(preview.sessionId);
-      message.success("已驳回");
-    },
-    onError: () => {
-      message.error("驳回失败");
-    },
-  });
-
-  const publishMutation = useMutation({
-    mutationFn: async (sessionId: string) =>
-      publishReleaseSession(props.projectId, sessionId),
-    onSuccess: (res) => {
-      message.success(`发布成功：${res.releaseId}`);
-      setPreview(null);
-      setSelectedNamespaceIds([]);
-      props.onClose();
-    },
-    onError: (error: unknown) => {
-      const { status, data } = extractApiError(error);
-      if (
-        status === 422 &&
-        isRecord(data) &&
-        data.code === "VALIDATION_FAILED" &&
-        Array.isArray(data.errors)
-      ) {
-        const d = data as unknown as ValidationFailedError;
-        setPreview((prev) =>
-          prev
-            ? {
-                ...prev,
-                canPublish: false,
-                errors: d.errors,
-              }
-            : prev,
-        );
-        message.error("校验失败，请先修复翻译后再发布");
-        return;
-      }
-      message.error("发布失败");
-    },
-  });
-
   const diffText = useMemo(() => {
     if (!preview) {
       return null;
@@ -444,82 +336,19 @@ const PublishDrawer: React.FC<Props> = (props) => {
       destroyOnClose
       extra={
         <Space>
-          <Button
-            disabled={
-              !preview || preview.status !== "DRAFT" || !preview.canPublish
-            }
-            loading={submitMutation.isPending}
-            onClick={() => {
-              if (!preview) {
-                return;
-              }
-              submitMutation.mutate(preview.sessionId);
-            }}
-          >
-            Submit
-          </Button>
-          <Button
-            disabled={!preview || preview.status !== "IN_REVIEW"}
-            loading={approveMutation.isPending}
-            onClick={() => {
-              if (!preview) {
-                return;
-              }
-              approveMutation.mutate(preview.sessionId);
-            }}
-          >
-            Approve
-          </Button>
-          <Button
-            danger
-            disabled={!preview || preview.status !== "IN_REVIEW"}
-            loading={rejectMutation.isPending}
-            onClick={() => {
-              if (!preview) {
-                return;
-              }
-              let reason = "";
-              Modal.confirm({
-                title: "驳回原因",
-                content: (
-                  <Input.TextArea
-                    autoSize={{ minRows: 3, maxRows: 8 }}
-                    onChange={(e) => {
-                      reason = e.target.value;
-                    }}
-                  />
-                ),
-                okText: "Reject",
-                cancelText: "Cancel",
-                onOk: async () => {
-                  if (!reason.trim()) {
-                    message.error("请输入原因");
-                    throw new Error("reason required");
-                  }
-                  await rejectMutation.mutateAsync({
-                    sessionId: preview.sessionId,
-                    reason: reason.trim(),
-                  });
-                },
-              });
-            }}
-          >
-            Reject
-          </Button>
+          <Button onClick={close}>关闭</Button>
           <Button
             type="primary"
-            disabled={
-              !preview || preview.status !== "APPROVED" || !preview.canPublish
-            }
-            loading={publishMutation.isPending}
+            loading={previewMutation.isPending}
+            disabled={!preview}
             onClick={() => {
-              if (!preview) {
-                return;
+              if (preview) {
+                message.success("草稿已创建");
+                close();
               }
-              publishMutation.mutate(preview.sessionId);
             }}
           >
-            Publish
+            确认创建
           </Button>
         </Space>
       }

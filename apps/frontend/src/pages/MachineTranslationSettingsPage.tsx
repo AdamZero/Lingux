@@ -12,11 +12,11 @@ import {
   Statistic,
   Row,
   Col,
-  Select,
   Empty,
   Skeleton,
   message,
   Modal,
+  Drawer,
 } from "antd";
 import {
   RobotOutlined,
@@ -25,7 +25,6 @@ import {
   ThunderboltOutlined,
   GlobalOutlined,
   ApiOutlined,
-  DollarOutlined,
   ReloadOutlined,
   SettingOutlined,
   PlusOutlined,
@@ -36,7 +35,7 @@ import {
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   getTranslationProviders,
-  getCostStatistics,
+  getMonthlyStats,
   checkProviderHealth,
   deleteTranslationProvider,
   updateTranslationProvider,
@@ -44,11 +43,9 @@ import {
 } from "@/api/machine-translation";
 import type { TranslationProvider } from "@/api/machine-translation";
 import { ProviderModal } from "@/components/translation/ProviderModal";
-import { MonthlyStatsSection } from "@/components/translation/MonthlyStatsSection";
 import { TranslationJobList } from "@/components/translation/TranslationJobList";
 
 const { Title, Text } = Typography;
-const { Option } = Select;
 
 const providerIcons: Record<string, React.ReactNode> = {
   MOCK: <ExperimentOutlined />,
@@ -73,15 +70,14 @@ const providerNames: Record<string, string> = {
 };
 
 const MachineTranslationSettingsPage: React.FC = () => {
-  const [billingPeriod, setBillingPeriod] = useState<string>(
-    new Date().toISOString().slice(0, 7),
-  );
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingProvider, setEditingProvider] =
     useState<TranslationProvider | null>(null);
   const [providerHealthStatus, setProviderHealthStatus] = useState<
-    Record<string, "healthy" | "unhealthy" | "checking">
+    Record<string, "HEALTHY" | "UNHEALTHY" | "ERROR" | "UNKNOWN" | "checking">
   >({});
+  const [isJobListOpen, setIsJobListOpen] = useState(false);
+  const [isCharStatsOpen, setIsCharStatsOpen] = useState(false);
   const queryClient = useQueryClient();
 
   // 获取翻译供应商列表
@@ -94,13 +90,10 @@ const MachineTranslationSettingsPage: React.FC = () => {
     queryFn: getTranslationProviders,
   });
 
-  // 获取成本统计
-  const { data: costStats, isLoading: costLoading } = useQuery({
-    queryKey: ["translation-costs", billingPeriod],
-    queryFn: () =>
-      getCostStatistics({
-        billingPeriod,
-      }),
+  // 获取月度统计
+  const { data: monthlyStats } = useQuery({
+    queryKey: ["translation-monthly-stats"],
+    queryFn: () => getMonthlyStats(),
   });
 
   // 删除供应商
@@ -154,15 +147,15 @@ const MachineTranslationSettingsPage: React.FC = () => {
         ...prev,
         [providerId]: result.status,
       }));
-      if (result.status === "healthy") {
+      if (result.isHealthy) {
         message.success("供应商服务正常");
       } else {
-        message.warning("供应商服务异常");
+        message.warning(result.error || "供应商服务异常");
       }
     } catch (error) {
       setProviderHealthStatus((prev) => ({
         ...prev,
-        [providerId]: "unhealthy",
+        [providerId]: "ERROR",
       }));
       message.error("健康检查失败");
     }
@@ -232,13 +225,13 @@ const MachineTranslationSettingsPage: React.FC = () => {
             {health === "checking" && (
               <Badge status="processing" text="检查中..." />
             )}
-            {health === "healthy" && (
+            {health === "HEALTHY" && (
               <span style={{ fontSize: 12, color: "#52c41a" }}>✓ 服务正常</span>
             )}
-            {health === "unhealthy" && (
+            {(health === "UNHEALTHY" || health === "ERROR") && (
               <span style={{ fontSize: 12, color: "#ff4d4f" }}>✗ 服务异常</span>
             )}
-            {!health && (
+            {(health === "UNKNOWN" || !health) && (
               <span style={{ fontSize: 12, color: "#999" }}>未检查</span>
             )}
           </Space>
@@ -319,14 +312,6 @@ const MachineTranslationSettingsPage: React.FC = () => {
     },
   ];
 
-  // 计算总成本
-  const totalCost =
-    costStats?.reduce((sum, stat) => sum + stat.totalCost, 0) || 0;
-  const totalCharacters =
-    costStats?.reduce((sum, stat) => sum + stat.totalCharacters, 0) || 0;
-  const totalJobs =
-    costStats?.reduce((sum, stat) => sum + stat.jobCount, 0) || 0;
-
   return (
     <div style={{ padding: 24 }}>
       <Title level={2}>
@@ -336,39 +321,35 @@ const MachineTranslationSettingsPage: React.FC = () => {
 
       {/* 统计卡片 */}
       <Row gutter={16} style={{ marginBottom: 24 }}>
-        <Col span={6}>
-          <Card>
+        <Col span={8}>
+          <Card
+            style={{ cursor: "pointer" }}
+            onClick={() => setIsCharStatsOpen(true)}
+            hoverable
+          >
             <Statistic
               title="本月总字符数"
-              value={totalCharacters}
+              value={monthlyStats?.totalCharacters || 0}
               prefix={<GlobalOutlined />}
               valueStyle={{ color: "#1890ff" }}
             />
           </Card>
         </Col>
-        <Col span={6}>
-          <Card>
-            <Statistic
-              title="本月总成本"
-              value={totalCost}
-              prefix={<DollarOutlined />}
-              suffix="USD"
-              precision={4}
-              valueStyle={{ color: "#52c41a" }}
-            />
-          </Card>
-        </Col>
-        <Col span={6}>
-          <Card>
+        <Col span={8}>
+          <Card
+            style={{ cursor: "pointer" }}
+            onClick={() => setIsJobListOpen(true)}
+            hoverable
+          >
             <Statistic
               title="本月翻译任务"
-              value={totalJobs}
+              value={monthlyStats?.totalJobs || 0}
               prefix={<ThunderboltOutlined />}
               valueStyle={{ color: "#722ed1" }}
             />
           </Card>
         </Col>
-        <Col span={6}>
+        <Col span={8}>
           <Card>
             <Statistic
               title="已启用供应商"
@@ -381,11 +362,85 @@ const MachineTranslationSettingsPage: React.FC = () => {
         </Col>
       </Row>
 
-      {/* 月度统计 */}
-      <MonthlyStatsSection />
+      {/* 供应商字符数统计弹窗 */}
+      <Modal
+        title="供应商字符数统计"
+        open={isCharStatsOpen}
+        onCancel={() => setIsCharStatsOpen(false)}
+        footer={null}
+        width={600}
+      >
+        <Table
+          dataSource={monthlyStats?.providers || []}
+          rowKey="providerId"
+          pagination={false}
+          columns={[
+            {
+              title: "供应商",
+              dataIndex: "providerName",
+              key: "providerName",
+              render: (name: string, record: { providerType: string }) => (
+                <Space>
+                  {providerIcons[record.providerType] || <ApiOutlined />}
+                  <span>{name}</span>
+                  <Tag color="blue">{record.providerType}</Tag>
+                </Space>
+              ),
+            },
+            {
+              title: "本月字符数",
+              dataIndex: "characterCount",
+              key: "characterCount",
+              align: "right",
+              render: (value: number) => value.toLocaleString(),
+            },
+            {
+              title: "任务数",
+              dataIndex: "jobCount",
+              key: "jobCount",
+              align: "right",
+            },
+            {
+              title: "占比",
+              dataIndex: "percentage",
+              key: "percentage",
+              align: "right",
+              render: (value: number) => `${value.toFixed(1)}%`,
+            },
+          ]}
+          summary={() => (
+            <Table.Summary fixed>
+              <Table.Summary.Row>
+                <Table.Summary.Cell index={0}>
+                  <Text strong>总计</Text>
+                </Table.Summary.Cell>
+                <Table.Summary.Cell index={1} align="right">
+                  <Text strong>
+                    {monthlyStats?.totalCharacters?.toLocaleString() || 0}
+                  </Text>
+                </Table.Summary.Cell>
+                <Table.Summary.Cell index={2} align="right">
+                  <Text strong>{monthlyStats?.totalJobs || 0}</Text>
+                </Table.Summary.Cell>
+                <Table.Summary.Cell index={3} align="right">
+                  <Text strong>100%</Text>
+                </Table.Summary.Cell>
+              </Table.Summary.Row>
+            </Table.Summary>
+          )}
+        />
+      </Modal>
 
-      {/* 翻译任务列表 */}
-      <TranslationJobList />
+      {/* 翻译任务列表弹窗 */}
+      <Drawer
+        title="翻译任务列表"
+        placement="right"
+        width={1200}
+        open={isJobListOpen}
+        onClose={() => setIsJobListOpen(false)}
+      >
+        <TranslationJobList providers={providers || []} />
+      </Drawer>
 
       {/* 供应商列表 */}
       <Card
@@ -431,73 +486,6 @@ const MachineTranslationSettingsPage: React.FC = () => {
               ),
             }}
           />
-        )}
-      </Card>
-
-      {/* 成本统计 */}
-      <Card
-        title={
-          <Space>
-            <DollarOutlined />
-            <span>成本统计</span>
-          </Space>
-        }
-        extra={
-          <Select
-            value={billingPeriod}
-            onChange={setBillingPeriod}
-            style={{ width: 150 }}
-          >
-            <Option value={new Date().toISOString().slice(0, 7)}>本月</Option>
-            <Option
-              value={new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)
-                .toISOString()
-                .slice(0, 7)}
-            >
-              上月
-            </Option>
-          </Select>
-        }
-      >
-        {costLoading ? (
-          <Skeleton active />
-        ) : costStats && costStats.length > 0 ? (
-          <Table
-            dataSource={costStats}
-            columns={[
-              {
-                title: "供应商",
-                dataIndex: "providerName",
-                key: "providerName",
-              },
-              {
-                title: "计费周期",
-                dataIndex: "billingPeriod",
-                key: "billingPeriod",
-              },
-              {
-                title: "字符数",
-                dataIndex: "totalCharacters",
-                key: "totalCharacters",
-                render: (value: number) => value.toLocaleString(),
-              },
-              {
-                title: "成本 (USD)",
-                dataIndex: "totalCost",
-                key: "totalCost",
-                render: (value: number) => `$${value.toFixed(6)}`,
-              },
-              {
-                title: "任务数",
-                dataIndex: "jobCount",
-                key: "jobCount",
-              },
-            ]}
-            rowKey={(record) => `${record.providerId}-${record.billingPeriod}`}
-            pagination={false}
-          />
-        ) : (
-          <Empty description="暂无成本数据" />
         )}
       </Card>
 
