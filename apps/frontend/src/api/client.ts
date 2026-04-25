@@ -4,12 +4,12 @@ import { useAppStore } from "@/store/useAppStore";
 
 const apiClient = axios.create({
   baseURL: "/api/v1",
+  timeout: 30000,
   headers: {
     "Content-Type": "application/json",
   },
 });
 
-// Request interceptor for adding auth token
 apiClient.interceptors.request.use(
   (config) => {
     const token = useAppStore.getState().token;
@@ -23,17 +23,38 @@ apiClient.interceptors.request.use(
   },
 );
 
-// Response interceptor for error handling
 apiClient.interceptors.response.use(
-  (response) => response.data,
+  (response) => {
+    // For blob responses, return directly without processing
+    if (response.config.responseType === "blob") {
+      return response.data;
+    }
+
+    const res = response.data;
+    if (res && typeof res === "object" && "code" in res) {
+      if (res.code === 200 || res.code === 0) {
+        return res.data;
+      }
+      message.error(res.message || "请求失败");
+      const error = new Error(res.message || "请求失败") as Error & {
+        code?: number;
+        response?: unknown;
+      };
+      error.code = res.code;
+      error.response = res;
+      return Promise.reject(error);
+    }
+    return res;
+  },
   (error) => {
-    const msg = error.response?.data?.message || "Network Error";
+    const msg = error.response?.data?.message || error.message || "网络错误";
     message.error(msg);
 
-    // Handle 401 errors (unauthorized)
     if (error.response?.status === 401) {
       useAppStore.getState().logout();
-      window.location.href = "/login";
+      if (window.location.pathname !== "/login") {
+        window.location.href = "/login";
+      }
     }
 
     return Promise.reject(error);

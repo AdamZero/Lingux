@@ -1,6 +1,3 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
 generator client {
   provider = "prisma-client-js"
 }
@@ -9,190 +6,26 @@ datasource db {
   provider = "postgresql"
 }
 
-model Project {
+model Config {
+  id          String   @id @default(cuid())
+  key         String   @unique
+  value       Json
+  description String?
+  createdAt   DateTime @default(now()) @db.Timestamptz
+  updatedAt   DateTime @updatedAt @db.Timestamptz
+
+  @@index([key])
+}
+
+model Asset {
   id          String   @id @default(cuid())
   name        String
-  description String?
-  baseLocale  String   @default("zh-CN")
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-
-  namespaces  Namespace[]
-  projectLocales ProjectLocale[]
-  users       User[]      @relation("ProjectUsers")
-  currentReleaseId String?   @unique
-  currentRelease   Release?   @relation("ProjectCurrentRelease", fields: [currentReleaseId], references: [id], onDelete: SetNull)
-  releases          Release[]  @relation("ProjectReleases")
-  releaseSessions   ReleaseSession[]
-}
-
-model Locale {
-  id        String   @id @default(cuid())
-  code      String   @unique // e.g., "en-US"
-  name      String   // e.g., "English"
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  projectLocales ProjectLocale[]
-  translations Translation[]
-}
-
-model ProjectLocale {
-  projectId  String
-  localeId   String
-  enabled    Boolean  @default(true)
-  disabledAt DateTime?
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
-
-  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  locale  Locale  @relation(fields: [localeId], references: [id], onDelete: Restrict)
-
-  @@id([projectId, localeId])
-  @@index([localeId])
-}
-
-model Namespace {
-  id          String   @id @default(cuid())
-  name        String   // e.g., "common"
+  url         String
+  type        String
   description String?
   projectId   String
-  project     Project  @relation(fields: [projectId], references: [id])
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-
-  keys Key[]
-
-  @@unique([projectId, name])
-}
-
-enum KeyType {
-  TEXT
-  RICH_TEXT
-  ASSET
-}
-
-model Key {
-  id          String   @id @default(cuid())
-  name        String   // e.g., "login.submit"
-  description String?
-  type        KeyType  @default(TEXT)
-  namespaceId String
-  namespace   Namespace @relation(fields: [namespaceId], references: [id])
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-
-  translations Translation[]
-
-  @@unique([namespaceId, name])
-}
-
-enum TranslationStatus {
-  PENDING      // 待翻译
-  TRANSLATING  // 翻译中
-  REVIEWING    // 审核中
-  APPROVED     // 已审核
-  PUBLISHED    // 已发布
-}
-
-enum TranslationPriority {
-  LOW
-  MEDIUM
-  HIGH
-}
-
-model Translation {
-  id             String            @id @default(cuid())
-  content        String
-  status         TranslationStatus @default(PENDING)
-  isLlmTranslated Boolean           @default(false)
-  reviewComment  String?
-  
-  keyId     String
-  key       Key      @relation(fields: [keyId], references: [id])
-  localeId  String
-  locale    Locale   @relation(fields: [localeId], references: [id])
-  
-  submitterId String?
-  submitter   User?    @relation("TranslationSubmitter", fields: [submitterId], references: [id])
-  reviewerId  String?
-  reviewer    User?    @relation("Reviewer", fields: [reviewerId], references: [id])
-  
-  priority    TranslationPriority @default(MEDIUM)
-  dueDate     DateTime?
-  approvedAt  DateTime?
-  
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@unique([keyId, localeId])
-  @@index([status, submitterId])
-  @@index([status, reviewerId])
-  @@index([priority, updatedAt])
-}
-
-enum UserRole {
-  ADMIN
-  EDITOR
-  REVIEWER
-}
-
-enum AuditScopeType {
-  GLOBAL
-  PROJECT
-}
-
-enum AuditActorType {
-  USER
-  SYSTEM
-  INTEGRATION
-  LLM
-}
-
-model Enterprise {
-  id         String   @id @default(cuid())
-  name       String
-  domain     String?  @unique
-  externalId String?  @unique
-  platform   String   // feishu, qixin, dingtalk
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
-
-  members    EnterpriseMember[]
-}
-
-model EnterpriseMember {
-  id           String   @id @default(cuid())
-  enterpriseId String
-  userId       String
-  role         String   @default("member") // admin, member
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
-
-  enterprise   Enterprise @relation(fields: [enterpriseId], references: [id], onDelete: Cascade)
-  user         User       @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@unique([enterpriseId, userId])
-}
-
-model User {
-  id         String   @id @default(cuid())
-  username   String   @unique
-  name       String?  // 真实姓名
-  email      String?  @unique
-  avatar     String?  // 头像 URL
-  mobile     String?  // 手机号
-  role       UserRole @default(EDITOR)
-  externalId String?  @unique // For Feishu/DingTalk
-  provider   String?  // 登录来源: feishu, dingtalk, qixin
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
-
-  projects     Project[]          @relation("ProjectUsers")
-  reviews      Translation[]      @relation("Reviewer")
-  submissions  Translation[]      @relation("TranslationSubmitter")
-  auditLogs    AuditLog[]
-  enterprises  EnterpriseMember[]
+  createdAt   DateTime @default(now()) @db.Timestamptz
+  updatedAt   DateTime @updatedAt @db.Timestamptz
 }
 
 model AuditLog {
@@ -205,48 +38,270 @@ model AuditLog {
   actorType     AuditActorType @default(SYSTEM)
   actorId       String?
   userId        String?
-  user          User?          @relation(fields: [userId], references: [id])
   correlationId String?
   version       Int            @default(1)
   payload       Json?
-  createdAt     DateTime       @default(now())
+  createdAt     DateTime       @default(now()) @db.Timestamptz
+  user          User?          @relation(fields: [userId], references: [id])
 
   @@index([projectId, createdAt])
   @@index([targetType, targetId, createdAt])
   @@index([userId, createdAt])
 }
 
-model Release {
-  id              String   @id @default(cuid())
-  projectId        String
-  project          Project  @relation("ProjectReleases", fields: [projectId], references: [id], onDelete: Cascade)
-  currentForProject Project? @relation("ProjectCurrentRelease")
-  basedOnReleaseId String?
-  basedOnRelease   Release? @relation("ReleaseBase", fields: [basedOnReleaseId], references: [id], onDelete: SetNull)
-  derivedReleases  Release[] @relation("ReleaseBase")
-  version          Int
-  note             String?
-  scope            Json
-  createdAt        DateTime @default(now())
+model Enterprise {
+  id               String             @id @default(cuid())
+  name             String
+  domain           String?            @unique
+  externalId       String?            @unique
+  platform         String
+  createdAt        DateTime           @default(now())
+  updatedAt        DateTime           @updatedAt
+  enterpriseMembers EnterpriseMember[]
+}
 
+model EnterpriseMember {
+  id           String     @id @default(cuid())
+  enterpriseId String
+  userId       String
+  role         String     @default("member")
+  createdAt    DateTime   @default(now()) @db.Timestamptz
+  updatedAt    DateTime   @updatedAt @db.Timestamptz
+  enterprise   Enterprise @relation(fields: [enterpriseId], references: [id], onDelete: Cascade)
+  user         User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([enterpriseId, userId])
+}
+
+model Key {
+  id          String        @id @default(cuid())
+  name        String
+  description String?
+  type        KeyType       @default(TEXT)
+  namespaceId String
+  createdAt   DateTime      @default(now()) @db.Timestamptz
+  updatedAt   DateTime      @updatedAt @db.Timestamptz
+  namespace          Namespace     @relation(fields: [namespaceId], references: [id])
+  translations       Translation[]
+  translationJobItems TranslationJobItem[]
+
+  @@unique([namespaceId, name])
+}
+
+model Locale {
+  id            String          @id @default(cuid())
+  code          String          @unique
+  name          String
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @updatedAt
+  projectLocales ProjectLocale[]
+  translations   Translation[]
+}
+
+model Namespace {
+  id          String   @id @default(cuid())
+  name        String
+  description String?
+  projectId   String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  keys        Key[]
+  project     Project  @relation(fields: [projectId], references: [id])
+
+  @@unique([projectId, name])
+}
+
+model Project {
+  id                                        String           @id @default(cuid())
+  name                                      String
+  description                               String?
+  baseLocale                                String           @default("zh-CN")
+  createdAt                                 DateTime         @default(now())
+  updatedAt                                 DateTime         @updatedAt
+  currentReleaseId                          String?          @unique
+  approvalEnabled                           Boolean          @default(false)
+  accessMode                                String           @default("PUBLIC")
+  autoTranslateEnabled                      Boolean          @default(false)
+  autoTranslateProviderId                   String?          @db.VarChar(255)
+  namespaces                                Namespace[]
+  currentRelease Release? @relation("ProjectCurrentRelease", fields: [currentReleaseId], references: [id])
+  projectLocales                            ProjectLocale[]
+  projectMembers                            ProjectMember[]
+  projectOwners                             ProjectOwner[]
+  releases        Release[] @relation("ProjectReleases")
+  releaseSessions                           ReleaseSession[]
+  users                                     User[]           @relation("ProjectUsers")
+  translationJobs                           TranslationJob[]
+}
+
+model ProjectLocale {
+  projectId  String
+  localeId   String
+  enabled    Boolean   @default(true)
+  disabledAt DateTime? @db.Timestamptz
+  createdAt  DateTime  @default(now()) @db.Timestamptz
+  updatedAt  DateTime  @updatedAt @db.Timestamptz
+  locale     Locale    @relation(fields: [localeId], references: [id])
+  project    Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@id([projectId, localeId])
+  @@index([localeId])
+}
+
+model ProjectMember {
+  id        String   @id @default(cuid())
+  projectId String
+  userId    String
+  createdAt DateTime @default(now()) @db.Timestamptz
+  project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([projectId, userId])
+  @@index([userId])
+}
+
+model ProjectOwner {
+  id        String   @id @default(cuid())
+  projectId String
+  userId    String
+  createdAt DateTime @default(now()) @db.Timestamptz
+  project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([projectId, userId])
+  @@index([userId])
+}
+
+model Release {
+  id                                                        String            @id @default(cuid())
+  projectId                                                 String
+  basedOnReleaseId                                          String?
+  version                                                   Int
+  note                                                      String?
+  scope                                                     Json
+  createdAt                                                 DateTime          @default(now()) @db.Timestamptz
+  projectForCurrentRelease Project? @relation("ProjectCurrentRelease")
+  basedOnRelease Release? @relation("ReleaseToRelease", fields: [basedOnReleaseId], references: [id])
+  derivedReleases Release[] @relation("ReleaseToRelease")
+  project Project @relation("ProjectReleases", fields: [projectId], references: [id], onDelete: Cascade)
   artifacts ReleaseArtifact[]
-  baseForReleaseSessions      ReleaseSession[] @relation("ReleaseSessionBase")
-  publishedForReleaseSessions ReleaseSession[] @relation("ReleaseSessionPublished")
+  sessionsAsBase ReleaseSession[] @relation("ReleaseSessionBaseRelease")
+  sessionsAsPublished ReleaseSession[] @relation("ReleaseSessionPublishedRelease")
 
   @@unique([projectId, version])
   @@index([projectId, createdAt])
 }
 
 model ReleaseArtifact {
-  id        String   @id @default(cuid())
-  releaseId String
-  release   Release  @relation(fields: [releaseId], references: [id], onDelete: Cascade)
+  id         String   @id @default(cuid())
+  releaseId  String
   localeCode String
-  data      Json
-  createdAt DateTime @default(now())
+  data       Json
+  createdAt  DateTime @default(now()) @db.Timestamptz
+  release    Release  @relation(fields: [releaseId], references: [id], onDelete: Cascade)
 
   @@unique([releaseId, localeCode])
   @@index([localeCode])
+}
+
+model ReleaseSession {
+  id                                                 String               @id @default(cuid())
+  projectId                                          String
+  status                                             ReleaseSessionStatus @default(DRAFT)
+  createdBy                                          String?
+  baseReleaseId                                      String?
+  scope                                              Json
+  localeCodes                                        String[]
+  note                                               String?
+  validationErrors                                   Json?
+  nextArtifacts                                      Json
+  baseJson                                           String?
+  nextJson                                           String?
+  submittedAt                                        DateTime?            @db.Timestamptz
+  reviewedAt                                        DateTime?            @db.Timestamptz
+  reviewNote                                         String?
+  publishedAt                                        DateTime?            @db.Timestamptz
+  publishedReleaseId                                 String?
+  expiresAt                                          DateTime?            @db.Timestamptz
+  archivedAt                                         DateTime?            @db.Timestamptz
+  archivedBy                                         String?
+  archivedReason                                     String?
+  createdAt                                          DateTime             @default(now()) @db.Timestamptz
+  updatedAt                                          DateTime             @updatedAt @db.Timestamptz
+  baseRelease      Release? @relation("ReleaseSessionBaseRelease", fields: [baseReleaseId], references: [id])
+  project          Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  publishedRelease Release? @relation("ReleaseSessionPublishedRelease", fields: [publishedReleaseId], references: [id])
+
+  @@index([projectId, createdAt])
+  @@index([projectId, status])
+  @@index([projectId, status, createdBy])
+  @@index([projectId, archivedAt])
+}
+
+model Translation {
+  id                                 String              @id @default(cuid())
+  content                            String
+  status                             TranslationStatus   @default(PENDING)
+  isLlmTranslated                    Boolean             @default(false)
+  reviewComment                      String?
+  keyId                              String
+  localeId                           String
+  reviewerId                         String?
+  createdAt                          DateTime            @default(now()) @db.Timestamptz
+  updatedAt                          DateTime            @updatedAt @db.Timestamptz
+  approvedAt                         DateTime?           @db.Timestamptz
+  dueDate                            DateTime?           @db.Timestamptz
+  priority                           TranslationPriority @default(MEDIUM)
+  submitterId                        String?
+  key                                Key                 @relation(fields: [keyId], references: [id])
+  locale                             Locale              @relation(fields: [localeId], references: [id])
+  reviewer  User?  @relation("TranslationReviewer", fields: [reviewerId], references: [id])
+  submitter User?  @relation("TranslationSubmitter", fields: [submitterId], references: [id])
+
+  @@unique([keyId, localeId])
+  @@index([priority, updatedAt])
+  @@index([status, reviewerId])
+  @@index([status, submitterId])
+}
+
+model User {
+  id                                        String             @id @default(cuid())
+  username                                  String             @unique
+  email                                     String?            @unique
+  role                                      UserRole           @default(EDITOR)
+  externalId                                String?            @unique
+  createdAt                                 DateTime           @default(now()) @db.Timestamptz
+  updatedAt                                 DateTime           @updatedAt @db.Timestamptz
+  avatar                                    String?
+  mobile                                    String?
+  name                                      String?
+  provider                                  String?
+  auditLogs                                  AuditLog[]
+  enterpriseMembers                          EnterpriseMember[]
+  projectMembers                             ProjectMember[]
+  projectOwners                             ProjectOwner[]
+  reviewedTranslations  Translation[] @relation("TranslationReviewer")
+  submittedTranslations Translation[] @relation("TranslationSubmitter")
+  projects                                   Project[]          @relation("ProjectUsers")
+  translationJobs                            TranslationJob[]
+}
+
+enum AuditActorType {
+  USER
+  SYSTEM
+  INTEGRATION
+  LLM
+}
+
+enum AuditScopeType {
+  GLOBAL
+  PROJECT
+}
+
+enum KeyType {
+  TEXT
+  RICH_TEXT
+  ASSET
 }
 
 enum ReleaseSessionStatus {
@@ -258,57 +313,161 @@ enum ReleaseSessionStatus {
   EXPIRED
 }
 
-model ReleaseSession {
-  id            String              @id @default(cuid())
-  projectId     String
-  project       Project             @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  status        ReleaseSessionStatus @default(DRAFT)
+enum TranslationPriority {
+  LOW
+  MEDIUM
+  HIGH
+}
 
-  baseReleaseId String?
-  baseRelease   Release?            @relation("ReleaseSessionBase", fields: [baseReleaseId], references: [id], onDelete: SetNull)
+enum TranslationStatus {
+  PENDING
+  TRANSLATING
+  REVIEWING
+  APPROVED
+  PUBLISHED
+}
 
-  scope         Json
-  localeCodes   String[]
-  note          String?
+enum UserRole {
+  ADMIN
+  EDITOR
+  REVIEWER
+}
 
-  validationErrors Json?
-  nextArtifacts     Json
-  baseJson          String?
-  nextJson          String?
+// 翻译供应商配置
+model TranslationProvider {
+  id                String                    @id @default(cuid())
+  name              String                    // 显示名称
+  type              TranslationProviderType
+  baseUrl           String                    // API基础地址
+  apiKeyEncrypted   String                    // 加密的API Key
+  config            Json                      // 额外配置参数
+  isEnabled         Boolean                   @default(true)
+  isDefault         Boolean                   @default(false)  // 默认供应商
+  rateLimitPerMin   Int                       @default(60)     // 每分钟请求限制
+  maxCharsPerReq    Int                       @default(5000)   // 单次最大字符数
+  maxTextsPerReq    Int                       @default(100)    // 单次最大文本数
+  timeoutMs         Int                       @default(30000)  // 请求超时
+  healthStatus      TranslationProviderHealthStatus @default(UNKNOWN) // 健康检查状态
+  healthCheckedAt   DateTime?                 @db.Timestamptz  // 最后检查时间
+  healthError       String?                   // 健康检查错误信息
+  createdAt         DateTime                  @default(now()) @db.Timestamptz
+  updatedAt         DateTime                  @updatedAt @db.Timestamptz
 
-  submittedAt   DateTime?
-  reviewedAt    DateTime?
-  reviewNote    String?
-  publishedAt   DateTime?
-  publishedReleaseId String?
-  publishedRelease   Release?       @relation("ReleaseSessionPublished", fields: [publishedReleaseId], references: [id], onDelete: SetNull)
+  jobs  TranslationJob[]
+  costs TranslationCost[]
 
-  expiresAt    DateTime?
-  createdAt    DateTime            @default(now())
-  updatedAt    DateTime            @updatedAt
+  @@index([type, isEnabled])
+  @@index([healthStatus])
+}
 
+// 翻译任务
+model TranslationJob {
+  id                String            @id @default(cuid())
+  providerId        String
+  projectId         String?
+  userId            String?           // 发起人 ID
+  status            TranslationJobStatus @default(PENDING)
+  sourceLanguage    String
+  targetLanguages   String[]          // 多语言数组
+  totalKeys         Int               // 总词条数
+  translatedKeys    Int @default(0)   // 已翻译词条数
+  characterCount    Int
+  error             String?
+  createdAt         DateTime          @default(now()) @db.Timestamptz
+  completedAt       DateTime?         @db.Timestamptz
+  
+  provider          TranslationProvider @relation(fields: [providerId], references: [id], onDelete: Cascade)
+  user              User?               @relation(fields: [userId], references: [id])
+  project           Project?            @relation(fields: [projectId], references: [id])
+  items             TranslationJobItem[]
+  
+  @@index([providerId, createdAt])
   @@index([projectId, status])
+  @@index([createdAt])
+  @@index([userId, createdAt])  // 新增索引
+}
+
+// 翻译任务明细（一个词条）
+model TranslationJobItem {
+  id                String                @id @default(cuid())
+  jobId             String
+  keyId             String
+  keyName           String
+  namespaceName     String?
+  sourceContent     String
+  translations      TranslationJobItemTranslation[]
+  createdAt         DateTime              @default(now()) @db.Timestamptz
+  
+  job               TranslationJob        @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  key               Key                   @relation(fields: [keyId], references: [id])
+  
+  @@index([jobId])
+  @@index([keyId])
+}
+
+// 翻译任务项的多语言翻译结果
+model TranslationJobItemTranslation {
+  id                String                @id @default(cuid())
+  itemId            String
+  targetLanguage    String
+  translatedContent String?
+  status            TranslationJobItemStatus @default(SUCCESS)
+  errorMessage      String?
+  characterCount    Int
+  createdAt         DateTime              @default(now()) @db.Timestamptz
+  
+  item              TranslationJobItem    @relation(fields: [itemId], references: [id], onDelete: Cascade)
+  
+  @@index([itemId])
+  @@unique([itemId, targetLanguage])
+}
+
+enum TranslationJobItemStatus {
+  SUCCESS
+  FAILED
+  SKIPPED
+}
+
+// 翻译成本统计
+model TranslationCost {
+  id                String   @id @default(cuid())
+  providerId        String
+  projectId         String?
+  characterCount    Int      // 字符数
+  tokenCount        Int?     // Token数
+  estimatedCost     Float    // 估算成本（USD）
+  actualCost        Float?   // 实际成本（对账后）
+  billingPeriod     String?  // 账单周期（如"2024-01"）
+  createdAt         DateTime @default(now()) @db.Timestamptz
+  
+  provider TranslationProvider @relation(fields: [providerId], references: [id])
+
+  @@index([providerId, billingPeriod])
   @@index([projectId, createdAt])
 }
 
-model Asset {
-  id          String   @id @default(cuid())
-  name        String
-  url         String
-  type        String   // e.g., "image", "video"
-  description String?
-  projectId   String
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+enum TranslationProviderType {
+  GOOGLE
+  DEEPL
+  AZURE
+  OPENAI
+  BAIDU
+  CUSTOM
+  MOCK
+  TENCENT
 }
 
-model Config {
-  id          String   @id @default(cuid())
-  key         String   @unique // e.g., "feature.review", "feature.import"
-  value       Json     // 配置值
-  description String?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+enum TranslationJobStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  FAILED
+  PARTIAL  // 部分成功（批量翻译中部分失败）
+}
 
-  @@index([key])
+enum TranslationProviderHealthStatus {
+  UNKNOWN     // 未知/未检查
+  HEALTHY     // 健康
+  UNHEALTHY   // 不健康（检查失败）
+  ERROR       // 错误（调用异常）
 }

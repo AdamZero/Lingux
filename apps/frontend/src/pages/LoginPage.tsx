@@ -1,8 +1,53 @@
 import React, { useEffect } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { Layout, Button, Card, Typography, Space, message } from "antd";
-import { MessageOutlined } from "@ant-design/icons";
-import { useAppStore, selectIsAuthenticated } from "@/store/useAppStore";
+import {
+  Layout,
+  Button,
+  Card,
+  Typography,
+  Space,
+  message,
+  Divider,
+  Select,
+} from "antd";
+import { MessageOutlined, CodeOutlined } from "@ant-design/icons";
+import { useAppStore } from "@/store/useAppStore";
+
+const { Option } = Select;
+
+// 开发环境快速登录账号列表
+const DEV_ACCOUNTS = [
+  {
+    username: "admin@demo",
+    name: "演示管理员",
+    role: "ADMIN",
+    platform: "飞书",
+  },
+  {
+    username: "editor@demo",
+    name: "演示编辑",
+    role: "EDITOR",
+    platform: "飞书",
+  },
+  {
+    username: "reviewer@demo",
+    name: "演示审核员",
+    role: "REVIEWER",
+    platform: "飞书",
+  },
+  {
+    username: "admin@test",
+    name: "测试管理员",
+    role: "ADMIN",
+    platform: "钉钉",
+  },
+  {
+    username: "editor@test",
+    name: "测试编辑",
+    role: "EDITOR",
+    platform: "钉钉",
+  },
+];
 
 const { Content } = Layout;
 const { Title, Text } = Typography;
@@ -12,40 +57,38 @@ const LoginPage: React.FC = () => {
   const [searchParams] = useSearchParams();
   const setToken = useAppStore((state) => state.setToken);
   const setUser = useAppStore((state) => state.setUser);
-  const isAuthenticated = useAppStore(selectIsAuthenticated);
+  const token = useAppStore((state) => state.token);
 
-  // Check for token in URL (from hash fragment for security)
   useEffect(() => {
     const hash = window.location.hash.substring(1);
     const hashParams = new URLSearchParams(hash);
-    const token = hashParams.get("token");
-    const userStr = hashParams.get("user");
+    const tokenFromUrl = hashParams.get("token");
+    const userStrFromUrl = hashParams.get("user");
 
-    const searchToken = searchParams.get("token");
-    const searchUserStr = searchParams.get("user");
+    const tokenFromSearch = searchParams.get("token");
+    const userStrFromSearch = searchParams.get("user");
 
-    const finalToken = token || searchToken;
-    const finalUserStr = userStr || searchUserStr;
+    const finalToken = tokenFromUrl || tokenFromSearch;
+    const finalUserStr = userStrFromUrl || userStrFromSearch;
 
     if (finalToken && finalUserStr) {
       try {
         const user = JSON.parse(finalUserStr);
         setToken(finalToken);
         setUser(user);
-        message.success("Login successful");
-        navigate("/projects");
-      } catch (error) {
-        message.error("Failed to parse user data");
+        message.success("登录成功");
+        window.history.replaceState(null, "", window.location.pathname);
+      } catch {
+        message.error("用户数据解析失败");
       }
     }
-  }, [searchParams, setToken, setUser, navigate]);
+  }, [searchParams, setToken, setUser]);
 
-  // Redirect if already authenticated
   useEffect(() => {
-    if (isAuthenticated) {
-      navigate("/projects");
+    if (token) {
+      navigate("/projects", { replace: true });
     }
-  }, [isAuthenticated, navigate]);
+  }, [token, navigate]);
 
   const handleFeishuLogin = () => {
     window.location.href = "/api/v1/auth/feishu";
@@ -58,6 +101,16 @@ const LoginPage: React.FC = () => {
   const handleDingTalkLogin = () => {
     window.location.href = "/api/v1/auth/dingtalk";
   };
+
+  // 开发环境快速登录
+  const handleDevLogin = (username: string) => {
+    window.location.href = `/api/v1/auth/dev-login?username=${encodeURIComponent(username)}`;
+  };
+
+  // 判断是否为开发环境
+  const isDevelopment =
+    process.env.NODE_ENV === "development" ||
+    window.location.hostname === "localhost";
 
   return (
     <Layout style={{ minHeight: "100vh", background: "#f0f2f5" }}>
@@ -79,33 +132,58 @@ const LoginPage: React.FC = () => {
             <Button
               type="primary"
               size="large"
+              block
               icon={<MessageOutlined />}
               onClick={handleFeishuLogin}
-              style={{ width: "100%" }}
             >
-              Sign in with Feishu
+              飞书登录
             </Button>
-
-            <Button
-              type="default"
-              size="large"
-              icon={<MessageOutlined />}
-              onClick={handleQixinLogin}
-              style={{ width: "100%" }}
-            >
-              Sign in with Qixin
+            <Button size="large" block onClick={handleQixinLogin}>
+              企信登录
             </Button>
-
-            <Button
-              type="default"
-              size="large"
-              icon={<MessageOutlined />}
-              onClick={handleDingTalkLogin}
-              style={{ width: "100%" }}
-            >
-              Sign in with DingTalk
+            <Button size="large" block onClick={handleDingTalkLogin}>
+              钉钉登录
             </Button>
           </Space>
+
+          {isDevelopment && (
+            <>
+              <Divider>
+                <Text type="secondary" style={{ fontSize: 12 }}>
+                  开发环境快速登录
+                </Text>
+              </Divider>
+              <Space direction="vertical" style={{ width: "100%" }}>
+                <Select
+                  placeholder="选择开发账号快速登录"
+                  size="large"
+                  style={{ width: "100%" }}
+                  onChange={handleDevLogin}
+                  value={undefined}
+                >
+                  {DEV_ACCOUNTS.map((account) => (
+                    <Option key={account.username} value={account.username}>
+                      <div
+                        style={{
+                          display: "flex",
+                          justifyContent: "space-between",
+                          alignItems: "center",
+                        }}
+                      >
+                        <span>
+                          <CodeOutlined style={{ marginRight: 8 }} />
+                          {account.name}
+                        </span>
+                        <span style={{ fontSize: 12, color: "#999" }}>
+                          {account.platform} · {account.role}
+                        </span>
+                      </div>
+                    </Option>
+                  ))}
+                </Select>
+              </Space>
+            </>
+          )}
         </Card>
       </Content>
     </Layout>

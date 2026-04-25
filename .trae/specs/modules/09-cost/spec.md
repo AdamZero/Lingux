@@ -4,7 +4,7 @@
 **模块名称**: 成本管控  
 **版本**: v1.0  
 **最后更新**: 2026-03-17  
-**迭代计划**: 第 4 迭代  
+**迭代计划**: 第 4 迭代
 
 ---
 
@@ -15,6 +15,7 @@
 成本管控模块用于统计和管控 LLM 翻译的成本，帮助企业控制翻译预算。
 
 **功能**：
+
 - LLM 翻译成本统计
 - 预算设置与预警
 - 用量配额管理
@@ -37,39 +38,39 @@
 interface TranslationCost {
   id: string;
   projectId: string;
-  provider: string;             // openai, claude, wenxin, qwen
-  model: string;                // gpt-4, claude-3, etc.
-  operationType: 'translate' | 'review' | 'suggest';
-  
+  provider: string; // openai, claude, wenxin, qwen
+  model: string; // gpt-4, claude-3, etc.
+  operationType: "translate" | "review" | "suggest";
+
   // 用量统计
   inputTokens: number;
   outputTokens: number;
   characterCount: number;
-  
+
   // 成本计算
-  inputCost: number;            // 输入成本
-  outputCost: number;           // 输出成本
-  totalCost: number;            // 总成本
-  currency: 'USD' | 'CNY';
-  
+  inputCost: number; // 输入成本
+  outputCost: number; // 输出成本
+  totalCost: number; // 总成本
+  currency: "USD" | "CNY";
+
   // 关联信息
   translationId?: string;
   keyId?: string;
   userId: string;
-  
+
   createdAt: Date;
 }
 ```
 
 ### 2.2 成本统计维度
 
-| 维度 | 说明 | 用途 |
-|------|------|------|
-| 按项目 | 各项目 LLM 成本 | 项目成本核算 |
-| 按语言 | 各语言对成本 | 语言对定价参考 |
-| 按供应商 | OpenAI/Claude/文心/通义 | 供应商优化 |
-| 按用户 | 各用户用量 | 个人效率分析 |
-| 按时间 | 日/周/月趋势 | 预算规划 |
+| 维度     | 说明                    | 用途           |
+| -------- | ----------------------- | -------------- |
+| 按项目   | 各项目 LLM 成本         | 项目成本核算   |
+| 按语言   | 各语言对成本            | 语言对定价参考 |
+| 按供应商 | OpenAI/Claude/文心/通义 | 供应商优化     |
+| 按用户   | 各用户用量              | 个人效率分析   |
+| 按时间   | 日/周/月趋势            | 预算规划       |
 
 ### 2.3 成本报表示例
 
@@ -122,21 +123,22 @@ interface TranslationCost {
 | 100% | 立即暂停 | - |
 
 **配额配置**：
+
 ```typescript
 interface QuotaConfig {
   // 字符数配额
   maxCharactersPerMonth: number;
   maxCharactersPerDay: number;
-  
+
   // 调用次数配额
   maxCallsPerMonth: number;
   maxCallsPerDay: number;
   maxCallsPerHour: number;
-  
+
   // 成本配额
   maxCostPerMonth: number;
   maxCostPerDay: number;
-  
+
   // 速率限制
   rateLimitPerMinute: number;
   rateLimitPerSecond: number;
@@ -152,26 +154,26 @@ model TranslationCost {
   id        String   @id @default(cuid())
   projectId String
   project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  
+
   provider  String   // openai, claude, wenxin, qwen
   model     String   // gpt-4, claude-3, etc.
   operationType String // translate, review, suggest
-  
+
   inputTokens  Int
   outputTokens Int
   characterCount Int
-  
+
   inputCost  Float
   outputCost Float
   totalCost  Float
   currency   String @default("CNY")
-  
+
   translationId String?
   keyId         String?
   userId        String
-  
+
   createdAt DateTime @default(now())
-  
+
   @@index([projectId, createdAt])
   @@index([userId, createdAt])
 }
@@ -180,15 +182,15 @@ model BudgetConfig {
   id          String @id @default(cuid())
   projectId   String?
   project     Project? @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  
+
   type        String // project, user
   targetId    String? // projectId or userId
-  
+
   maxCostPerMonth Float
   maxCostPerDay   Float?
-  
+
   alertThresholds Json // [50, 80, 95]
-  
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }
@@ -205,23 +207,21 @@ model BudgetConfig {
 **功能**: 获取成本统计  
 **权限**: ADMIN  
 **查询参数**:
+
 - `startDate`: 开始日期
 - `endDate`: 结束日期
 - `groupBy`: 分组维度（provider/locale/user）
 
 **响应**:
+
 ```json
 {
   "code": 200,
   "data": {
     "total": 1234.56,
     "currency": "CNY",
-    "byProvider": [
-      { "provider": "qwen", "cost": 567.89, "percentage": 46 }
-    ],
-    "byLocale": [
-      { "locale": "zh-CN→en-US", "cost": 456.78 }
-    ]
+    "byProvider": [{ "provider": "qwen", "cost": 567.89, "percentage": 46 }],
+    "byLocale": [{ "locale": "zh-CN→en-US", "cost": 456.78 }]
   }
 }
 ```
@@ -238,6 +238,7 @@ model BudgetConfig {
 **功能**: 设置预算  
 **权限**: ADMIN  
 **请求体**:
+
 ```json
 {
   "maxCostPerMonth": 5000,

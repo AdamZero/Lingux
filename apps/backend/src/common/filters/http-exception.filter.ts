@@ -38,7 +38,9 @@ export class HttpExceptionFilter implements ExceptionFilter {
         ? message
         : (message as { message: string }).message || 'Unknown error';
 
-    const errorResponse = {
+    const isDev = process.env.NODE_ENV !== 'production';
+
+    const errorResponse: Record<string, unknown> = {
       statusCode: status,
       timestamp: new Date().toISOString(),
       path: request.url,
@@ -46,6 +48,14 @@ export class HttpExceptionFilter implements ExceptionFilter {
       message: errorMessage,
       requestId: this.asyncContext.getRequestId(),
     };
+
+    // 开发模式下返回详细错误信息
+    if (isDev && status >= 500) {
+      errorResponse.stack =
+        exception instanceof Error ? exception.stack : undefined;
+      errorResponse.error =
+        exception instanceof Error ? exception.message : String(exception);
+    }
 
     // 记录错误日志
     if (status >= 500) {

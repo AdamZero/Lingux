@@ -518,4 +518,48 @@ export class TranslationService {
       throw new NotFoundException(`Translation not found`);
     }
   }
+
+  async batchUpdate(
+    projectId: string,
+    namespaceId: string,
+    keyId: string,
+    translations: Array<{
+      localeCode: string;
+      content: string;
+      status?: string;
+    }>,
+  ) {
+    await this.assertKeyInPath(projectId, namespaceId, keyId);
+
+    const results = await Promise.all(
+      translations.map(async (t) => {
+        try {
+          await this.findOne(projectId, namespaceId, keyId, t.localeCode);
+          return await this.update(
+            projectId,
+            namespaceId,
+            keyId,
+            t.localeCode,
+            {
+              content: t.content,
+              status: t.status as TranslationStatus,
+            },
+          );
+        } catch (error) {
+          // If translation doesn't exist, create it
+          if (error instanceof NotFoundException) {
+            return await this.create(projectId, namespaceId, keyId, {
+              localeCode: t.localeCode,
+              content: t.content,
+              status:
+                (t.status as TranslationStatus) || TranslationStatus.PENDING,
+            });
+          }
+          throw error;
+        }
+      }),
+    );
+
+    return results;
+  }
 }

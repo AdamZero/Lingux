@@ -1,6 +1,7 @@
 import {
   BadRequestException,
   ConflictException,
+  ForbiddenException,
   Injectable,
   NotFoundException,
   UnprocessableEntityException,
@@ -46,6 +47,51 @@ export class ReleaseService {
   constructor(private readonly prisma: PrismaService) {}
 
   private systemUserId: string | null = null;
+
+  // ==================== 权限检查 ====================
+
+  async isProjectOwner(projectId: string, userId: string): Promise<boolean> {
+    const owner = await this.prisma.projectOwner.findUnique({
+      where: { projectId_userId: { projectId, userId } },
+    });
+    return !!owner;
+  }
+
+  async canApproveRelease(projectId: string, userId: string): Promise<boolean> {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { role: true },
+    });
+    if (user?.role === 'ADMIN') return true;
+    return await this.isProjectOwner(projectId, userId);
+  }
+
+  async canPublishWithoutApproval(
+    projectId: string,
+    userId: string,
+  ): Promise<boolean> {
+    const owners = await this.prisma.projectOwner.findMany({
+      where: { projectId },
+    });
+    // 必须有且只有一个 Owner，且该 Owner 是当前用户
+    return owners.length === 1 && owners[0]?.userId === userId;
+  }
+
+  async isApprovalEnabled(projectId: string): Promise<boolean> {
+    const project = await this.prisma.project.findUnique({
+      where: { id: projectId },
+      select: { approvalEnabled: true },
+    });
+    return project?.approvalEnabled ?? false;
+  }
+
+  async isAdmin(userId: string): Promise<boolean> {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { role: true },
+    });
+    return user?.role === 'ADMIN';
+  }
 
   private isPlainObject(value: unknown): value is Record<string, unknown> {
     return typeof value === 'object' && value !== null && !Array.isArray(value);
@@ -369,7 +415,7 @@ export class ReleaseService {
   private resolveLocaleCodes(params: {
     requested?: string[];
     enabled: string[];
-  }) {
+  }): string[] {
     if (!params.requested) {
       return params.enabled;
     }
@@ -675,6 +721,50 @@ export class ReleaseService {
     };
   }
 
+  async cancelDraft(
+    projectId: string,
+    sessionId: string,
+    userId: string,
+    isAdmin: boolean,
+  ) {
+    const normalized = typeof sessionId === 'string' ? sessionId.trim() : '';
+    if (!normalized) {
+      throw new BadRequestException('sessionId is required');
+    }
+
+    // 查找草稿 session
+    const session = await this.prisma.releaseSession.findFirst({
+      where: { id: normalized, projectId },
+    });
+
+    // 检查是否存在且状态为 DRAFT
+    if (!session) {
+      throw new NotFoundException(
+        `ReleaseSession with ID ${normalized} not found`,
+      );
+    }
+
+    if (session.status !== 'DRAFT') {
+      throw new BadRequestException(
+        `Cannot cancel session with status ${session.status}`,
+      );
+    }
+
+    // 检查权限：创建者或管理员可以撤销
+    if (session.createdBy !== userId && !isAdmin) {
+      throw new ForbiddenException(
+        'Only the creator or admin can cancel this draft',
+      );
+    }
+
+    // 删除草稿
+    await this.prisma.releaseSession.delete({
+      where: { id: normalized },
+    });
+
+    return { message: 'Draft cancelled successfully' };
+  }
+
   async getActiveReleaseSession(projectId: string) {
     const project = await this.prisma.project.findUnique({
       where: { id: projectId },
@@ -687,6 +777,7 @@ export class ReleaseService {
     const session = await this.prisma.releaseSession.findFirst({
       where: {
         projectId,
+        archivedAt: null,
         status: {
           in: ['DRAFT', 'IN_REVIEW', 'APPROVED'],
         },
@@ -694,7 +785,29 @@ export class ReleaseService {
       orderBy: { createdAt: 'desc' },
     });
 
-    return { currentReleaseId: project.currentReleaseId, session };
+    // 获取创建人信息
+    let createdByUser: {
+      id: string;
+      username: string;
+      name: string | null;
+      avatar: string | null;
+    } | null = null;
+    if (session?.createdBy) {
+      createdByUser = await this.prisma.user.findUnique({
+        where: { id: session.createdBy },
+        select: {
+          id: true,
+          username: true,
+          name: true,
+          avatar: true,
+        },
+      });
+    }
+
+    return {
+      currentReleaseId: project.currentReleaseId,
+      session: session ? { ...session, createdByUser } : null,
+    };
   }
 
   async getReleaseSession(projectId: string, sessionId: string) {
@@ -726,6 +839,7 @@ export class ReleaseService {
   async submitReleaseSession(
     projectId: string,
     sessionId: string,
+    userId: string,
     note?: string,
   ) {
     const normalized = typeof sessionId === 'string' ? sessionId.trim() : '';
@@ -739,6 +853,14 @@ export class ReleaseService {
     if (!session) {
       throw new NotFoundException(
         `ReleaseSession with ID ${normalized} not found`,
+      );
+    }
+
+    // 检查权限：只有创建者或管理员可以提交
+    const isAdmin = await this.isAdmin(userId);
+    if (session.createdBy !== userId && !isAdmin) {
+      throw new ForbiddenException(
+        'Only the creator or admins can submit this release session',
       );
     }
 
@@ -763,6 +885,7 @@ export class ReleaseService {
       data: {
         status: 'IN_REVIEW',
         submittedAt: new Date(),
+        submittedBy: userId,
         note: note?.trim() ? note.trim() : session.note,
       },
     });
@@ -773,11 +896,20 @@ export class ReleaseService {
   async approveReleaseSession(
     projectId: string,
     sessionId: string,
+    userId: string,
     note?: string,
   ) {
     const normalized = typeof sessionId === 'string' ? sessionId.trim() : '';
     if (!normalized) {
       throw new BadRequestException('sessionId is required');
+    }
+
+    // 检查权限
+    const canApprove = await this.canApproveRelease(projectId, userId);
+    if (!canApprove) {
+      throw new BadRequestException(
+        'Only project owners or admins can approve releases',
+      );
     }
 
     const session = await this.prisma.releaseSession.findFirst({
@@ -810,6 +942,7 @@ export class ReleaseService {
   async rejectReleaseSession(
     projectId: string,
     sessionId: string,
+    userId: string,
     reason: string,
   ) {
     const normalized = typeof sessionId === 'string' ? sessionId.trim() : '';
@@ -819,6 +952,14 @@ export class ReleaseService {
     const normalizedReason = typeof reason === 'string' ? reason.trim() : '';
     if (!normalizedReason) {
       throw new BadRequestException('reason is required');
+    }
+
+    // 检查权限
+    const canApprove = await this.canApproveRelease(projectId, userId);
+    if (!canApprove) {
+      throw new BadRequestException(
+        'Only project owners or admins can reject releases',
+      );
     }
 
     const session = await this.prisma.releaseSession.findFirst({
@@ -848,7 +989,11 @@ export class ReleaseService {
     return { session: updated };
   }
 
-  async publishReleaseSession(projectId: string, sessionId: string) {
+  async publishReleaseSession(
+    projectId: string,
+    sessionId: string,
+    userId: string,
+  ) {
     const normalized = typeof sessionId === 'string' ? sessionId.trim() : '';
     if (!normalized) {
       throw new BadRequestException('sessionId is required');
@@ -864,8 +1009,39 @@ export class ReleaseService {
       );
     }
 
-    if (session.status !== 'APPROVED') {
-      throw new BadRequestException('ReleaseSession is not approved');
+    // 检查发布权限
+    const approvalEnabled = await this.isApprovalEnabled(projectId);
+
+    if (approvalEnabled) {
+      // 启用了审批流程
+      if (session.status === 'DRAFT') {
+        // 检查是否是单 Owner，如果是则自动批准
+        const canAutoApprove = await this.canPublishWithoutApproval(
+          projectId,
+          userId,
+        );
+        if (!canAutoApprove) {
+          throw new BadRequestException(
+            'Release session must be approved before publishing',
+          );
+        }
+        // 单 Owner 自动批准
+        await this.prisma.releaseSession.update({
+          where: { id: normalized },
+          data: { status: 'APPROVED', reviewedAt: new Date() },
+        });
+      } else if (session.status !== 'APPROVED') {
+        throw new BadRequestException(
+          'Release session must be approved before publishing',
+        );
+      }
+    } else {
+      // 未启用审批，直接发布
+      if (session.status !== 'DRAFT' && session.status !== 'APPROVED') {
+        throw new BadRequestException(
+          `Cannot publish from ${session.status} status`,
+        );
+      }
     }
 
     const baseReleaseId = session.baseReleaseId ?? null;
@@ -944,7 +1120,90 @@ export class ReleaseService {
     return { releaseId: created.id, currentReleaseId: created.id };
   }
 
-  async previewRelease(projectId: string, dto: CreateReleaseDto) {
+  private isSameScope(
+    a: ReleaseScope,
+    b: { type: string; namespaceIds?: string[]; keyIds?: string[] },
+  ): boolean {
+    if (a.type !== b.type) return false;
+
+    if (a.type === 'namespaces' && b.type === 'namespaces') {
+      const aIds = new Set(a.namespaceIds);
+      const bIds = new Set(b.namespaceIds ?? []);
+      if (aIds.size !== bIds.size) return false;
+      return Array.from(aIds).every((id) => bIds.has(id));
+    }
+
+    if (a.type === 'keys' && b.type === 'keys') {
+      const aIds = new Set(a.keyIds);
+      const bIds = new Set(b.keyIds ?? []);
+      if (aIds.size !== bIds.size) return false;
+      return Array.from(aIds).every((id) => bIds.has(id));
+    }
+
+    return a.type === 'all' && b.type === 'all';
+  }
+
+  /**
+   * 检查是否存在活跃的发布会话
+   */
+  async hasActiveSession(projectId: string): Promise<boolean> {
+    const session = await this.prisma.releaseSession.findFirst({
+      where: {
+        projectId,
+        archivedAt: null,
+        status: {
+          in: ['DRAFT', 'IN_REVIEW', 'APPROVED'],
+        },
+      },
+    });
+    return !!session;
+  }
+
+  /**
+   * 归档所有活跃的发布会话
+   */
+  async archiveActiveSessions(
+    projectId: string,
+    userId: string,
+    reason: string,
+  ) {
+    await this.prisma.releaseSession.updateMany({
+      where: {
+        projectId,
+        archivedAt: null,
+        status: {
+          in: ['DRAFT', 'IN_REVIEW', 'APPROVED'],
+        },
+      },
+      data: {
+        archivedAt: new Date(),
+        archivedBy: userId,
+        archivedReason: reason,
+      },
+    });
+  }
+
+  /**
+   * 强制创建新的发布会话（先归档现有会话）
+   */
+  async forceCreateSession(
+    projectId: string,
+    dto: CreateReleaseDto,
+    userId: string,
+    reason: string,
+  ) {
+    // 先归档所有活跃会话
+    await this.archiveActiveSessions(projectId, userId, reason);
+
+    // 然后创建新会话
+    return this.previewRelease(projectId, dto, userId);
+  }
+
+  async previewRelease(
+    projectId: string,
+    dto: CreateReleaseDto,
+    userId: string,
+  ) {
     const ctx = await this.getProjectContext(projectId);
     const scope = this.parseScope(dto.scope);
 
@@ -988,60 +1247,103 @@ export class ReleaseService {
       localeCodes,
     });
 
-    const active = await this.prisma.releaseSession.findFirst({
-      where: {
-        projectId,
-        status: {
-          in: ['DRAFT', 'IN_REVIEW', 'APPROVED'],
+    // 使用事务确保并发安全
+    const result = await this.prisma.$transaction(async (tx) => {
+      // 查询活跃的 session，使用 FOR UPDATE 锁定
+      const active = await tx.releaseSession.findFirst({
+        where: {
+          projectId,
+          archivedAt: null,
+          status: {
+            in: ['DRAFT', 'IN_REVIEW', 'APPROVED'],
+          },
         },
-      },
-      orderBy: { createdAt: 'desc' },
+        orderBy: { createdAt: 'desc' },
+      });
+
+      // 检查是否有其他用户的草稿存在（排他性锁定）
+      const otherUserDraft = await tx.releaseSession.findFirst({
+        where: {
+          projectId,
+          archivedAt: null,
+          status: 'DRAFT',
+          createdBy: { not: userId },
+        },
+      });
+
+      if (otherUserDraft) {
+        throw new ConflictException({
+          code: 'DRAFT_LOCKED_BY_OTHER',
+          message: `用户 ${otherUserDraft.createdBy} 正在准备发布，请等待或联系管理员`,
+          lockedBy: otherUserDraft.createdBy,
+          lockedAt: otherUserDraft.createdAt,
+        });
+      }
+
+      // 检查 scope 是否匹配，如果不匹配则视为没有 active session
+      const scopeMatches =
+        active &&
+        this.isSameScope(
+          scope,
+          (active.scope as {
+            type: string;
+            namespaceIds?: string[];
+            keyIds?: string[];
+          }) ?? { type: 'all' },
+        );
+
+      if (active && active.status !== 'DRAFT' && scopeMatches) {
+        throw new ConflictException({
+          code: 'RELEASE_SESSION_LOCKED',
+          sessionId: active.id,
+          status: active.status,
+        });
+      }
+
+      const data = {
+        status: 'DRAFT',
+        baseReleaseId: baseReleaseId ?? null,
+        scope: {
+          type: scope.type,
+          ...(scope.type === 'namespaces'
+            ? { namespaceIds: scope.namespaceIds }
+            : {}),
+          ...(scope.type === 'keys' ? { keyIds: scope.keyIds } : {}),
+          localeCodes,
+        },
+        localeCodes,
+        note: dto.note?.trim() ? dto.note.trim() : null,
+        validationErrors: built.errors as unknown as Prisma.InputJsonValue,
+        nextArtifacts: built.artifacts as unknown as Prisma.InputJsonValue,
+        baseJson: this.stringifyJson(base),
+        nextJson: this.stringifyJson(next),
+      } as const;
+
+      // 只有 scope 匹配时才更新现有 session，否则创建新 session
+      const session =
+        active && scopeMatches
+          ? await tx.releaseSession.update({
+              where: { id: active.id },
+              data,
+            })
+          : await tx.releaseSession.create({
+              data: { projectId, createdBy: userId, ...data },
+            });
+
+      return session;
+    }, {
+      // 设置事务隔离级别为 Serializable 以防止幻读
+      isolationLevel: Prisma.TransactionIsolationLevel.Serializable,
     });
 
-    if (active && active.status !== 'DRAFT') {
-      throw new ConflictException({
-        code: 'RELEASE_SESSION_LOCKED',
-        sessionId: active.id,
-        status: active.status,
-      });
-    }
-
-    const data = {
-      status: 'DRAFT',
-      baseReleaseId: baseReleaseId ?? null,
-      scope: {
-        type: scope.type,
-        ...(scope.type === 'namespaces'
-          ? { namespaceIds: scope.namespaceIds }
-          : {}),
-        ...(scope.type === 'keys' ? { keyIds: scope.keyIds } : {}),
-        localeCodes,
-      },
-      localeCodes,
-      note: dto.note?.trim() ? dto.note.trim() : null,
-      validationErrors: built.errors as unknown as Prisma.InputJsonValue,
-      nextArtifacts: built.artifacts as unknown as Prisma.InputJsonValue,
-      baseJson: this.stringifyJson(base),
-      nextJson: this.stringifyJson(next),
-    } as const;
-
-    const session = active
-      ? await this.prisma.releaseSession.update({
-          where: { id: active.id },
-          data,
-        })
-      : await this.prisma.releaseSession.create({
-          data: { projectId, ...data },
-        });
-
     return {
-      sessionId: session.id,
-      status: session.status,
+      sessionId: result.id,
+      status: result.status,
       baseReleaseId: baseReleaseId ?? null,
       canPublish: built.errors.length === 0,
       errors: built.errors,
-      baseJson: data.baseJson,
-      nextJson: data.nextJson,
+      baseJson: this.stringifyJson(base),
+      nextJson: this.stringifyJson(next),
     };
   }
 
@@ -1164,5 +1466,154 @@ export class ReleaseService {
       throw new NotFoundException('No release has been published yet');
     }
     return this.getArtifact(projectId, project.currentReleaseId, localeCode);
+  }
+
+  /**
+   * 全局获取发布详情（无需 projectId，用于公开分享链接）
+   * 支持 Release 和 ReleaseSession 两种类型
+   */
+  async getReleasePublic(releaseId: string) {
+    // 先尝试获取 Release
+    const release = await this.prisma.release.findUnique({
+      where: { id: releaseId },
+    });
+
+    if (release) {
+      // 是 Release，获取关联数据
+      const [project, sessions, locales] = await Promise.all([
+        this.prisma.project.findUnique({
+          where: { id: release.projectId },
+          select: { id: true, name: true },
+        }),
+        this.prisma.releaseSession.findMany({
+          where: { publishedReleaseId: releaseId },
+          take: 1,
+          orderBy: { createdAt: 'desc' },
+          select: {
+            id: true,
+            status: true,
+            submittedAt: true,
+            reviewedAt: true,
+            reviewNote: true,
+            publishedAt: true,
+            createdBy: true,
+          },
+        }),
+        this.prisma.releaseArtifact.findMany({
+          where: { releaseId },
+          select: { localeCode: true },
+          orderBy: { localeCode: 'asc' },
+        }),
+      ]);
+
+      const session = sessions?.[0];
+
+      return {
+        id: release.id,
+        projectId: release.projectId,
+        projectName: project?.name,
+        basedOnReleaseId: release.basedOnReleaseId,
+        version: release.version,
+        note: release.note,
+        status: session?.status || 'PUBLISHED',
+        scope: release.scope as ReleaseScope,
+        createdAt: release.createdAt,
+        localeCodes: locales.map((l) => l.localeCode),
+        session: session,
+        // 标识这是 Release 类型
+        type: 'RELEASE' as const,
+      };
+    }
+
+    // 不是 Release，尝试获取 ReleaseSession（包括已归档的）
+    const session = await this.prisma.releaseSession.findFirst({
+      where: { id: releaseId },
+      include: {
+        project: {
+          select: { id: true, name: true, currentReleaseId: true },
+        },
+      },
+    });
+
+    if (session) {
+      // 获取创建人信息和项目 owners
+      const [createdByUser, projectOwners] = await Promise.all([
+        session.createdBy
+          ? this.prisma.user.findUnique({
+              where: { id: session.createdBy },
+              select: { id: true, name: true },
+            })
+          : Promise.resolve(null),
+        this.prisma.projectOwner.findMany({
+          where: { projectId: session.projectId },
+          include: {
+            user: {
+              select: { id: true, name: true },
+            },
+          },
+        }),
+      ]);
+
+      // 是 ReleaseSession，返回统一格式
+      return {
+        id: session.id,
+        projectId: session.projectId,
+        projectName: session.project?.name,
+        basedOnReleaseId: session.baseReleaseId,
+        version: null, // ReleaseSession 还没有版本号
+        note: session.note,
+        status: session.status,
+        scope: session.scope as ReleaseScope,
+        createdAt: session.createdAt,
+        localeCodes: session.localeCodes || [],
+        session: {
+          id: session.id,
+          status: session.status,
+          submittedAt: session.submittedAt,
+          reviewedAt: session.reviewedAt,
+          reviewNote: session.reviewNote,
+          publishedAt: session.publishedAt,
+          createdBy: session.createdBy,
+        },
+        // 标识这是 ReleaseSession 类型
+        type: 'SESSION' as const,
+        // ReleaseSession 特有的字段
+        baseJson: session.baseJson,
+        nextJson: session.nextJson,
+        validationErrors: session.validationErrors,
+        createdByUser,
+        owners: projectOwners.map((o) => o.user),
+      };
+    }
+
+    // 都没找到
+    throw new NotFoundException(`Release with ID ${releaseId} not found`);
+  }
+
+  /**
+   * 全局获取产物（无需 projectId，用于公开分享链接）
+   */
+  async getArtifactPublic(releaseId: string, localeCode: string) {
+    const release = await this.prisma.release.findUnique({
+      where: { id: releaseId },
+      select: { id: true },
+    });
+    if (!release) {
+      throw new NotFoundException(`Release with ID ${releaseId} not found`);
+    }
+
+    const artifact = await this.prisma.releaseArtifact.findUnique({
+      where: {
+        releaseId_localeCode: { releaseId, localeCode },
+      },
+      select: { data: true },
+    });
+    if (!artifact) {
+      throw new NotFoundException(
+        `Artifact not found for locale ${localeCode} in release ${releaseId}`,
+      );
+    }
+
+    return (artifact.data as ArtifactDict) ?? {};
   }
 }

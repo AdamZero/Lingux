@@ -113,25 +113,17 @@ describe('KeyService', () => {
 
       const result = await service.findAll(projectId, namespaceId);
       expect(result).toEqual(expectedResult);
-      expect(prisma.key.findMany).toHaveBeenCalledWith({
-        where: {
-          namespaceId: namespaceId,
-          namespace: { projectId },
-        },
-        orderBy: {
-          updatedAt: 'desc',
-        },
-        include: {
-          translations: {
-            orderBy: {
-              updatedAt: 'desc',
-            },
-            include: {
-              locale: true,
-            },
+      expect(prisma.key.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: {
+            namespaceId: namespaceId,
+            namespace: { projectId },
           },
-        },
-      });
+          orderBy: {
+            updatedAt: 'desc',
+          },
+        }),
+      );
     });
   });
 

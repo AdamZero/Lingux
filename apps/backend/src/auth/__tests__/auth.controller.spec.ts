@@ -1,12 +1,9 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { AuthController } from '../auth.controller';
 import { AuthService } from '../auth.service';
+import { FeishuService } from '../services/feishu.service';
+import { PrismaService } from '../../prisma.service';
 import type { Request, Response } from 'express';
-import axios from 'axios';
-
-// Mock axios
-jest.mock('axios');
-const mockAxios = axios as jest.Mocked<typeof axios>;
 
 // Mock Logger
 import { Logger } from '@nestjs/common';
@@ -28,6 +25,7 @@ jest.mock('@nestjs/common', () => ({
 describe('AuthController', () => {
   let authController: AuthController;
   let authService: jest.Mocked<AuthService>;
+  let feishuService: jest.Mocked<FeishuService>;
   let mockResponse: jest.Mocked<Response>;
 
   beforeEach(async () => {
@@ -36,6 +34,13 @@ describe('AuthController', () => {
       validateUser: jest.fn(),
       login: jest.fn(),
       validateToken: jest.fn(),
+    } as any;
+
+    // Mock FeishuService
+    feishuService = {
+      buildAuthUrl: jest.fn(),
+      getAccessToken: jest.fn(),
+      getUserInfo: jest.fn(),
     } as any;
 
     // Mock Response
@@ -52,6 +57,14 @@ describe('AuthController', () => {
           provide: AuthService,
           useValue: authService,
         },
+        {
+          provide: FeishuService,
+          useValue: feishuService,
+        },
+        {
+          provide: PrismaService,
+          useValue: {},
+        },
       ],
     }).compile();
 
@@ -67,13 +80,19 @@ describe('AuthController', () => {
       // Set up environment variables
       process.env.FEISHU_CLIENT_ID = 'test-client-id';
       process.env.FEISHU_CALLBACK_URL =
-        'http://localhost:3001/api/v1/auth/feishu/callback';
+        'http://localhost:3000/api/v1/auth/feishu/callback';
+
+      const expectedAuthUrl =
+        'https://open.feishu.cn/open-apis/authen/v1/index?client_id=test-client-id&redirect_uri=http%3A%2F%2Flocalhost%3A3000%2Fapi%2Fv1%2Fauth%2Ffeishu%2Fcallback&scope=user_info&response_type=code';
+      feishuService.buildAuthUrl.mockReturnValue(expectedAuthUrl);
 
       await authController.feishuLogin(mockResponse);
 
-      expect(mockResponse.redirect).toHaveBeenCalledWith(
-        'https://open.feishu.cn/open-apis/authen/v1/index?client_id=test-client-id&redirect_uri=http%3A%2F%2Flocalhost%3A3001%2Fapi%2Fv1%2Fauth%2Ffeishu%2Fcallback&scope=user_info&response_type=code',
+      expect(feishuService.buildAuthUrl).toHaveBeenCalledWith(
+        'test-client-id',
+        'http://localhost:3000/api/v1/auth/feishu/callback',
       );
+      expect(mockResponse.redirect).toHaveBeenCalledWith(expectedAuthUrl);
     });
   });
 
@@ -89,19 +108,15 @@ describe('AuthController', () => {
       );
     });
 
-    it('should return 401 if Feishu API returns error', async () => {
+    it('should return 500 if Feishu API returns error', async () => {
       const mockRequest = {
         query: { code: 'test-code' },
       } as unknown as Request;
 
-      // Mock axios to return Feishu API error
-      mockAxios.post.mockResolvedValueOnce({
-        status: 200,
-        data: {
-          code: 20003,
-          msg: 'code is invalid',
-        },
-      } as any);
+      // Mock FeishuService to throw error
+      feishuService.getAccessToken.mockRejectedValue(
+        new Error('Feishu authentication error: code is invalid'),
+      );
 
       // Set up environment variables
       process.env.FEISHU_CLIENT_ID = 'test-client-id';
@@ -109,26 +124,24 @@ describe('AuthController', () => {
 
       await authController.feishuCallback(mockRequest, mockResponse);
 
-      expect(mockResponse.status).toHaveBeenCalledWith(401);
-      expect(mockResponse.send).toHaveBeenCalledWith(
-        'Feishu authentication error: code is invalid',
-      );
+      expect(mockResponse.status).toHaveBeenCalledWith(500);
+      expect(mockResponse.send).toHaveBeenCalledWith('Internal server error');
     });
 
-    it('should return 401 if no open_id is returned', async () => {
+    it('should return 500 if no open_id is returned', async () => {
       const mockRequest = {
         query: { code: 'test-code' },
       } as unknown as Request;
 
-      // Mock axios to return success but no open_id
-      mockAxios.post.mockResolvedValueOnce({
-        status: 200,
-        data: {
-          code: 0,
-          msg: 'success',
-          data: {},
-        },
-      } as any);
+      // Mock FeishuService to return empty openId
+      feishuService.getAccessToken.mockResolvedValue({
+        accessToken: '',
+        openId: '',
+      });
+      // Mock getUserInfo to throw error when accessToken is empty
+      feishuService.getUserInfo.mockRejectedValue(
+        new Error('Invalid access token'),
+      );
 
       // Set up environment variables
       process.env.FEISHU_CLIENT_ID = 'test-client-id';
@@ -136,10 +149,8 @@ describe('AuthController', () => {
 
       await authController.feishuCallback(mockRequest, mockResponse);
 
-      expect(mockResponse.status).toHaveBeenCalledWith(401);
-      expect(mockResponse.send).toHaveBeenCalledWith(
-        'Failed to get user information from Feishu',
-      );
+      expect(mockResponse.status).toHaveBeenCalledWith(500);
+      expect(mockResponse.send).toHaveBeenCalledWith('Internal server error');
     });
 
     it('should redirect to frontend with token on success', async () => {
@@ -169,18 +180,17 @@ describe('AuthController', () => {
         },
       };
 
-      // Mock axios to return success
-      mockAxios.post.mockResolvedValueOnce({
-        status: 200,
-        data: {
-          code: 0,
-          msg: 'success',
-          data: {
-            access_token: 'test-access-token',
-            open_id: 'test-open-id',
-          },
-        },
-      } as any);
+      // Mock FeishuService
+      feishuService.getAccessToken.mockResolvedValue({
+        accessToken: 'test-access-token',
+        openId: 'test-open-id',
+      });
+      feishuService.getUserInfo.mockResolvedValue({
+        name: 'Test User',
+        email: 'test@example.com',
+        avatar: 'https://example.com/avatar.png',
+        mobile: '1234567890',
+      });
 
       // Mock AuthService methods
       authService.validateUser.mockResolvedValueOnce(mockUser);
@@ -189,16 +199,29 @@ describe('AuthController', () => {
       // Set up environment variables
       process.env.FEISHU_CLIENT_ID = 'test-client-id';
       process.env.FEISHU_CLIENT_SECRET = 'test-client-secret';
+      process.env.FRONTEND_URL = 'http://localhost:8080';
 
       await authController.feishuCallback(mockRequest, mockResponse);
 
-      expect(authService.validateUser).toHaveBeenCalledWith(
-        'test-open-id',
-        'feishu',
+      expect(feishuService.getAccessToken).toHaveBeenCalledWith(
+        'test-code',
+        'test-client-id',
+        'test-client-secret',
       );
-      expect(authService.login).toHaveBeenCalledWith(mockUser);
+      expect(authService.validateUser).toHaveBeenCalledWith({
+        externalId: 'test-open-id',
+        provider: 'feishu',
+        name: 'Test User',
+        email: 'test@example.com',
+        avatar: 'https://example.com/avatar.png',
+        mobile: '1234567890',
+      });
+      expect(authService.login).toHaveBeenCalledWith({
+        ...mockUser,
+        name: mockUser.name ?? undefined,
+      });
       expect(mockResponse.redirect).toHaveBeenCalledWith(
-        `/login#token=test-token&user=${JSON.stringify(mockUser)}`,
+        `http://localhost:8080/login#token=test-token&user=${JSON.stringify(mockLoginResult.user)}`,
       );
     });
 
@@ -207,8 +230,10 @@ describe('AuthController', () => {
         query: { code: 'test-code' },
       } as unknown as Request;
 
-      // Mock axios to throw error
-      mockAxios.post.mockRejectedValueOnce(new Error('Network error'));
+      // Mock FeishuService to throw unexpected error
+      feishuService.getAccessToken.mockRejectedValue(
+        new Error('Network error'),
+      );
 
       // Set up environment variables
       process.env.FEISHU_CLIENT_ID = 'test-client-id';

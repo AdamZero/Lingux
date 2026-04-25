@@ -74,9 +74,17 @@ describe('ReviewsService', () => {
 
       const mockCount = 1;
 
-      (mockPrisma.$transaction as jest.Mock).mockResolvedValue([mockTranslations, mockCount]);
+      (mockPrisma.$transaction as jest.Mock).mockResolvedValue([
+        mockTranslations,
+        mockCount,
+      ]);
 
-      const result = await service.getReviewTasks(projectId, status, page, pageSize);
+      const result = await service.getReviewTasks(
+        projectId,
+        status,
+        page,
+        pageSize,
+      );
 
       expect(mockPrisma.$transaction).toHaveBeenCalled();
 
@@ -205,13 +213,13 @@ describe('ReviewsService', () => {
 
       mockPrisma.translation.findUnique.mockResolvedValue(null);
 
-      await expect(service.approveReview(translationId, userId)).rejects.toThrow(
-        NotFoundException,
-      );
+      await expect(
+        service.approveReview(translationId, userId),
+      ).rejects.toThrow(NotFoundException);
 
-      await expect(service.approveReview(translationId, userId)).rejects.toThrow(
-        `Translation ${translationId} not found`,
-      );
+      await expect(
+        service.approveReview(translationId, userId),
+      ).rejects.toThrow(`Translation ${translationId} not found`);
     });
   });
 
@@ -238,7 +246,12 @@ describe('ReviewsService', () => {
       mockPrisma.translation.findUnique.mockResolvedValue(existingTranslation);
       mockPrisma.translation.update.mockResolvedValue(updatedTranslation);
 
-      const result = await service.rejectReview(translationId, userId, reason, suggestion);
+      const result = await service.rejectReview(
+        translationId,
+        userId,
+        reason,
+        suggestion,
+      );
 
       expect(prisma.translation.findUnique).toHaveBeenCalledWith({
         where: { id: translationId },
@@ -289,9 +302,9 @@ describe('ReviewsService', () => {
 
       mockPrisma.translation.findUnique.mockResolvedValue(null);
 
-      await expect(service.rejectReview(translationId, userId, reason)).rejects.toThrow(
-        NotFoundException,
-      );
+      await expect(
+        service.rejectReview(translationId, userId, reason),
+      ).rejects.toThrow(NotFoundException);
     });
   });
 });

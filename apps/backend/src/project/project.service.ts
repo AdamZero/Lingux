@@ -6,6 +6,8 @@ import {
 import { CreateProjectDto } from './dto/create-project.dto';
 import { UpdateProjectDto } from './dto/update-project.dto';
 import { PrismaService } from '../prisma.service';
+import * as yaml from 'js-yaml';
+import { TranslationStatus } from '@prisma/client';
 
 @Injectable()
 export class ProjectService {
@@ -203,9 +205,24 @@ export class ProjectService {
             locale: true,
           },
         },
+        projectOwners: {
+          include: {
+            user: {
+              select: {
+                id: true,
+                username: true,
+                name: true,
+                avatar: true,
+              },
+            },
+          },
+        },
       },
     });
-    return projects.map((p) => this.toProjectResponse(p));
+    return projects.map((p) => ({
+      ...this.toProjectResponse(p),
+      owners: p.projectOwners.map((o) => o.user),
+    }));
   }
 
   async findOne(id: string) {
@@ -213,16 +230,37 @@ export class ProjectService {
   }
 
   async update(id: string, updateProjectDto: UpdateProjectDto) {
-    const { localeIds, ...projectData } = updateProjectDto;
+    const {
+      localeIds,
+      autoTranslateEnabled,
+      autoTranslateProviderId,
+      ...projectData
+    } = updateProjectDto;
     const cleanProjectData = Object.fromEntries(
       Object.entries(projectData).filter(([, value]) => value !== undefined),
     ) as typeof projectData;
+
+    // 构建自动翻译配置
+    interface AutoTranslateData {
+      autoTranslateEnabled?: boolean;
+      autoTranslateProviderId?: string;
+    }
+    const autoTranslateData: AutoTranslateData = {};
+    if (autoTranslateEnabled !== undefined) {
+      autoTranslateData.autoTranslateEnabled = autoTranslateEnabled;
+    }
+    if (autoTranslateProviderId !== undefined) {
+      autoTranslateData.autoTranslateProviderId = autoTranslateProviderId;
+    }
 
     if (!localeIds) {
       try {
         const project = await this.prisma.project.update({
           where: { id },
-          data: cleanProjectData,
+          data: {
+            ...cleanProjectData,
+            ...autoTranslateData,
+          },
           include: {
             projectLocales: {
               where: {
@@ -251,10 +289,24 @@ export class ProjectService {
       throw new NotFoundException(`Project with ID ${id} not found`);
     }
 
-    if (Object.keys(cleanProjectData).length > 0) {
+    // 更新项目数据和自动翻译配置
+    interface UpdateProjectData {
+      name?: string;
+      description?: string;
+      autoTranslateEnabled?: boolean;
+      autoTranslateProviderId?: string;
+    }
+    const updateData: UpdateProjectData = { ...cleanProjectData };
+    if (Object.keys(autoTranslateData).length > 0) {
+      updateData.autoTranslateEnabled = autoTranslateData.autoTranslateEnabled;
+      updateData.autoTranslateProviderId =
+        autoTranslateData.autoTranslateProviderId;
+    }
+
+    if (Object.keys(updateData).length > 0) {
       await this.prisma.project.update({
         where: { id },
-        data: cleanProjectData,
+        data: updateData,
       });
     }
 
@@ -378,5 +430,549 @@ export class ProjectService {
         ? { before: last.createdAt.toISOString(), beforeId: last.id }
         : null,
     };
+  }
+
+  async previewImport(
+    projectId: string,
+    fileContent: string,
+    format: 'json' | 'yaml',
+  ) {
+    // Verify project exists
+    const project = await this.prisma.project.findUnique({
+      where: { id: projectId },
+      select: { id: true },
+    });
+    if (!project) {
+      throw new NotFoundException(`Project with ID ${projectId} not found`);
+    }
+
+    // Parse file content
+    let importData: Record<string, Record<string, Record<string, string>>>;
+    try {
+      if (format === 'yaml') {
+        importData = yaml.load(fileContent) as Record<
+          string,
+          Record<string, Record<string, string>>
+        >;
+      } else {
+        importData = JSON.parse(fileContent) as Record<
+          string,
+          Record<string, Record<string, string>>
+        >;
+      }
+    } catch (error) {
+      throw new BadRequestException(`Invalid ${format} file: ${error.message}`);
+    }
+
+    if (!importData || typeof importData !== 'object') {
+      throw new BadRequestException('Invalid import data format');
+    }
+
+    // Get existing namespaces
+    const existingNamespaces = await this.prisma.namespace.findMany({
+      where: { projectId },
+      select: { name: true },
+    });
+    const existingNamespaceNames = new Set(
+      existingNamespaces.map((n) => n.name),
+    );
+
+    // Build preview
+    const namespaces = Object.entries(importData).map(([name, keys]) => ({
+      name,
+      keyCount: Object.keys(keys).length,
+      exists: existingNamespaceNames.has(name),
+    }));
+
+    return {
+      namespaces,
+      totalNamespaces: namespaces.length,
+      totalKeys: namespaces.reduce((sum, ns) => sum + ns.keyCount, 0),
+    };
+  }
+
+  async importMultiple(
+    projectId: string,
+    fileContent: string,
+    format: 'json' | 'yaml',
+    mode: 'fillMissing' | 'overwrite',
+    selectedNamespaces?: string[],
+  ) {
+    // Verify project exists
+    const project = await this.prisma.project.findUnique({
+      where: { id: projectId },
+      select: { id: true },
+    });
+    if (!project) {
+      throw new NotFoundException(`Project with ID ${projectId} not found`);
+    }
+
+    // Parse file content
+    let importData: Record<string, Record<string, Record<string, string>>>;
+    try {
+      if (format === 'yaml') {
+        importData = yaml.load(fileContent) as Record<
+          string,
+          Record<string, Record<string, string>>
+        >;
+      } else {
+        importData = JSON.parse(fileContent) as Record<
+          string,
+          Record<string, Record<string, string>>
+        >;
+      }
+    } catch (error) {
+      throw new BadRequestException(`Invalid ${format} file: ${error.message}`);
+    }
+
+    if (!importData || typeof importData !== 'object') {
+      throw new BadRequestException('Invalid import data format');
+    }
+
+    // Filter namespaces if specified
+    let namespacesToImport = Object.entries(importData);
+    if (selectedNamespaces && selectedNamespaces.length > 0) {
+      namespacesToImport = namespacesToImport.filter(([name]) =>
+        selectedNamespaces.includes(name),
+      );
+    }
+
+    const result = {
+      createdNamespaces: 0,
+      updatedNamespaces: 0,
+      createdKeys: 0,
+      updatedKeys: 0,
+      skippedKeys: 0,
+    };
+
+    await this.prisma.$transaction(async (tx) => {
+      for (const [namespaceName, keys] of namespacesToImport) {
+        // Find or create namespace
+        let namespace = await tx.namespace.findUnique({
+          where: {
+            projectId_name: { projectId, name: namespaceName },
+          },
+        });
+
+        if (!namespace) {
+          namespace = await tx.namespace.create({
+            data: {
+              name: namespaceName,
+              projectId,
+            },
+          });
+          result.createdNamespaces++;
+        } else {
+          result.updatedNamespaces++;
+        }
+
+        // Process keys
+        for (const [keyName, translations] of Object.entries(keys)) {
+          let key = await tx.key.findFirst({
+            where: {
+              namespaceId: namespace.id,
+              name: keyName,
+            },
+          });
+
+          if (!key) {
+            key = await tx.key.create({
+              data: {
+                name: keyName,
+                namespaceId: namespace.id,
+                type: 'TEXT',
+              },
+            });
+            result.createdKeys++;
+          } else {
+            result.updatedKeys++;
+          }
+
+          // Process translations
+          for (const [localeCode, content] of Object.entries(translations)) {
+            const locale = await tx.locale.findUnique({
+              where: { code: localeCode },
+            });
+            if (!locale) continue;
+
+            const existingTranslation = await tx.translation.findUnique({
+              where: {
+                keyId_localeId: { keyId: key.id, localeId: locale.id },
+              },
+            });
+
+            if (!existingTranslation) {
+              await tx.translation.create({
+                data: {
+                  keyId: key.id,
+                  localeId: locale.id,
+                  content,
+                  status: TranslationStatus.PENDING,
+                },
+              });
+            } else if (mode === 'overwrite') {
+              await tx.translation.update({
+                where: {
+                  keyId_localeId: { keyId: key.id, localeId: locale.id },
+                },
+                data: {
+                  content,
+                  status: TranslationStatus.PENDING,
+                },
+              });
+            } else {
+              result.skippedKeys++;
+            }
+          }
+        }
+      }
+    });
+
+    return result;
+  }
+
+  // ==================== 项目成员管理 ====================
+
+  async getMembers(projectId: string) {
+    const project = await this.prisma.project.findUnique({
+      where: { id: projectId },
+      include: {
+        projectOwners: {
+          include: {
+            user: {
+              select: {
+                id: true,
+                username: true,
+                name: true,
+                email: true,
+                avatar: true,
+              },
+            },
+          },
+        },
+        users: {
+          select: {
+            id: true,
+            username: true,
+            name: true,
+            email: true,
+            avatar: true,
+          },
+        },
+      },
+    });
+
+    if (!project) {
+      throw new NotFoundException(`Project with ID ${projectId} not found`);
+    }
+
+    const ownerIds = new Set(project.projectOwners.map((o) => o.userId));
+
+    return {
+      owners: project.projectOwners.map((o) => o.user),
+      members: project.users.filter((u) => !ownerIds.has(u.id)),
+    };
+  }
+
+  async addOwner(projectId: string, userId: string, currentUserId: string) {
+    // 检查项目是否存在
+    const project = await this.prisma.project.findUnique({
+      where: { id: projectId },
+      include: { projectOwners: true },
+    });
+    if (!project) {
+      throw new NotFoundException(`Project with ID ${projectId} not found`);
+    }
+
+    // 检查当前用户是否有权限（Owner 或 ADMIN）
+    const currentUser = await this.prisma.user.findUnique({
+      where: { id: currentUserId },
+    });
+    const isOwner = project.projectOwners.some(
+      (o) => o.userId === currentUserId,
+    );
+    if (!isOwner && currentUser?.role !== 'ADMIN') {
+      throw new BadRequestException(
+        'Only project owners or admins can add owners',
+      );
+    }
+
+    // 检查用户是否存在
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+    });
+    if (!user) {
+      throw new NotFoundException(`User with ID ${userId} not found`);
+    }
+
+    // 检查是否已经是 Owner
+    const existingOwner = await this.prisma.projectOwner.findUnique({
+      where: { projectId_userId: { projectId, userId } },
+    });
+    if (existingOwner) {
+      throw new BadRequestException('User is already an owner of this project');
+    }
+
+    // 添加 Owner
+    await this.prisma.projectOwner.create({
+      data: { projectId, userId },
+    });
+
+    // 同时添加到项目成员（如果还不是）
+    await this.prisma.project.update({
+      where: { id: projectId },
+      data: {
+        users: {
+          connect: { id: userId },
+        },
+      },
+    });
+
+    return { success: true };
+  }
+
+  async removeOwner(projectId: string, userId: string, currentUserId: string) {
+    // 检查项目是否存在
+    const project = await this.prisma.project.findUnique({
+      where: { id: projectId },
+      include: { projectOwners: true },
+    });
+    if (!project) {
+      throw new NotFoundException(`Project with ID ${projectId} not found`);
+    }
+
+    // 检查当前用户是否有权限（Owner 或 ADMIN）
+    const currentUser = await this.prisma.user.findUnique({
+      where: { id: currentUserId },
+    });
+    const isOwner = project.projectOwners.some(
+      (o) => o.userId === currentUserId,
+    );
+    if (!isOwner && currentUser?.role !== 'ADMIN') {
+      throw new BadRequestException(
+        'Only project owners or admins can remove owners',
+      );
+    }
+
+    // 检查是否是 Owner
+    const existingOwner = await this.prisma.projectOwner.findUnique({
+      where: { projectId_userId: { projectId, userId } },
+    });
+    if (!existingOwner) {
+      throw new BadRequestException('User is not an owner of this project');
+    }
+
+    // 检查是否是最后一个 Owner - 使用事务确保并发安全
+    await this.prisma.$transaction(async (tx) => {
+      // 重新查询 owner 数量（在事务内）
+      const ownerCount = await tx.projectOwner.count({
+        where: { projectId },
+      });
+
+      if (ownerCount <= 1) {
+        throw new BadRequestException(
+          'Cannot remove the last owner. Please add another owner first.',
+        );
+      }
+
+      // 移除 Owner
+      await tx.projectOwner.delete({
+        where: { projectId_userId: { projectId, userId } },
+      });
+    });
+
+    return { success: true };
+  }
+
+  async addMember(projectId: string, userId: string, currentUserId: string) {
+    // 检查项目是否存在
+    const project = await this.prisma.project.findUnique({
+      where: { id: projectId },
+      include: { projectOwners: true },
+    });
+    if (!project) {
+      throw new NotFoundException(`Project with ID ${projectId} not found`);
+    }
+
+    // 检查当前用户是否有权限（Owner 或 ADMIN）
+    const currentUser = await this.prisma.user.findUnique({
+      where: { id: currentUserId },
+    });
+    const isOwner = project.projectOwners.some(
+      (o) => o.userId === currentUserId,
+    );
+    if (!isOwner && currentUser?.role !== 'ADMIN') {
+      throw new BadRequestException(
+        'Only project owners or admins can add members',
+      );
+    }
+
+    // 检查用户是否存在
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+    });
+    if (!user) {
+      throw new NotFoundException(`User with ID ${userId} not found`);
+    }
+
+    // 检查是否已经是成员
+    const existingMember = await this.prisma.project.findFirst({
+      where: {
+        id: projectId,
+        users: { some: { id: userId } },
+      },
+    });
+    if (existingMember) {
+      throw new BadRequestException('User is already a member of this project');
+    }
+
+    // 添加成员
+    await this.prisma.project.update({
+      where: { id: projectId },
+      data: {
+        users: {
+          connect: { id: userId },
+        },
+      },
+    });
+
+    return { success: true };
+  }
+
+  async removeMember(projectId: string, userId: string, currentUserId: string) {
+    // 检查项目是否存在
+    const project = await this.prisma.project.findUnique({
+      where: { id: projectId },
+      include: { projectOwners: true },
+    });
+    if (!project) {
+      throw new NotFoundException(`Project with ID ${projectId} not found`);
+    }
+
+    // 检查当前用户是否有权限（Owner 或 ADMIN）
+    const currentUser = await this.prisma.user.findUnique({
+      where: { id: currentUserId },
+    });
+    const isOwner = project.projectOwners.some(
+      (o) => o.userId === currentUserId,
+    );
+    if (!isOwner && currentUser?.role !== 'ADMIN') {
+      throw new BadRequestException(
+        'Only project owners or admins can remove members',
+      );
+    }
+
+    // 检查是否是 Owner（Owner 不能直接移除，需要先移除 Owner 身份）
+    const isTargetOwner = project.projectOwners.some(
+      (o) => o.userId === userId,
+    );
+    if (isTargetOwner) {
+      throw new BadRequestException(
+        'Cannot remove an owner. Please remove owner status first.',
+      );
+    }
+
+    // 移除成员
+    await this.prisma.project.update({
+      where: { id: projectId },
+      data: {
+        users: {
+          disconnect: { id: userId },
+        },
+      },
+    });
+
+    return { success: true };
+  }
+
+  async getMyRole(projectId: string, userId: string) {
+    const project = await this.prisma.project.findUnique({
+      where: { id: projectId },
+      select: { accessMode: true },
+    });
+    if (!project) {
+      throw new NotFoundException(`Project with ID ${projectId} not found`);
+    }
+
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { role: true },
+    });
+
+    // 检查是否是 Owner
+    const ownerRecord = await this.prisma.projectOwner.findUnique({
+      where: { projectId_userId: { projectId, userId } },
+    });
+    const isOwner = !!ownerRecord;
+
+    // 检查是否是成员
+    let isMember = false;
+    if (project.accessMode === 'PUBLIC') {
+      // PUBLIC 模式：全员可访问
+      isMember = true;
+    } else {
+      // PRIVATE 模式：检查是否在成员列表
+      const memberRecord = await this.prisma.projectMember.findUnique({
+        where: { projectId_userId: { projectId, userId } },
+      });
+      isMember = !!memberRecord;
+    }
+
+    return {
+      isAdmin: user?.role === 'ADMIN',
+      isOwner,
+      isMember: isOwner || isMember, // Owner 一定是 Member
+      accessMode: project.accessMode,
+    };
+  }
+
+  async updateSettings(
+    projectId: string,
+    settings: { approvalEnabled?: boolean; accessMode?: 'PUBLIC' | 'PRIVATE' },
+    currentUserId: string,
+  ) {
+    // 检查项目是否存在
+    const project = await this.prisma.project.findUnique({
+      where: { id: projectId },
+      include: { projectOwners: true },
+    });
+    if (!project) {
+      throw new NotFoundException(`Project with ID ${projectId} not found`);
+    }
+
+    // 检查当前用户是否有权限（Owner 或 ADMIN）
+    const currentUser = await this.prisma.user.findUnique({
+      where: { id: currentUserId },
+    });
+    const isOwner = project.projectOwners.some(
+      (o) => o.userId === currentUserId,
+    );
+    if (!isOwner && currentUser?.role !== 'ADMIN') {
+      throw new BadRequestException(
+        'Only project owners or admins can update settings',
+      );
+    }
+
+    // 更新设置
+    const updateData: any = {};
+    if (settings.approvalEnabled !== undefined) {
+      updateData.approvalEnabled = settings.approvalEnabled;
+    }
+    if (settings.accessMode !== undefined) {
+      updateData.accessMode = settings.accessMode;
+    }
+
+    const updatedProject = await this.prisma.project.update({
+      where: { id: projectId },
+      data: updateData,
+      include: {
+        projectLocales: {
+          where: { enabled: true },
+          include: { locale: true },
+        },
+      },
+    });
+
+    return this.toProjectResponse(updatedProject);
   }
 }

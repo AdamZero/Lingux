@@ -38,7 +38,7 @@ describe('WorkspaceController', () => {
 
       mockWorkspaceService.getStats.mockResolvedValue(mockStats);
 
-      const mockReq = { user: { userId } };
+      const mockReq = { user: { id: userId } };
       const result = await controller.getStats(projectId, mockReq as any);
 
       expect(service.getStats).toHaveBeenCalledWith(projectId, userId);
@@ -62,10 +62,20 @@ describe('WorkspaceController', () => {
 
       mockWorkspaceService.getTasks.mockResolvedValue(mockTasks);
 
-      const mockReq = { user: { userId } };
-      const result = await controller.getTasks(projectId, page, pageSize, mockReq as any);
+      const mockReq = { user: { id: userId } };
+      const result = await controller.getTasks(
+        projectId,
+        page,
+        pageSize,
+        mockReq as any,
+      );
 
-      expect(service.getTasks).toHaveBeenCalledWith(projectId, userId, page, pageSize);
+      expect(service.getTasks).toHaveBeenCalledWith(
+        projectId,
+        userId,
+        page,
+        pageSize,
+      );
       expect(result).toEqual(mockTasks);
     });
   });

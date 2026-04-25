@@ -2,39 +2,40 @@ import {
   Controller,
   Get,
   Post,
+  Query,
   UseGuards,
   Req,
   Res,
   Logger,
+  ForbiddenException,
+  UnauthorizedException,
 } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
 import { AuthService } from './auth.service';
 import { FeishuService } from './services/feishu.service';
 import type { Request, Response } from 'express';
-
-// Define user type
-interface User {
-  id: string;
-  username: string;
-  name?: string;
-  role: string;
-}
+import { AuthUser } from './types/auth.types';
+import { PrismaService } from '../prisma.service';
 
 @Controller('auth')
 export class AuthController {
   private readonly logger = new Logger(AuthController.name);
+  private readonly isDevelopment: boolean;
 
   constructor(
     private readonly authService: AuthService,
     private readonly feishuService: FeishuService,
-  ) {}
+    private readonly prisma: PrismaService,
+  ) {
+    this.isDevelopment = process.env.NODE_ENV !== 'production';
+  }
 
   @Get('feishu')
   async feishuLogin(@Res() res: Response) {
     const clientId = process.env.FEISHU_CLIENT_ID || 'your-feishu-client-id';
     const callbackUrl =
       process.env.FEISHU_CALLBACK_URL ||
-      'http://localhost:3001/api/v1/auth/feishu/callback';
+      'http://localhost:3000/api/v1/auth/feishu/callback';
 
     const authUrl = this.feishuService.buildAuthUrl(clientId, callbackUrl);
     res.redirect(authUrl);
@@ -86,7 +87,7 @@ export class AuthController {
       this.logger.log('Login result:', loginResult);
 
       // Redirect to frontend with token (using hash fragment for better security)
-      const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
+      const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:8080';
       res.redirect(
         `${frontendUrl}/login#token=${loginResult.access_token}&user=${JSON.stringify(loginResult.user)}`,
       );
@@ -105,14 +106,14 @@ export class AuthController {
   @Get('qixin/callback')
   @UseGuards(AuthGuard('qixin'))
   async qixinCallback(@Req() req: Request, @Res() res: Response) {
-    const user = req.user as User;
+    const user = req.user as AuthUser;
     if (!user) {
       return res.status(401).send('Authentication failed');
     }
     const loginResult = await this.authService.login(user);
 
     // Redirect to frontend with token (using hash fragment for better security)
-    const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
+    const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:8080';
     res.redirect(
       `${frontendUrl}/login#token=${loginResult.access_token}&user=${JSON.stringify(loginResult.user)}`,
     );
@@ -127,14 +128,14 @@ export class AuthController {
   @Get('dingtalk/callback')
   @UseGuards(AuthGuard('dingtalk'))
   async dingTalkCallback(@Req() req: Request, @Res() res: Response) {
-    const user = req.user as User;
+    const user = req.user as AuthUser;
     if (!user) {
       return res.status(401).send('Authentication failed');
     }
     const loginResult = await this.authService.login(user);
 
     // Redirect to frontend with token (using hash fragment for better security)
-    const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
+    const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:8080';
     res.redirect(
       `${frontendUrl}/login#token=${loginResult.access_token}&user=${JSON.stringify(loginResult.user)}`,
     );
@@ -143,7 +144,7 @@ export class AuthController {
   @Get('me')
   @UseGuards(AuthGuard('jwt'))
   async getProfile(@Req() req: Request) {
-    return req.user as User;
+    return req.user as AuthUser;
   }
 
   @Post('feishu/log')
@@ -158,36 +159,93 @@ export class AuthController {
     }
   }
 
-  // Development only: Test login endpoint
+  /**
+   * 开发环境快速登录接口
+   * 仅用于开发和测试环境，允许直接通过用户名登录，无需OAuth授权
+   */
   @Get('dev-login')
-  async devLogin(@Res() res: Response) {
-    if (process.env.NODE_ENV === 'production') {
-      return res.status(403).send('Not available in production');
+  async devLogin(@Query('username') username: string, @Res() res: Response) {
+    // 只允许在开发环境使用
+    if (!this.isDevelopment) {
+      throw new ForbiddenException(
+        'Dev login is only available in development mode',
+      );
     }
 
     try {
-      // Find or create a test user
-      const testUser = await this.authService.validateUser({
-        externalId: 'dev-test-user',
-        provider: 'dev',
-        name: 'Test User',
-        email: 'test@example.com',
+      // 如果没有提供用户名，默认使用第一个演示管理员
+      const targetUsername = username || 'admin@demo';
+
+      // 查找用户
+      const user = await this.prisma.user.findUnique({
+        where: { username: targetUsername },
       });
 
+      if (!user) {
+        this.logger.error(`Dev login failed: User ${targetUsername} not found`);
+        return res
+          .status(404)
+          .send(
+            `User ${targetUsername} not found. Please run seed script first.`,
+          );
+      }
+
+      this.logger.log(`Dev login: ${user.username} (${user.role})`);
+
+      // 生成登录token
       const loginResult = await this.authService.login({
-        ...testUser,
-        name: testUser?.name ?? undefined,
+        id: user.id,
+        username: user.username,
+        name: user.name ?? undefined,
+        role: user.role,
       });
 
-      // Redirect to frontend with token
-      // Support multiple possible frontend URLs
-      const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5175';
+      // 重定向到前端，带上token
+      const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:8080';
       res.redirect(
         `${frontendUrl}/login#token=${loginResult.access_token}&user=${JSON.stringify(loginResult.user)}`,
       );
     } catch (error) {
       this.logger.error('Dev login error:', error);
-      return res.status(500).send('Login failed');
+      return res.status(500).send('Dev login failed');
+    }
+  }
+
+  /**
+   * 开发环境快速登录 - 返回JSON格式（用于API调用）
+   * 仅用于开发和测试环境
+   */
+  @Get('dev-login/json')
+  async devLoginJson(@Query('username') username: string) {
+    // 只允许在开发环境使用
+    if (!this.isDevelopment) {
+      throw new ForbiddenException(
+        'Dev login is only available in development mode',
+      );
+    }
+
+    try {
+      const targetUsername = username || 'admin@demo';
+
+      const user = await this.prisma.user.findUnique({
+        where: { username: targetUsername },
+      });
+
+      if (!user) {
+        throw new UnauthorizedException(`User ${targetUsername} not found`);
+      }
+
+      this.logger.log(`Dev login (JSON): ${user.username} (${user.role})`);
+
+      return await this.authService.login({
+        id: user.id,
+        username: user.username,
+        name: user.name ?? undefined,
+        role: user.role,
+      });
+    } catch (error) {
+      this.logger.error('Dev login JSON error:', error);
+      throw error;
     }
   }
 }

@@ -29,7 +29,7 @@ export class ConfigService {
 
   async updateFeatureFlag(key: string, enabled: boolean): Promise<FeatureFlag> {
     const configKey = `feature.${key}`;
-    
+
     const config = await this.prisma.config.findUnique({
       where: { key: configKey },
     });

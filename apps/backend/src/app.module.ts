@@ -23,6 +23,7 @@ import { APP_FILTER } from '@nestjs/core';
 import { WorkspaceModule } from './workspace/workspace.module';
 import { ConfigModule } from './config/config.module';
 import { ReviewsModule } from './reviews/reviews.module';
+import { CacheModule } from './common/cache/cache.module';
 
 @Module({
   imports: [
@@ -40,6 +41,7 @@ import { ReviewsModule } from './reviews/reviews.module';
     WorkspaceModule,
     ConfigModule,
     ReviewsModule,
+    CacheModule,
   ],
   controllers: [AppController],
   providers: [

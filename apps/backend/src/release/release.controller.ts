@@ -1,5 +1,19 @@
-import { Body, Controller, Get, Param, Post, Query } from '@nestjs/common';
 import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  HttpCode,
+  HttpStatus,
+  Param,
+  Post,
+  Query,
+  Request,
+  UseGuards,
+} from '@nestjs/common';
+import { AuthGuard } from '@nestjs/passport';
+import {
+  ForceCreateSessionDto,
   ListReleasesQueryDto,
   PreviewReleaseDto,
   PublishReleaseDto,
@@ -10,6 +24,7 @@ import {
 import { ReleaseService } from './release.service';
 
 @Controller('projects/:projectId')
+@UseGuards(AuthGuard('jwt'))
 export class ReleaseController {
   constructor(private readonly releaseService: ReleaseService) {}
 
@@ -17,21 +32,57 @@ export class ReleaseController {
   preview(
     @Param('projectId') projectId: string,
     @Body() dto: PreviewReleaseDto,
+    @Request() req: { user: { id: string } },
   ) {
-    return this.releaseService.previewRelease(projectId, dto);
+    return this.releaseService.previewRelease(projectId, dto, req.user.id);
   }
 
   @Post('releases')
   create(
     @Param('projectId') projectId: string,
     @Body() dto: PublishReleaseDto,
+    @Request() req: { user: { id: string } },
   ) {
-    return this.releaseService.publishReleaseSession(projectId, dto.sessionId);
+    return this.releaseService.publishReleaseSession(
+      projectId,
+      dto.sessionId,
+      req.user.id,
+    );
   }
 
   @Get('release-sessions/active')
   getActiveReleaseSession(@Param('projectId') projectId: string) {
     return this.releaseService.getActiveReleaseSession(projectId);
+  }
+
+  @Post('release-sessions/force-create')
+  forceCreateSession(
+    @Param('projectId') projectId: string,
+    @Body() dto: ForceCreateSessionDto,
+    @Request() req: { user: { id: string } },
+  ) {
+    return this.releaseService.forceCreateSession(
+      projectId,
+      dto,
+      req.user.id,
+      dto.reason,
+    );
+  }
+
+  @Delete('release-sessions/:sessionId')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  async cancelDraft(
+    @Param('projectId') projectId: string,
+    @Param('sessionId') sessionId: string,
+    @Request() req: { user: { id: string; role: string } },
+  ) {
+    const isAdmin = req.user.role === 'ADMIN';
+    await this.releaseService.cancelDraft(
+      projectId,
+      sessionId,
+      req.user.id,
+      isAdmin,
+    );
   }
 
   @Get('release-sessions/:sessionId')
@@ -47,10 +98,12 @@ export class ReleaseController {
     @Param('projectId') projectId: string,
     @Param('sessionId') sessionId: string,
     @Body() dto: ReleaseSessionNoteDto,
+    @Request() req: { user: { id: string } },
   ) {
     return this.releaseService.submitReleaseSession(
       projectId,
       sessionId,
+      req.user.id,
       dto.note,
     );
   }
@@ -60,10 +113,12 @@ export class ReleaseController {
     @Param('projectId') projectId: string,
     @Param('sessionId') sessionId: string,
     @Body() dto: ReleaseSessionNoteDto,
+    @Request() req: { user: { id: string } },
   ) {
     return this.releaseService.approveReleaseSession(
       projectId,
       sessionId,
+      req.user.id,
       dto.note,
     );
   }
@@ -73,10 +128,12 @@ export class ReleaseController {
     @Param('projectId') projectId: string,
     @Param('sessionId') sessionId: string,
     @Body() dto: ReleaseSessionRejectDto,
+    @Request() req: { user: { id: string } },
   ) {
     return this.releaseService.rejectReleaseSession(
       projectId,
       sessionId,
+      req.user.id,
       dto.reason,
     );
   }
@@ -85,8 +142,13 @@ export class ReleaseController {
   publishReleaseSession(
     @Param('projectId') projectId: string,
     @Param('sessionId') sessionId: string,
+    @Request() req: { user: { id: string } },
   ) {
-    return this.releaseService.publishReleaseSession(projectId, sessionId);
+    return this.releaseService.publishReleaseSession(
+      projectId,
+      sessionId,
+      req.user.id,
+    );
   }
 
   @Get('releases')

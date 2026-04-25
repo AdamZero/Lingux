@@ -1,303 +1,315 @@
-import React, { useState } from "react";
+import React, { useState, useMemo } from "react";
 import {
   Card,
   Table,
   Button,
   Space,
   Tag,
-  Modal,
-  Form,
-  Input,
-  Select,
-  DatePicker,
-  App as AntdApp,
   Tooltip,
-  Typography,
-  Badge,
-  Statistic,
+  Select,
+  App as AntdApp,
+  Modal,
   Row,
   Col,
+  Statistic,
 } from "antd";
 import {
   PlusOutlined,
-  RocketOutlined,
   RollbackOutlined,
   EyeOutlined,
+  DownloadOutlined,
   CheckCircleOutlined,
   ClockCircleOutlined,
-  SyncOutlined,
+  FileTextOutlined,
 } from "@ant-design/icons";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
+import dayjs from "dayjs";
 import apiClient from "@/api/client";
 import { PageHeader } from "@/components/common/PageHeader";
 import { EmptyState } from "@/components/common/EmptyState";
+
+import { useAppStore } from "@/store/useAppStore";
 import { usePermission } from "@/hooks/usePermission";
+import {
+  useReleases,
+  type Release,
+} from "@/components/release/hooks/useReleases";
+import ActiveSessionCard from "@/components/release/ActiveSessionCard";
+import ReleaseDetailDrawer from "@/components/release/ReleaseDetailDrawer";
+import PublishDrawer from "@/components/release/PublishDrawer";
 
-const { Text } = Typography;
 const { Option } = Select;
-const { RangePicker } = DatePicker;
 
-type ReleaseStatus =
-  | "DRAFT"
-  | "PENDING_APPROVAL"
-  | "APPROVED"
-  | "PUBLISHING"
-  | "PUBLISHED"
-  | "FAILED"
-  | "ROLLED_BACK";
-
-interface Release {
+export interface Project {
   id: string;
   name: string;
-  description?: string;
-  status: ReleaseStatus;
-  version: string;
-  localeCodes: string[];
-  publishedAt?: string;
-  createdAt: string;
-  createdBy: {
-    id: string;
-    username: string;
-  };
-  statistics: {
-    totalKeys: number;
-    approvedKeys: number;
-    publishedKeys: number;
-  };
+  baseLocale: string;
+  locales: { id: string; code: string; name: string }[];
+  currentReleaseId?: string | null;
 }
 
-const statusConfig: Record<
-  ReleaseStatus,
-  {
-    color: string;
-    text: string;
-    status: "default" | "processing" | "success" | "error" | "warning";
-  }
-> = {
-  DRAFT: { color: "default", text: "草稿", status: "default" },
-  PENDING_APPROVAL: { color: "orange", text: "待审批", status: "warning" },
-  APPROVED: { color: "cyan", text: "已审批", status: "processing" },
-  PUBLISHING: { color: "processing", text: "发布中", status: "processing" },
-  PUBLISHED: { color: "success", text: "已发布", status: "success" },
-  FAILED: { color: "error", text: "失败", status: "error" },
-  ROLLED_BACK: { color: "purple", text: "已回滚", status: "default" },
+const statusConfig: Record<string, { color: string; text: string }> = {
+  DRAFT: { color: "default", text: "草稿" },
+  IN_REVIEW: { color: "orange", text: "审核中" },
+  APPROVED: { color: "cyan", text: "已审批" },
+  REJECTED: { color: "red", text: "已驳回" },
+  PUBLISHED: { color: "success", text: "已发布" },
+  ROLLED_BACK: { color: "purple", text: "已回滚" },
+};
+
+// 全局统计卡片
+const GlobalStats: React.FC<{ releases: Release[] }> = ({ releases }) => {
+  const stats = useMemo(() => {
+    const publishedCount = releases.filter(
+      (r) => r.status === "PUBLISHED",
+    ).length;
+    const reviewingCount = releases.filter(
+      (r) => r.status === "IN_REVIEW",
+    ).length;
+    const draftCount = releases.filter((r) => r.status === "DRAFT").length;
+    const totalProjects = new Set(releases.map((r) => r.projectId)).size;
+
+    return {
+      publishedCount,
+      reviewingCount,
+      draftCount,
+      totalProjects,
+      totalReleases: releases.length,
+    };
+  }, [releases]);
+
+  return (
+    <Row gutter={16} style={{ marginBottom: 16 }}>
+      <Col span={4}>
+        <Card>
+          <Statistic
+            title="总发布数"
+            value={stats.totalReleases}
+            valueStyle={{ color: "#3B82F6" }}
+          />
+        </Card>
+      </Col>
+      <Col span={4}>
+        <Card>
+          <Statistic
+            title="涉及项目"
+            value={stats.totalProjects}
+            valueStyle={{ color: "#8B5CF6" }}
+          />
+        </Card>
+      </Col>
+      <Col span={4}>
+        <Card>
+          <Statistic
+            title="已发布"
+            value={stats.publishedCount}
+            valueStyle={{ color: "#10B981" }}
+            prefix={<CheckCircleOutlined />}
+          />
+        </Card>
+      </Col>
+      <Col span={4}>
+        <Card>
+          <Statistic
+            title="审核中"
+            value={stats.reviewingCount}
+            valueStyle={{ color: "#F59E0B" }}
+            prefix={<ClockCircleOutlined />}
+          />
+        </Card>
+      </Col>
+      <Col span={4}>
+        <Card>
+          <Statistic
+            title="草稿"
+            value={stats.draftCount}
+            valueStyle={{ color: "#6B7280" }}
+            prefix={<FileTextOutlined />}
+          />
+        </Card>
+      </Col>
+      <Col span={4}>
+        <Card>
+          <Statistic
+            title="待处理"
+            value={stats.reviewingCount + stats.draftCount}
+            valueStyle={{ color: "#EF4444" }}
+          />
+        </Card>
+      </Col>
+    </Row>
+  );
 };
 
 const ReleaseCenter: React.FC = () => {
-  const { message } = AntdApp.useApp();
-  const queryClient = useQueryClient();
-  const { canPublish } = usePermission();
+  const { notification } = AntdApp.useApp();
+  const { canPublish, canApprove } = usePermission();
+  const currentUser = useAppStore((state) => state.user);
+  const currentUserId = currentUser?.id;
 
-  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
-  const [statusFilter, setStatusFilter] = useState<ReleaseStatus | null>(null);
+  const [selectedProjectId, setSelectedProjectId] = useState<string | null>(
+    null,
+  );
+  const [isPublishDrawerOpen, setIsPublishDrawerOpen] = useState(false);
+  const [isDetailDrawerOpen, setIsDetailDrawerOpen] = useState(false);
+  const [selectedRelease, setSelectedRelease] = useState<Release | null>(null);
+  const [statusFilter, setStatusFilter] = useState<string | null>(null);
 
-  const [createForm] = Form.useForm();
+  const { data: projects = [] } = useQuery<Project[]>({
+    queryKey: ["projects"],
+    queryFn: async () => apiClient.get("/projects"),
+  });
 
-  const { data: releases = [], isLoading } = useQuery<Release[]>({
-    queryKey: ["releases", statusFilter],
+  const { data: currentProject } = useQuery<Project>({
+    queryKey: ["project", selectedProjectId],
     queryFn: async () => {
-      const params: Record<string, string> = {};
-      if (statusFilter) {
-        params.status = statusFilter;
-      }
-      return await apiClient.get("/releases", { params });
+      if (!selectedProjectId) return null;
+      return apiClient.get(`/projects/${selectedProjectId}`);
     },
+    enabled: !!selectedProjectId,
   });
 
-  const createReleaseMutation = useMutation({
-    mutationFn: (values: {
-      name: string;
-      description?: string;
-      version: string;
-      localeCodes: string[];
-      scope: { type: "all" | "namespaces"; namespaceIds?: string[] };
-    }) => apiClient.post("/releases", values),
-    onSuccess: () => {
-      message.success("发布创建成功");
-      setIsCreateModalOpen(false);
-      createForm.resetFields();
-      queryClient.invalidateQueries({ queryKey: ["releases"] });
-    },
-    onError: () => {
-      message.error("创建失败");
-    },
-  });
+  // 获取所有项目的发布（全局视角）
+  const {
+    releases: allReleases,
+    isLoading,
+    activeSession,
+    currentReleaseId,
+    submitMutation,
+    approveMutation,
+    rejectMutation,
+    publishMutation,
+    rollbackMutation,
+    downloadArtifact,
+    cancelDraft,
+    isCanceling,
+  } = useReleases(selectedProjectId);
 
-  const publishReleaseMutation = useMutation({
-    mutationFn: (releaseId: string) =>
-      apiClient.post(`/releases/${releaseId}/publish`),
-    onSuccess: () => {
-      message.success("发布已提交");
-      queryClient.invalidateQueries({ queryKey: ["releases"] });
-    },
-    onError: () => {
-      message.error("操作失败");
-    },
-  });
-
-  const approveReleaseMutation = useMutation({
-    mutationFn: (releaseId: string) =>
-      apiClient.post(`/releases/${releaseId}/approve`),
-    onSuccess: () => {
-      message.success("审批通过");
-      queryClient.invalidateQueries({ queryKey: ["releases"] });
-    },
-    onError: () => {
-      message.error("操作失败");
-    },
-  });
-
-  const rollbackReleaseMutation = useMutation({
-    mutationFn: (releaseId: string) =>
-      apiClient.post(`/releases/${releaseId}/rollback`),
-    onSuccess: () => {
-      message.success("回滚成功");
-      queryClient.invalidateQueries({ queryKey: ["releases"] });
-    },
-    onError: () => {
-      message.error("回滚失败");
-    },
-  });
-
-  const handleCreate = () => {
-    createForm.validateFields().then((values) => {
-      createReleaseMutation.mutate(values);
-    });
-  };
-
-  const handlePublish = (release: Release) => {
-    Modal.confirm({
-      title: "确认发布",
-      content: `确定要发布 "${release.name}" 吗？`,
-      onOk: () => publishReleaseMutation.mutate(release.id),
-    });
-  };
-
-  const handleApprove = (release: Release) => {
-    Modal.confirm({
-      title: "审批通过",
-      content: `确定要批准 "${release.name}" 吗？`,
-      onOk: () => approveReleaseMutation.mutate(release.id),
-    });
-  };
+  // 根据项目筛选
+  const filteredReleases = useMemo(() => {
+    let result = allReleases;
+    if (statusFilter) {
+      result = result.filter((r) => r.status === statusFilter);
+    }
+    return result;
+  }, [allReleases, statusFilter]);
 
   const handleRollback = (release: Release) => {
     Modal.confirm({
       title: "回滚发布",
-      content: `确定要回滚 "${release.name}" 吗？这将撤销本次发布的所有内容。`,
+      content: `确定要回滚到版本 ${release.version} 吗？`,
       okText: "确定回滚",
       okButtonProps: { danger: true },
-      onOk: () => rollbackReleaseMutation.mutate(release.id),
+      onOk: () => {
+        rollbackMutation.mutate(
+          { releaseId: release.id },
+          {
+            onSuccess: () => notification.success({ message: "回滚成功" }),
+            onError: (error: unknown) => {
+              const err = error as {
+                response?: { data?: { message?: string } };
+              };
+              notification.error({
+                message: err.response?.data?.message || "回滚失败",
+              });
+            },
+          },
+        );
+      },
     });
   };
 
   const columns = [
     {
-      title: "发布名称",
-      dataIndex: "name",
-      key: "name",
-      render: (text: string, record: Release) => (
-        <div>
-          <Text strong>{text}</Text>
-          <div>
-            <Text type="secondary" style={{ fontSize: 12 }}>
-              v{record.version}
-            </Text>
-          </div>
-        </div>
-      ),
+      title: "项目",
+      key: "project",
+      width: 150,
+      render: (_: unknown, r: Release) => {
+        const project = projects.find((p) => p.id === r.projectId);
+        return <Tag>{project?.name || r.projectId}</Tag>;
+      },
+    },
+    {
+      title: "版本",
+      dataIndex: "version",
+      key: "version",
+      width: 80,
+      render: (v: number) => <strong>v{v}</strong>,
     },
     {
       title: "状态",
       dataIndex: "status",
       key: "status",
-      render: (status: ReleaseStatus) => {
-        const config = statusConfig[status];
-        return <Badge status={config.status} text={config.text} />;
-      },
+      width: 100,
+      render: (s: string) => (
+        <Tag color={statusConfig[s]?.color}>{statusConfig[s]?.text || s}</Tag>
+      ),
     },
     {
-      title: "语言",
-      key: "locales",
-      render: (_: unknown, record: Release) => (
+      title: "标签",
+      key: "tags",
+      width: 150,
+      render: (_: unknown, r: Release) => (
         <Space wrap>
-          {record.localeCodes.map((code) => (
-            <Tag key={code}>{code}</Tag>
+          {r.tags?.map((t) => (
+            <Tag key={t}>{t}</Tag>
           ))}
         </Space>
       ),
     },
     {
-      title: "进度",
-      key: "progress",
-      render: (_: unknown, record: Release) => (
-        <Statistic
-          value={record.statistics.publishedKeys}
-          suffix={`/ ${record.statistics.totalKeys}`}
-          valueStyle={{ fontSize: 14 }}
-        />
+      title: "语言",
+      key: "locales",
+      width: 150,
+      render: (_: unknown, r: Release) => (
+        <Space wrap>
+          {r.localeCodes?.map((c) => (
+            <Tag key={c} size="small">
+              {c}
+            </Tag>
+          ))}
+        </Space>
       ),
     },
     {
-      title: "创建者",
-      dataIndex: ["createdBy", "username"],
-      key: "createdBy",
-    },
-    {
-      title: "创建时间",
-      dataIndex: "createdAt",
-      key: "createdAt",
-      render: (date: string) => dayjs(date).format("YYYY-MM-DD HH:mm"),
+      title: "发布时间",
+      dataIndex: "publishedAt",
+      key: "publishedAt",
+      width: 180,
+      render: (d: string) => (d ? dayjs(d).format("YYYY-MM-DD HH:mm") : "-"),
     },
     {
       title: "操作",
       key: "action",
-      render: (_: unknown, record: Release) => (
+      width: 200,
+      render: (_: unknown, r: Release) => (
         <Space>
           <Tooltip title="查看详情">
             <Button
               type="text"
               icon={<EyeOutlined />}
               onClick={() => {
-                setSelectedRelease(record);
+                setSelectedRelease(r);
                 setIsDetailDrawerOpen(true);
               }}
             />
           </Tooltip>
-          {record.status === "DRAFT" && (
-            <Tooltip title="提交发布">
-              <Button
-                type="text"
-                icon={<SyncOutlined />}
-                onClick={() => handlePublish(record)}
-              />
-            </Tooltip>
-          )}
-          {record.status === "PENDING_APPROVAL" && canPublish && (
-            <Tooltip title="审批">
-              <Button
-                type="text"
-                icon={<CheckCircleOutlined />}
-                onClick={() => handleApprove(record)}
-              />
-            </Tooltip>
-          )}
-          {record.status === "APPROVED" && canPublish && (
-            <Tooltip title="发布">
-              <Button
-                type="text"
-                icon={<RocketOutlined />}
-                onClick={() => handlePublish(record)}
-              />
-            </Tooltip>
-          )}
-          {record.status === "PUBLISHED" && canPublish && (
+          <Tooltip title="下载产物">
+            <Button
+              type="text"
+              icon={<DownloadOutlined />}
+              onClick={() =>
+                r.localeCodes?.forEach((c) => downloadArtifact(r.id, c))
+              }
+            />
+          </Tooltip>
+          {r.status === "PUBLISHED" && currentReleaseId !== r.id && (
             <Tooltip title="回滚">
               <Button
                 type="text"
                 danger
                 icon={<RollbackOutlined />}
-                onClick={() => handleRollback(record)}
+                onClick={() => handleRollback(r)}
               />
             </Tooltip>
           )}
@@ -306,89 +318,71 @@ const ReleaseCenter: React.FC = () => {
     },
   ];
 
-  const publishedCount = releases.filter(
-    (r) => r.status === "PUBLISHED",
-  ).length;
-  const publishingCount = releases.filter(
-    (r) => r.status === "PUBLISHING",
-  ).length;
-  const pendingCount = releases.filter(
-    (r) => r.status === "PENDING_APPROVAL",
-  ).length;
-
   return (
     <div>
       <PageHeader
         title="发布中心"
-        description="管理翻译内容的发布和回滚"
+        description="管理翻译内容的发布、审批和回滚"
         extra={
-          canPublish && (
-            <Button
-              type="primary"
-              icon={<PlusOutlined />}
-              onClick={() => setIsCreateModalOpen(true)}
-            >
-              创建发布
-            </Button>
-          )
+          <Space>
+            <Select
+              placeholder="筛选项目（可选）"
+              style={{ width: 200 }}
+              value={selectedProjectId}
+              onChange={setSelectedProjectId}
+              allowClear
+              options={projects.map((p) => ({ label: p.name, value: p.id }))}
+            />
+            {canPublish && (
+              <Button
+                type="primary"
+                icon={<PlusOutlined />}
+                onClick={() => {
+                  if (!selectedProjectId) {
+                    message.error("请先选择一个项目");
+                    return;
+                  }
+                  setIsPublishDrawerOpen(true);
+                }}
+              >
+                创建发布
+              </Button>
+            )}
+          </Space>
         }
       />
 
-      <Row gutter={16} style={{ marginBottom: 24 }}>
-        <Col xs={24} sm={8}>
-          <Card>
-            <Statistic
-              title="已发布"
-              value={publishedCount}
-              prefix={<CheckCircleOutlined />}
-              valueStyle={{ color: "#3f8600" }}
-            />
-          </Card>
-        </Col>
-        <Col xs={24} sm={8}>
-          <Card>
-            <Statistic
-              title="发布中"
-              value={publishingCount}
-              prefix={<SyncOutlined spin />}
-              valueStyle={{ color: "#1890ff" }}
-            />
-          </Card>
-        </Col>
-        <Col xs={24} sm={8}>
-          <Card>
-            <Statistic
-              title="待审批"
-              value={pendingCount}
-              prefix={<ClockCircleOutlined />}
-              valueStyle={{ color: "#faad14" }}
-            />
-          </Card>
-        </Col>
-      </Row>
+      {/* 全局统计卡片 */}
+      <GlobalStats releases={allReleases} />
 
+      {/* 当前活跃会话 */}
+      {activeSession && (
+        <ActiveSessionCard
+          session={activeSession}
+          currentUserId={currentUserId}
+        />
+      )}
+
+      {/* 发布列表 */}
       <Card>
         <Space style={{ marginBottom: 16 }}>
           <Select
             placeholder="按状态筛选"
             style={{ width: 150 }}
             value={statusFilter}
-            onChange={(value) => setStatusFilter(value || null)}
+            onChange={(v) => setStatusFilter(v || null)}
             allowClear
           >
             <Option value="DRAFT">草稿</Option>
-            <Option value="PENDING_APPROVAL">待审批</Option>
+            <Option value="IN_REVIEW">审核中</Option>
             <Option value="APPROVED">已审批</Option>
-            <Option value="PUBLISHING">发布中</Option>
             <Option value="PUBLISHED">已发布</Option>
-            <Option value="FAILED">失败</Option>
-            <Option value="ROLLED_BACK">已回滚</Option>
+            <Option value="REJECTED">已驳回</Option>
           </Select>
         </Space>
-
         <Table
           columns={columns}
-          dataSource={releases}
+          dataSource={filteredReleases}
           rowKey="id"
           loading={isLoading}
           locale={{
@@ -397,46 +391,60 @@ const ReleaseCenter: React.FC = () => {
         />
       </Card>
 
-      <Modal
-        title="创建发布"
-        open={isCreateModalOpen}
-        onOk={handleCreate}
-        onCancel={() => setIsCreateModalOpen(false)}
-        confirmLoading={createReleaseMutation.isPending}
-        width={600}
-      >
-        <Form form={createForm} layout="vertical">
-          <Form.Item
-            name="name"
-            label="发布名称"
-            rules={[{ required: true, message: "请输入发布名称" }]}
-          >
-            <Input placeholder="例如: 2026-03 版本更新" />
-          </Form.Item>
-          <Form.Item
-            name="version"
-            label="版本号"
-            rules={[{ required: true, message: "请输入版本号" }]}
-          >
-            <Input placeholder="例如: 1.0.0" />
-          </Form.Item>
-          <Form.Item name="description" label="描述">
-            <Input.TextArea rows={2} />
-          </Form.Item>
-          <Form.Item
-            name="localeCodes"
-            label="目标语言"
-            rules={[{ required: true, message: "请选择目标语言" }]}
-          >
-            <Select mode="multiple" placeholder="选择语言">
-              <Option value="en">英语 (en)</Option>
-              <Option value="zh-CN">简体中文 (zh-CN)</Option>
-              <Option value="ja">日语 (ja)</Option>
-              <Option value="ko">韩语 (ko)</Option>
-            </Select>
-          </Form.Item>
-        </Form>
-      </Modal>
+      <PublishDrawer
+        open={isPublishDrawerOpen}
+        onClose={() => setIsPublishDrawerOpen(false)}
+        projectId={selectedProjectId || ""}
+        locales={
+          currentProject?.locales.map((l) => ({
+            code: l.code,
+            name: l.name,
+          })) || []
+        }
+        currentReleaseId={currentProject?.currentReleaseId}
+        scope={{ type: "all" }}
+        scopeLabel="全部词条"
+        allowScopeChange={false}
+      />
+
+      <ReleaseDetailDrawer
+        release={selectedRelease}
+        open={isDetailDrawerOpen}
+        onClose={() => {
+          setIsDetailDrawerOpen(false);
+          setSelectedRelease(null);
+        }}
+        onDownload={(localeCode) =>
+          selectedRelease && downloadArtifact(selectedRelease.id, localeCode)
+        }
+        onSubmit={async (sessionId, note) => {
+          await submitMutation.mutateAsync({ sessionId, note });
+        }}
+        onApprove={async (sessionId, note) => {
+          await approveMutation.mutateAsync({ sessionId, note });
+        }}
+        onReject={async (sessionId, reason) => {
+          await rejectMutation.mutateAsync({ sessionId, reason });
+        }}
+        onPublish={async (sessionId) => {
+          await publishMutation.mutateAsync(sessionId);
+        }}
+        onCancel={async (sessionId) => {
+          await cancelDraft(sessionId);
+        }}
+        canSubmit={canPublish}
+        canApprove={canApprove}
+        canPublish={canPublish}
+        canCancel={true}
+        currentUserId={currentUserId}
+        loading={
+          submitMutation.isPending ||
+          approveMutation.isPending ||
+          rejectMutation.isPending ||
+          publishMutation.isPending ||
+          isCanceling
+        }
+      />
     </div>
   );
 };

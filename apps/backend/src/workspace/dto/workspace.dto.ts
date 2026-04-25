@@ -1,9 +1,11 @@
 export class WorkspaceStatsDto {
-  pending: number;
-  reviewing: number;
-  approved: number;
+  pendingApproval: number; // 待审批的发布申请
+  myPendingRelease: number; // 我的待发布变更
+  monthlyReleases: number; // 本月发布次数
+  memberCount: number; // 成员数（或贡献数）
 }
 
+// 旧的 DTO 保留兼容
 export class WorkspaceTaskKeyDto {
   id: string;
   name: string;
@@ -38,6 +40,7 @@ export enum TaskStatus {
   REVIEWING = 'REVIEWING',
 }
 
+// 旧的 Task DTO 保留兼容
 export class WorkspaceTaskDto {
   id: string;
   type: TaskType;
@@ -59,4 +62,24 @@ export class WorkspaceTasksResponseDto {
   page: number;
   pageSize: number;
   totalPages: number;
+}
+
+// 新的 Task DTO
+export interface ApprovalTaskDto {
+  id: string;
+  type: 'RELEASE_APPROVAL';
+  title: string;
+  description: string;
+  status: 'PENDING';
+  scope: any;
+  createdAt: string;
+}
+
+export interface ReleaseTaskDto {
+  id: string;
+  type: 'MY_RELEASE';
+  title: string;
+  status: 'DRAFT' | 'IN_REVIEW' | 'APPROVED' | 'REJECTED' | 'PUBLISHED';
+  scope: any;
+  createdAt: string;
 }

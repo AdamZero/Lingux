@@ -47,9 +47,19 @@ describe('ReviewsController', () => {
 
       mockReviewsService.getReviewTasks.mockResolvedValue(mockTasks);
 
-      const result = await controller.getReviewTasks(projectId, status, page, pageSize);
+      const result = await controller.getReviewTasks(
+        projectId,
+        status,
+        page,
+        pageSize,
+      );
 
-      expect(service.getReviewTasks).toHaveBeenCalledWith(projectId, status, page, pageSize);
+      expect(service.getReviewTasks).toHaveBeenCalledWith(
+        projectId,
+        status,
+        page,
+        pageSize,
+      );
       expect(result).toEqual(mockTasks);
     });
   });
@@ -62,7 +72,7 @@ describe('ReviewsController', () => {
 
       mockReviewsService.approveReview.mockResolvedValue(mockResult);
 
-      const mockReq = { user: { userId } };
+      const mockReq = { user: { id: userId } };
       const result = await controller.approveReview(id, mockReq as any);
 
       expect(service.approveReview).toHaveBeenCalledWith(id, userId);
@@ -80,10 +90,20 @@ describe('ReviewsController', () => {
 
       mockReviewsService.rejectReview.mockResolvedValue(mockResult);
 
-      const mockReq = { user: { userId } };
-      const result = await controller.rejectReview(id, mockReq as any, reason, suggestion);
+      const mockReq = { user: { id: userId } };
+      const result = await controller.rejectReview(
+        id,
+        mockReq as any,
+        reason,
+        suggestion,
+      );
 
-      expect(service.rejectReview).toHaveBeenCalledWith(id, userId, reason, suggestion);
+      expect(service.rejectReview).toHaveBeenCalledWith(
+        id,
+        userId,
+        reason,
+        suggestion,
+      );
       expect(result).toEqual(mockResult);
     });
 
@@ -95,10 +115,15 @@ describe('ReviewsController', () => {
 
       mockReviewsService.rejectReview.mockResolvedValue(mockResult);
 
-      const mockReq = { user: { userId } };
+      const mockReq = { user: { id: userId } };
       const result = await controller.rejectReview(id, mockReq as any, reason);
 
-      expect(service.rejectReview).toHaveBeenCalledWith(id, userId, reason, undefined);
+      expect(service.rejectReview).toHaveBeenCalledWith(
+        id,
+        userId,
+        reason,
+        undefined,
+      );
       expect(result).toEqual(mockResult);
     });
   });

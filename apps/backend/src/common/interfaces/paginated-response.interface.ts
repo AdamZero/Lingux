@@ -17,7 +17,7 @@ export function createPaginatedResponse<T>(
   pageSize: number,
 ): PaginatedResponse<T> {
   const totalPages = Math.ceil(total / pageSize);
-  
+
   return {
     code: 0,
     message: 'success',

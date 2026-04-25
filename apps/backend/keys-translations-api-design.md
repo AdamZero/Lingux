@@ -1,4 +1,4 @@
- # Keys & Translations API 设计思路
+# Keys & Translations API 设计思路
 
 本文档阐述 Lingux 平台核心功能——“文案（Keys）与翻译（Translations）”模块的 API 设计思路。
 
@@ -19,13 +19,13 @@
 
 #### `GET /`
 
--   **描述**: 获取指定命名空间下的所有文案列表，并聚合它们的所有翻译。
--   **用途**: 在管理界面中以表格或列表形式展示所有文案及其多语言翻译状态。
--   **查询参数**:
-    -   `page`, `limit`: 用于分页。
-    -   `search`: 按文案名称（Key Name）进行模糊搜索。
-    -   `status`: 按翻译状态过滤（如只看 `PENDING` 的）。
--   **响应体**: 返回一个文案对象数组，每个对象包含其所有语言的翻译条目。
+- **描述**: 获取指定命名空间下的所有文案列表，并聚合它们的所有翻译。
+- **用途**: 在管理界面中以表格或列表形式展示所有文案及其多语言翻译状态。
+- **查询参数**:
+  - `page`, `limit`: 用于分页。
+  - `search`: 按文案名称（Key Name）进行模糊搜索。
+  - `status`: 按翻译状态过滤（如只看 `PENDING` 的）。
+- **响应体**: 返回一个文案对象数组，每个对象包含其所有语言的翻译条目。
 
 ```json
 [
@@ -56,14 +56,14 @@
 
 #### `POST /`
 
--   **描述**: 在命名空间下创建一个新的文案。
--   **用途**: 开发者或内容管理员添加新的文案字段。
--   **请求体**:
-    -   `name` (String, required): 文案的唯一标识，如 `page.home.title`。
-    -   `description` (String): 对文案的描述，为翻译人员提供上下文。
-    -   `type` (Enum, default: `TEXT`): 文案类型（`TEXT`, `RICH_TEXT`, `ASSET`）。
-    -   `translations` (Object): 一个可选的初始化翻译对象，Key 为 locale code，Value 为内容。
--   **响应**: 返回新创建的文案对象。
+- **描述**: 在命名空间下创建一个新的文案。
+- **用途**: 开发者或内容管理员添加新的文案字段。
+- **请求体**:
+  - `name` (String, required): 文案的唯一标识，如 `page.home.title`。
+  - `description` (String): 对文案的描述，为翻译人员提供上下文。
+  - `type` (Enum, default: `TEXT`): 文案类型（`TEXT`, `RICH_TEXT`, `ASSET`）。
+  - `translations` (Object): 一个可选的初始化翻译对象，Key 为 locale code，Value 为内容。
+- **响应**: 返回新创建的文案对象。
 
 ### 2. 翻译（Translations）管理
 
@@ -73,15 +73,15 @@
 
 #### `PATCH /`
 
--   **描述**: 更新或创建单个翻译条目。这是最核心的翻译操作接口。
--   **用途**: 编辑、审核或发布某个文案在特定语言下的翻译。
--   **请求体**:
-    -   `content` (String): 新的翻译内容。
-    -   `status` (Enum): （可选）由审核员或发布流程更新翻译状态。
--   **逻辑**: 
-    -   普通编辑只修改 `content`。
-    -   审核员可以修改 `content` 和 `status`。
-    -   后端根据用户角色判断其是否有权限修改 `status`。
+- **描述**: 更新或创建单个翻译条目。这是最核心的翻译操作接口。
+- **用途**: 编辑、审核或发布某个文案在特定语言下的翻译。
+- **请求体**:
+  - `content` (String): 新的翻译内容。
+  - `status` (Enum): （可选）由审核员或发布流程更新翻译状态。
+- **逻辑**:
+  - 普通编辑只修改 `content`。
+  - 审核员可以修改 `content` 和 `status`。
+  - 后端根据用户角色判断其是否有权限修改 `status`。
 
 ### 3. 批量操作
 
@@ -89,13 +89,13 @@
 
 #### `POST /llm-translate`
 
--   **描述**: 触发 LLM 批量翻译。
--   **用途**: 对项目/命名空间下的多个文案进行自动翻译。
--   **行为**: 这是一个**异步接口**。API 会立即返回 `202 Accepted`，并在后台创建翻译任务。
--   **请求体**:
-    -   `sourceLocale` (String, required): 源语言。
-    -   `targetLocales` (Array<String>, required): 目标语言数组。
-    -   `keyIds` (Array<String>): （可选）需要翻译的文案 ID 列表。如果为空，则翻译整个项目或指定命名空间下的所有待翻译文案。
+- **描述**: 触发 LLM 批量翻译。
+- **用途**: 对项目/命名空间下的多个文案进行自动翻译。
+- **行为**: 这是一个**异步接口**。API 会立即返回 `202 Accepted`，并在后台创建翻译任务。
+- **请求体**:
+  - `sourceLocale` (String, required): 源语言。
+  - `targetLocales` (Array<String>, required): 目标语言数组。
+  - `keyIds` (Array<String>): （可选）需要翻译的文案 ID 列表。如果为空，则翻译整个项目或指定命名空间下的所有待翻译文案。
 
 ---
 

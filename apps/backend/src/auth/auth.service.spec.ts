@@ -6,6 +6,7 @@ describe('AuthService', () => {
   let prismaService: any;
   let jwtService: any;
   let enterpriseService: any;
+  let loggerService: any;
 
   beforeEach(() => {
     // Create fresh mocks for each test
@@ -28,11 +29,19 @@ describe('AuthService', () => {
       associateUserWithEnterprise: jest.fn(),
     };
 
+    loggerService = {
+      log: jest.fn(),
+      error: jest.fn(),
+      warn: jest.fn(),
+      debug: jest.fn(),
+    };
+
     // Directly instantiate the service with mocks
     authService = new AuthService(
       prismaService as any,
       jwtService as any,
       enterpriseService as any,
+      loggerService as any,
     );
   });
 
@@ -47,6 +56,7 @@ describe('AuthService', () => {
       };
 
       prismaService.user.findUnique.mockResolvedValue(existingUser);
+      prismaService.user.update.mockResolvedValue(existingUser);
 
       const result = await authService.validateUser({
         externalId: 'external_123',
@@ -195,6 +205,7 @@ describe('AuthService', () => {
       };
 
       prismaService.user.findUnique.mockResolvedValue(user);
+      prismaService.user.update.mockResolvedValue(user);
       enterpriseService.createOrGetEnterprise.mockResolvedValue(enterprise);
       enterpriseService.getEnterpriseMembers.mockResolvedValue([]);
 
@@ -243,6 +254,7 @@ describe('AuthService', () => {
       };
 
       prismaService.user.findUnique.mockResolvedValue(user);
+      prismaService.user.update.mockResolvedValue(user);
       enterpriseService.createOrGetEnterprise.mockResolvedValue(enterprise);
       enterpriseService.getEnterpriseMembers.mockResolvedValue([
         { id: '1', userId: '5', enterpriseId: 'ent_1', role: 'admin' },

@@ -12,13 +12,17 @@ import {
   UploadedFile,
   UseInterceptors,
   BadRequestException,
+  UseGuards,
+  Request,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
+import { AuthGuard } from '@nestjs/passport';
 import { KeyService } from './key.service';
 import { CreateKeyDto } from './dto/create-key.dto';
 import { UpdateKeyDto } from './dto/update-key.dto';
 
 @Controller('projects/:projectId/namespaces/:namespaceId/keys')
+@UseGuards(AuthGuard('jwt'))
 export class KeyController {
   constructor(private readonly keyService: KeyService) {}
 
@@ -27,8 +31,32 @@ export class KeyController {
     @Param('projectId') projectId: string,
     @Param('namespaceId') namespaceId: string,
     @Body() createKeyDto: CreateKeyDto,
+    @Request() req: { user: { id: string } },
   ) {
-    return this.keyService.create(projectId, namespaceId, createKeyDto);
+    return this.keyService.create(
+      projectId,
+      namespaceId,
+      createKeyDto,
+      req.user.id,
+    );
+  }
+
+  @Post('batch')
+  createBatch(
+    @Param('projectId') projectId: string,
+    @Param('namespaceId') namespaceId: string,
+    @Body() body: { keys: CreateKeyDto[] },
+    @Request() req: { user: { id: string } },
+  ) {
+    if (!body.keys || !Array.isArray(body.keys) || body.keys.length === 0) {
+      throw new BadRequestException('Keys array is required');
+    }
+    return this.keyService.createBatch(
+      projectId,
+      namespaceId,
+      body.keys,
+      req.user.id,
+    );
   }
 
   @Get()

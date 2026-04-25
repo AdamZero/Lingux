@@ -22,7 +22,7 @@ interface Key {
   name: string;
   description?: string;
   type: "TEXT" | "RICH_TEXT" | "ASSET";
-  translations: Translation[];
+  translations?: Translation[];
 }
 
 interface KeysTableProps {
@@ -74,8 +74,8 @@ export const KeysTable: React.FC<KeysTableProps> = ({
       key: "translations",
       render: (_: unknown, record: Key) => (
         <Space wrap>
-          {locales.map((locale) => {
-            const translation = record.translations.find(
+          {locales?.map((locale) => {
+            const translation = record.translations?.find(
               (t) => t.locale.code === locale.code,
             );
             const color = translation

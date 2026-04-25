@@ -75,6 +75,28 @@ export class TranslationController {
     );
   }
 
+  @Post('batch')
+  async batchUpdate(
+    @Param('projectId') projectId: string,
+    @Param('namespaceId') namespaceId: string,
+    @Param('keyId') keyId: string,
+    @Body()
+    body: {
+      translations: Array<{
+        localeCode: string;
+        content: string;
+        status?: string;
+      }>;
+    },
+  ) {
+    return this.translationService.batchUpdate(
+      projectId,
+      namespaceId,
+      keyId,
+      body.translations,
+    );
+  }
+
   @Post(':localeCode/approve')
   approve(
     @Param('projectId') projectId: string,

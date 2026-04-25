@@ -3,7 +3,7 @@
 **模块编号**: 06-release  
 **模块名称**: 发布管理  
 **版本**: v1.0  
-**最后更新**: 2026-03-17  
+**最后更新**: 2026-03-17
 
 ---
 
@@ -14,6 +14,7 @@
 本模块负责管理翻译的发布流程，包括发布创建、审批、执行和回滚。
 
 **MVP 范围**：
+
 - 发布创建和预览
 - 发布审批流程
 - 正式发布执行
@@ -22,10 +23,10 @@
 
 ### 1.2 关联模块
 
-| 模块 | 关系 | 说明 |
-|------|------|------|
-| 05-quality | 依赖 | 发布前必须通过质量门禁 |
-| 10-developer-experience | 依赖 | 发布后生成 CDN 文件 |
+| 模块                    | 关系 | 说明                   |
+| ----------------------- | ---- | ---------------------- |
+| 05-quality              | 依赖 | 发布前必须通过质量门禁 |
+| 10-developer-experience | 依赖 | 发布后生成 CDN 文件    |
 
 ---
 
@@ -39,12 +40,12 @@ DRAFT → IN_REVIEW → APPROVED → PUBLISHED
    └───────┴───────────┘
 ```
 
-| 状态 | 说明 | 可执行操作 |
-|------|------|------------|
-| DRAFT | 草稿，准备中 | 编辑发布范围、提交审核 |
-| IN_REVIEW | 审核中 | 通过/拒绝 |
-| APPROVED | 已通过，待发布 | 执行发布 |
-| PUBLISHED | 已发布 | 回滚 |
+| 状态      | 说明           | 可执行操作             |
+| --------- | -------------- | ---------------------- |
+| DRAFT     | 草稿，准备中   | 编辑发布范围、提交审核 |
+| IN_REVIEW | 审核中         | 通过/拒绝              |
+| APPROVED  | 已通过，待发布 | 执行发布               |
+| PUBLISHED | 已发布         | 回滚                   |
 
 ### 2.2 发布创建
 
@@ -67,17 +68,17 @@ DRAFT → IN_REVIEW → APPROVED → PUBLISHED
 interface Release {
   id: string;
   projectId: string;
-  version: number;          // 版本号，自增
+  version: number; // 版本号，自增
   status: ReleaseStatus;
-  scope: ReleaseScope;      // 发布范围
-  description?: string;     // 发布说明
+  scope: ReleaseScope; // 发布范围
+  description?: string; // 发布说明
   createdBy: string;
   createdAt: Date;
   publishedAt?: Date;
 }
 
 interface ReleaseScope {
-  type: 'all' | 'namespaces' | 'keys';
+  type: "all" | "namespaces" | "keys";
   namespaceIds?: string[];
   keyIds?: string[];
 }
@@ -228,24 +229,24 @@ model Release {
   id          String        @id @default(cuid())
   projectId   String
   project     Project       @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  
+
   version     Int
   status      ReleaseStatus @default(DRAFT)
   description String?
-  
+
   // 发布范围
   scopeType   String        // all, namespaces, keys
   scopeIds    String[]      // namespaceIds or keyIds
-  
+
   // 关联
   artifacts   ReleaseArtifact[]
-  
+
   // 审计
   createdBy   String
   createdAt   DateTime      @default(now())
   publishedAt DateTime?
   publishedBy String?
-  
+
   @@unique([projectId, version])
 }
 
@@ -253,12 +254,12 @@ model ReleaseArtifact {
   id        String @id @default(cuid())
   releaseId String
   release   Release @relation(fields: [releaseId], references: [id], onDelete: Cascade)
-  
+
   localeCode String
   content    String    // JSON 内容
-  
+
   createdAt  DateTime @default(now())
-  
+
   @@unique([releaseId, localeCode])
 }
 ```
@@ -274,6 +275,7 @@ model ReleaseArtifact {
 **功能**: 创建发布  
 **权限**: ADMIN  
 **请求体**:
+
 ```json
 {
   "description": "发布说明",
@@ -308,6 +310,7 @@ model ReleaseArtifact {
 **功能**: 拒绝发布  
 **权限**: ADMIN  
 **请求体**:
+
 ```json
 {
   "reason": "质量问题"

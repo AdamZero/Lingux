@@ -4,7 +4,7 @@
 **最后更新**: 2026-03-17\
 **执行状态**: 待开始
 
-***
+---
 
 ## 目录
 
@@ -15,7 +15,7 @@
 5. [组件架构](#五组件架构)
 6. [验收标准](#六验收标准)
 
-***
+---
 
 ## 一、概述
 
@@ -25,40 +25,40 @@
 
 ### 1.2 核心原则
 
-* **渐进式重构**：已有功能迁移优化，增量功能预留
+- **渐进式重构**：已有功能迁移优化，增量功能预留
 
-* **模块化设计**：高内聚低耦合，组件可复用
+- **模块化设计**：高内聚低耦合，组件可复用
 
-* **权限驱动**：基于角色的动态菜单和功能控制
+- **权限驱动**：基于角色的动态菜单和功能控制
 
-* **配置化开关**：后端控制功能启用状态
+- **配置化开关**：后端控制功能启用状态
 
 ### 1.3 技术栈
 
-| 层级   | 技术                    | 说明   |
-| ---- | --------------------- | ---- |
-| 框架   | React 18              | 沿用现有 |
-| 构建   | Vite                  | 沿用现有 |
-| UI 库 | Ant Design 6.x        | 沿用现有 |
+| 层级     | 技术                  | 说明     |
+| -------- | --------------------- | -------- |
+| 框架     | React 18              | 沿用现有 |
+| 构建     | Vite                  | 沿用现有 |
+| UI 库    | Ant Design 6.x        | 沿用现有 |
 | 状态管理 | Zustand + React Query | 沿用现有 |
-| 路由   | React Router 6        | 沿用现有 |
+| 路由     | React Router 6        | 沿用现有 |
 
-***
+---
 
 ## 二、关键决策
 
 ### 2.1 设计决策汇总
 
-| 决策项           | 方案                      | 说明              |
-| ------------- | ----------------------- | --------------- |
-| 工作台数据来源       | 后端接口 `/workspace/stats` | 需要后端提供          |
-| 审核工作台权限       | 仅 REVIEWER 和 ADMIN 可见   | Sidebar 动态渲染    |
-| ComingSoon 交互 | Modal 弹窗提示              | 轻量体验            |
-| 功能开关策略        | 后端配置接口                  | 动态控制            |
-| 编辑器 Modal 尺寸  | 1000px 宽度               | 左右各 500px       |
-| 命名空间切换        | 点击即切换                   | URL query 持久化筛选 |
-| 发布历史分页        | 后端分页                    | 与现有风格一致         |
-| 项目切换位置        | Header 下拉菜单             | 符合用户习惯          |
+| 决策项            | 方案                        | 说明                 |
+| ----------------- | --------------------------- | -------------------- |
+| 工作台数据来源    | 后端接口 `/workspace/stats` | 需要后端提供         |
+| 审核工作台权限    | 仅 REVIEWER 和 ADMIN 可见   | Sidebar 动态渲染     |
+| ComingSoon 交互   | Modal 弹窗提示              | 轻量体验             |
+| 功能开关策略      | 后端配置接口                | 动态控制             |
+| 编辑器 Modal 尺寸 | 1000px 宽度                 | 左右各 500px         |
+| 命名空间切换      | 点击即切换                  | URL query 持久化筛选 |
+| 发布历史分页      | 后端分页                    | 与现有风格一致       |
+| 项目切换位置      | Header 下拉菜单             | 符合用户习惯         |
 
 ### 2.2 接口需求（需后端提供）
 
@@ -88,37 +88,37 @@ Response: {
 }
 ```
 
-***
+---
 
 ## 三、后端依赖
 
 ### 3.1 已有接口（直接使用）
 
-| 接口                        | 用途     | 状态   |
-| ------------------------- | ------ | ---- |
+| 接口                      | 用途     | 状态    |
+| ------------------------- | -------- | ------- |
 | `GET /keys`               | Key 列表 | ✅ 可用 |
 | `POST /keys`              | 创建 Key | ✅ 可用 |
 | `PATCH /keys/:id`         | 更新 Key | ✅ 可用 |
 | `DELETE /keys/:id`        | 删除 Key | ✅ 可用 |
-| `POST /translations`      | 创建翻译   | ✅ 可用 |
-| `PATCH /translations/:id` | 更新翻译   | ✅ 可用 |
-| `GET /projects`           | 项目列表   | ✅ 可用 |
-| `GET /namespaces`         | 命名空间   | ✅ 可用 |
-| `GET /releases`           | 发布历史   | ✅ 可用 |
-| `POST /releases`          | 创建发布   | ✅ 可用 |
+| `POST /translations`      | 创建翻译 | ✅ 可用 |
+| `PATCH /translations/:id` | 更新翻译 | ✅ 可用 |
+| `GET /projects`           | 项目列表 | ✅ 可用 |
+| `GET /namespaces`         | 命名空间 | ✅ 可用 |
+| `GET /releases`           | 发布历史 | ✅ 可用 |
+| `POST /releases`          | 创建发布 | ✅ 可用 |
 
 ### 3.2 新增接口（需要后端实现）
 
-| 接口                          | 用途     | 优先级 | 阻塞功能               |
-| --------------------------- | ------ | --- | ------------------ |
-| `GET /workspace/stats`      | 工作台统计  | P0  | DashboardPage 统计卡片 |
-| `GET /workspace/tasks`      | 工作台待办  | P0  | DashboardPage 我的待办 |
-| `GET /config/features`      | 功能开关   | P1  | ComingSoon 判断      |
-| `GET /reviews`              | 审核任务列表 | P1  | ReviewDashboard    |
-| `POST /reviews/:id/approve` | 审核通过   | P1  | ReviewDashboard    |
-| `POST /reviews/:id/reject`  | 审核退回   | P1  | ReviewDashboard    |
+| 接口                        | 用途         | 优先级 | 阻塞功能               |
+| --------------------------- | ------------ | ------ | ---------------------- |
+| `GET /workspace/stats`      | 工作台统计   | P0     | DashboardPage 统计卡片 |
+| `GET /workspace/tasks`      | 工作台待办   | P0     | DashboardPage 我的待办 |
+| `GET /config/features`      | 功能开关     | P1     | ComingSoon 判断        |
+| `GET /reviews`              | 审核任务列表 | P1     | ReviewDashboard        |
+| `POST /reviews/:id/approve` | 审核通过     | P1     | ReviewDashboard        |
+| `POST /reviews/:id/reject`  | 审核退回     | P1     | ReviewDashboard        |
 
-***
+---
 
 ## 四、实施阶段
 
@@ -128,17 +128,17 @@ Response: {
 
 **任务清单**:
 
-* [ ] 创建 `DashboardPage.tsx`
+- [ ] 创建 `DashboardPage.tsx`
 
-* [ ] 实现 `StatsCards` 组件（3个统计卡片）
+- [ ] 实现 `StatsCards` 组件（3个统计卡片）
 
-* [ ] 实现 `QuickActions` 组件（3个快捷操作）
+- [ ] 实现 `QuickActions` 组件（3个快捷操作）
 
-* [ ] 实现 `MyTasks` 组件（待办列表）
+- [ ] 实现 `MyTasks` 组件（待办列表）
 
-* [ ] 实现 `RecentActivity` 组件（预留）
+- [ ] 实现 `RecentActivity` 组件（预留）
 
-* [ ] 配置路由 `/workspace`
+- [ ] 配置路由 `/workspace`
 
 **组件设计**:
 
@@ -149,17 +149,17 @@ Response: {
     <StatCard title="审核中" value={stats.reviewing} link="/reviews" />
     <StatCard title="已完成" value={stats.approved} link="/translations?status=APPROVED" />
   </StatsCards>
-  
+
   <QuickActions>
     <ActionButton icon="+" text="新建翻译" onClick={() => navigate('/translations')} />
     <ActionButton icon="📥" text="导入词条" onClick={() => openImportModal()} />
     <ActionButton icon="🚀" text="创建发布" onClick={() => navigate('/releases')} />
   </QuickActions>
-  
+
   <MyTasks>
     <TaskList tasks={tasks} onTaskClick={handleTaskClick} />
   </MyTasks>
-  
+
   <RecentActivity>
     <Empty description="功能开发中，敬请期待" />
   </RecentActivity>
@@ -172,16 +172,16 @@ Response: {
 // hooks/useWorkspaceStats.ts
 const useWorkspaceStats = () => {
   return useQuery({
-    queryKey: ['workspace', 'stats'],
-    queryFn: () => apiClient.get('/workspace/stats'),
+    queryKey: ["workspace", "stats"],
+    queryFn: () => apiClient.get("/workspace/stats"),
   });
 };
 
 // hooks/useWorkspaceTasks.ts
 const useWorkspaceTasks = (params: TaskParams) => {
   return useQuery({
-    queryKey: ['workspace', 'tasks', params],
-    queryFn: () => apiClient.get('/workspace/tasks', { params }),
+    queryKey: ["workspace", "tasks", params],
+    queryFn: () => apiClient.get("/workspace/tasks", { params }),
   });
 };
 ```
@@ -190,17 +190,17 @@ const useWorkspaceTasks = (params: TaskParams) => {
 
 **任务清单**:
 
-* [ ] 创建 `ProjectContext` 上下文
+- [ ] 创建 `ProjectContext` 上下文
 
-* [ ] 提取 `NamespaceSidebar` 组件
+- [ ] 提取 `NamespaceSidebar` 组件
 
-* [ ] 提取 `KeyListTable` 组件
+- [ ] 提取 `KeyListTable` 组件
 
-* [ ] 提取 `FilterBar` 组件
+- [ ] 提取 `FilterBar` 组件
 
-* [ ] 重构编辑器为 `TranslationEditorModal`
+- [ ] 重构编辑器为 `TranslationEditorModal`
 
-* [ ] 更新路由 `/translations`
+- [ ] 更新路由 `/translations`
 
 **组件设计**:
 
@@ -229,7 +229,7 @@ const useWorkspaceTasks = (params: TaskParams) => {
       </Content>
     </Layout>
   </ProjectProvider>
-  
+
   <TranslationEditorModal
     open={!!selectedKey}
     keyId={selectedKey?.id}
@@ -267,15 +267,15 @@ const useWorkspaceTasks = (params: TaskParams) => {
 
 **提取组件清单**:
 
-* [ ] `StatusBadge` - 统一状态徽章
+- [ ] `StatusBadge` - 统一状态徽章
 
-* [ ] `PageHeader` - 页面头部（标题 + 操作按钮）
+- [ ] `PageHeader` - 页面头部（标题 + 操作按钮）
 
-* [ ] `FilterBar` - 筛选工具栏
+- [ ] `FilterBar` - 筛选工具栏
 
-* [ ] `ComingSoonModal` - 功能未上线提示
+- [ ] `ComingSoonModal` - 功能未上线提示
 
-* [ ] `EmptyState` - 空状态（多种类型）
+- [ ] `EmptyState` - 空状态（多种类型）
 
 **组件目录**:
 
@@ -295,7 +295,7 @@ src/components/
     └── ReleaseHistoryTable.tsx
 ```
 
-***
+---
 
 ### 4.2 Week 2：ReleaseCenter 与权限体系
 
@@ -303,37 +303,37 @@ src/components/
 
 **任务清单**:
 
-* [ ] 创建 `ReleaseCenter.tsx`
+- [ ] 创建 `ReleaseCenter.tsx`
 
-* [ ] 实现 `CurrentReleaseCard` 组件
+- [ ] 实现 `CurrentReleaseCard` 组件
 
-* [ ] 实现 `ReleaseHistoryTable` 组件
+- [ ] 实现 `ReleaseHistoryTable` 组件
 
-* [ ] 迁移 `PublishDrawer` 为 `PublishModal`
+- [ ] 迁移 `PublishDrawer` 为 `PublishModal`
 
-* [ ] 更新路由 `/releases`
+- [ ] 更新路由 `/releases`
 
 **组件设计**:
 
 ```typescript
 <ReleaseCenter>
-  <PageHeader 
-    title="发布中心" 
+  <PageHeader
+    title="发布中心"
     extra={<Button type="primary" onClick={() => setPublishOpen(true)}>创建发布</Button>}
   />
-  
-  <CurrentReleaseCard 
+
+  <CurrentReleaseCard
     release={currentRelease}
     onRollback={handleRollback}
   />
-  
+
   <ReleaseHistoryTable
     releases={releases}
     pagination={pagination}
     onPageChange={handlePageChange}
     onViewDetail={handleViewDetail}
   />
-  
+
   <PublishModal
     open={isPublishOpen}
     onClose={() => setPublishOpen(false)}
@@ -346,13 +346,13 @@ src/components/
 
 **任务清单**:
 
-* [ ] 创建 `usePermission` hook
+- [ ] 创建 `usePermission` hook
 
-* [ ] 创建 `useFeatures` hook
+- [ ] 创建 `useFeatures` hook
 
-* [ ] 创建 `RequireRole` 路由守卫组件
+- [ ] 创建 `RequireRole` 路由守卫组件
 
-* [ ] 更新 Sidebar 动态渲染
+- [ ] 更新 Sidebar 动态渲染
 
 **Hook 设计**:
 
@@ -361,21 +361,21 @@ src/components/
 export const usePermission = () => {
   const { user } = useAppStore();
   const { data: features } = useFeatures();
-  
+
   return {
     user,
     features,
-    canReview: user?.role === 'REVIEWER' || user?.role === 'ADMIN',
-    canPublish: user?.role === 'ADMIN',
-    canManageMembers: user?.role === 'ADMIN',
+    canReview: user?.role === "REVIEWER" || user?.role === "ADMIN",
+    canPublish: user?.role === "ADMIN",
+    canManageMembers: user?.role === "ADMIN",
   };
 };
 
 // hooks/useFeatures.ts
 export const useFeatures = () => {
   return useQuery({
-    queryKey: ['config', 'features'],
-    queryFn: () => apiClient.get('/config/features'),
+    queryKey: ["config", "features"],
+    queryFn: () => apiClient.get("/config/features"),
     staleTime: 5 * 60 * 1000, // 5分钟缓存
   });
 };
@@ -387,13 +387,13 @@ export const useFeatures = () => {
 const Sidebar = () => {
   const { canReview, features } = usePermission();
   const location = useLocation();
-  
+
   const items = useMemo(() => {
     const baseItems = [
       { key: '/workspace', icon: <HomeOutlined />, label: '工作台' },
       { key: '/translations', icon: <TranslationOutlined />, label: '翻译管理' },
     ];
-    
+
     if (canReview && features?.review) {
       baseItems.push({
         key: '/reviews',
@@ -401,15 +401,15 @@ const Sidebar = () => {
         label: '审核工作台',
       });
     }
-    
+
     baseItems.push(
       { key: '/releases', icon: <RocketOutlined />, label: '发布中心' },
       { key: '/settings', icon: <SettingOutlined />, label: '项目设置' }
     );
-    
+
     return baseItems;
   }, [canReview, features]);
-  
+
   return <Menu items={items} selectedKeys={[location.pathname]} />;
 };
 ```
@@ -418,15 +418,15 @@ const Sidebar = () => {
 
 **任务清单**:
 
-* [ ] 完善 `ComingSoonModal` 组件
+- [ ] 完善 `ComingSoonModal` 组件
 
-* [ ] 在 DashboardPage 添加导入按钮（预留）
+- [ ] 在 DashboardPage 添加导入按钮（预留）
 
-* [ ] 创建 `ReviewDashboard` 占位组件
+- [ ] 创建 `ReviewDashboard` 占位组件
 
-* [ ] 创建 `MemberManagement` 占位组件
+- [ ] 创建 `MemberManagement` 占位组件
 
-* [ ] 创建 `ImportPreview` 占位组件
+- [ ] 创建 `ImportPreview` 占位组件
 
 **ComingSoonModal 使用**:
 
@@ -434,7 +434,7 @@ const Sidebar = () => {
 const DashboardPage = () => {
   const { features } = usePermission();
   const [importModalOpen, setImportModalOpen] = useState(false);
-  
+
   const handleImportClick = () => {
     if (!features?.import) {
       setImportModalOpen(true);
@@ -442,13 +442,13 @@ const DashboardPage = () => {
     }
     navigate('/imports');
   };
-  
+
   return (
     <>
       <QuickActions>
         <ActionButton text="导入词条" onClick={handleImportClick} />
       </QuickActions>
-      
+
       <ComingSoonModal
         open={importModalOpen}
         title="导入功能"
@@ -466,11 +466,11 @@ const DashboardPage = () => {
 ```typescript
 const ReviewDashboard = () => {
   const { canReview } = usePermission();
-  
+
   if (!canReview) {
     return <Navigate to="/workspace" replace />;
   }
-  
+
   // 实际功能待后端接口就绪后实现
   return (
     <PageHeader title="审核工作台" />
@@ -491,37 +491,37 @@ const ReviewDashboard = () => {
 // App.tsx
 <Routes>
   <Route path="/login" element={<LoginPage />} />
-  
+
   <Route path="/" element={<ProtectedRoute><MainLayout /></ProtectedRoute>}>
     {/* 默认跳转工作台 */}
     <Route index element={<Navigate to="/workspace" replace />} />
-    
+
     {/* 工作台 */}
     <Route path="workspace" element={<DashboardPage />} />
-    
+
     {/* 翻译管理 */}
     <Route path="translations" element={<TranslationWorkspace />} />
-    
+
     {/* 审核工作台（权限控制） */}
-    <Route 
-      path="reviews" 
+    <Route
+      path="reviews"
       element={
         <RequireRole roles={['REVIEWER', 'ADMIN']}>
           <ReviewDashboard />
         </RequireRole>
-      } 
+      }
     />
-    
+
     {/* 发布中心 */}
     <Route path="releases" element={<ReleaseCenter />} />
-    
+
     {/* 项目设置 */}
     <Route path="settings" element={<ProjectSettings />}>
       <Route index element={<GeneralSettings />} />
       <Route path="members" element={<MemberManagement />} />
     </Route>
   </Route>
-  
+
   <Route path="*" element={<NotFoundPage />} />
 </Routes>
 ```
@@ -531,18 +531,18 @@ const ReviewDashboard = () => {
 ```typescript
 const Header = () => {
   const { projects, currentProject, switchProject } = useProject();
-  
+
   return (
     <AntHeader>
       <div className="logo">Lingux</div>
-      
+
       <Select
         value={currentProject?.id}
         onChange={switchProject}
         style={{ width: 200 }}
         options={projects.map(p => ({ value: p.id, label: p.name }))}
       />
-      
+
       <Space>
         <NotificationBell />
         <UserMenu />
@@ -552,7 +552,7 @@ const Header = () => {
 };
 ```
 
-***
+---
 
 ### 4.3 Week 3：优化与联调
 
@@ -560,23 +560,23 @@ const Header = () => {
 
 **任务清单**:
 
-* [ ] 实现 `LoadingSkeleton` 组件（列表/卡片/详情）
+- [ ] 实现 `LoadingSkeleton` 组件（列表/卡片/详情）
 
-* [ ] 实现多种 `EmptyState`（无数据/无权限/无网络）
+- [ ] 实现多种 `EmptyState`（无数据/无权限/无网络）
 
-* [ ] 实现 `ErrorBoundary` 错误边界
+- [ ] 实现 `ErrorBoundary` 错误边界
 
-* [ ] 为所有列表页添加骨架屏
+- [ ] 为所有列表页添加骨架屏
 
 **EmptyState 类型**:
 
 ```typescript
-type EmptyType = 
-  | 'no-data'        // 暂无数据
-  | 'no-permission'  // 无权限访问
-  | 'no-network'     // 网络异常
-  | 'no-result'      // 搜索无结果
-  | 'construction';  // 功能开发中
+type EmptyType =
+  | "no-data" // 暂无数据
+  | "no-permission" // 无权限访问
+  | "no-network" // 网络异常
+  | "no-result" // 搜索无结果
+  | "construction"; // 功能开发中
 
 interface EmptyStateProps {
   type: EmptyType;
@@ -590,13 +590,13 @@ interface EmptyStateProps {
 
 **任务清单**:
 
-* [ ] 完善 `ProjectContext`
+- [ ] 完善 `ProjectContext`
 
-* [ ] 在需要的地方包裹 `ProjectProvider`
+- [ ] 在需要的地方包裹 `ProjectProvider`
 
-* [ ] 实现 `useProject` hook
+- [ ] 实现 `useProject` hook
 
-* [ ] 优化项目切换后的数据刷新
+- [ ] 优化项目切换后的数据刷新
 
 **ProjectContext 设计**:
 
@@ -611,14 +611,14 @@ interface ProjectContextType {
 
 const ProjectContext = createContext<ProjectContextType | null>(null);
 
-export const ProjectProvider: React.FC<{ projectId: string }> = ({ 
-  projectId, 
-  children 
+export const ProjectProvider: React.FC<{ projectId: string }> = ({
+  projectId,
+  children
 }) => {
   const { data: project, isLoading, refetch } = useProjectDetail(projectId);
   const { data: namespaces } = useNamespaces(projectId);
   const { data: locales } = useProjectLocales(projectId);
-  
+
   return (
     <ProjectContext.Provider value={{
       project,
@@ -637,15 +637,15 @@ export const ProjectProvider: React.FC<{ projectId: string }> = ({
 
 **联调清单**:
 
-* [ ] `/workspace/stats` - 工作台统计
+- [ ] `/workspace/stats` - 工作台统计
 
-* [ ] `/workspace/tasks` - 工作台待办
+- [ ] `/workspace/tasks` - 工作台待办
 
-* [ ] `/config/features` - 功能开关
+- [ ] `/config/features` - 功能开关
 
-* [ ] 审核相关接口（后续迭代）
+- [ ] 审核相关接口（后续迭代）
 
-***
+---
 
 ## 五、组件架构
 
@@ -754,7 +754,7 @@ ReviewDashboard（预留）
 └── fallback: EmptyState(type: 'construction')
 ```
 
-***
+---
 
 ## 六、验收标准
 
@@ -814,28 +814,28 @@ ReviewDashboard（预留）
 □ 错误边界捕获异常，不白屏
 ```
 
-***
+---
 
 ## 附录
 
 ### A. 命名规范
 
-| 类型   | 命名规则                 | 示例                       |
-| ---- | -------------------- | ------------------------ |
-| 组件   | PascalCase           | `TranslationEditorModal` |
-| Hook | camelCase，以 use 开头   | `useWorkspaceStats`      |
-| 工具函数 | camelCase            | `formatDate`             |
-| 常量   | UPPER\_SNAKE\_CASE   | `DEFAULT_PAGE_SIZE`      |
-| 类型   | PascalCase + Type 后缀 | `TranslationType`        |
+| 类型     | 命名规则               | 示例                     |
+| -------- | ---------------------- | ------------------------ |
+| 组件     | PascalCase             | `TranslationEditorModal` |
+| Hook     | camelCase，以 use 开头 | `useWorkspaceStats`      |
+| 工具函数 | camelCase              | `formatDate`             |
+| 常量     | UPPER_SNAKE_CASE       | `DEFAULT_PAGE_SIZE`      |
+| 类型     | PascalCase + Type 后缀 | `TranslationType`        |
 
 ### B. 文件模板
 
 **组件文件模板**:
 
 ```typescript
-import React from 'react';
-import {  } from 'antd';
-import styles from './ComponentName.module.css';
+import React from "react";
+import {} from "antd";
+import styles from "./ComponentName.module.css";
 
 interface ComponentNameProps {
   // props 定义
@@ -851,17 +851,17 @@ export default ComponentName;
 **Hook 文件模板**:
 
 ```typescript
-import { useQuery } from '@tanstack/react-query';
-import apiClient from '@/api/client';
+import { useQuery } from "@tanstack/react-query";
+import apiClient from "@/api/client";
 
 export const useHookName = (params: ParamsType) => {
   return useQuery({
-    queryKey: ['key', params],
-    queryFn: () => apiClient.get('/endpoint', { params }),
+    queryKey: ["key", params],
+    queryFn: () => apiClient.get("/endpoint", { params }),
   });
 };
 ```
 
-***
+---
 
 **文档结束**

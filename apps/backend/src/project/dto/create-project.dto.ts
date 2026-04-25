@@ -1,4 +1,11 @@
-import { IsString, IsOptional, IsNotEmpty, IsArray } from 'class-validator';
+import {
+  IsString,
+  IsOptional,
+  IsNotEmpty,
+  IsArray,
+  IsBoolean,
+  MaxLength,
+} from 'class-validator';
 
 export class CreateProjectDto {
   @IsString()
@@ -7,6 +14,7 @@ export class CreateProjectDto {
 
   @IsString()
   @IsOptional()
+  @MaxLength(50, { message: 'Description must not exceed 50 characters' })
   description?: string;
 
   @IsString()
@@ -17,4 +25,8 @@ export class CreateProjectDto {
   @IsString({ each: true })
   @IsOptional()
   localeIds?: string[];
+
+  @IsBoolean()
+  @IsOptional()
+  autoTranslateEnabled?: boolean = false;
 }

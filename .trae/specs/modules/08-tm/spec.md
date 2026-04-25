@@ -4,7 +4,7 @@
 **模块名称**: 翻译记忆 (TM)  
 **版本**: v1.0  
 **最后更新**: 2026-03-17  
-**迭代计划**: 第 3 迭代  
+**迭代计划**: 第 3 迭代
 
 ---
 
@@ -15,6 +15,7 @@
 翻译记忆（Translation Memory, TM）存储历史翻译，在新翻译时提供相似内容推荐，提高翻译效率和一致性。
 
 **功能**：
+
 - TM 数据存储
 - 相似度匹配
 - 实时推荐
@@ -35,7 +36,7 @@
 ```typescript
 interface TranslationMemory {
   id: string;
-  projectId?: string;           // null 表示全局 TM
+  projectId?: string; // null 表示全局 TM
   sourceText: string;
   sourceLocale: string;
   targetText: string;
@@ -45,8 +46,8 @@ interface TranslationMemory {
     namespace?: string;
     pagePath?: string;
   };
-  quality: number;              // 质量评分 0-100
-  usageCount: number;           // 被使用次数
+  quality: number; // 质量评分 0-100
+  usageCount: number; // 被使用次数
   lastUsedAt?: Date;
   createdAt: Date;
 }
@@ -64,24 +65,25 @@ interface TranslationMemory {
 | < 75% | 低匹配 | 灰色 | 忽略 |
 
 **匹配算法**：
+
 ```typescript
 function calculateSimilarity(source: string, tmSource: string): number {
   // 1. 标准化处理
   const normalized1 = normalize(source);
   const normalized2 = normalize(tmSource);
-  
+
   // 2. 完全匹配检查
   if (normalized1 === normalized2) return 100;
-  
+
   // 3. 编辑距离计算 (Levenshtein Distance)
   const distance = levenshteinDistance(normalized1, normalized2);
   const maxLength = Math.max(normalized1.length, normalized2.length);
   const similarity = (1 - distance / maxLength) * 100;
-  
+
   // 4. 占位符差异惩罚
   const placeholderDiff = comparePlaceholders(source, tmSource);
   const adjustedSimilarity = similarity * (1 - placeholderDiff * 0.1);
-  
+
   return Math.round(adjustedSimilarity);
 }
 ```
@@ -126,19 +128,19 @@ model TranslationMemory {
   id            String   @id @default(cuid())
   projectId     String?  // null 表示全局 TM
   project       Project? @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  
+
   sourceText    String
   sourceLocale  String
   targetText    String
   targetLocale  String
-  
+
   context       Json?    // { keyName, namespace, pagePath }
   quality       Int      @default(100)
   usageCount    Int      @default(0)
   lastUsedAt    DateTime?
-  
+
   createdAt     DateTime @default(now())
-  
+
   @@index([projectId, sourceLocale, targetLocale])
 }
 ```
@@ -154,12 +156,14 @@ model TranslationMemory {
 **功能**: 搜索相似翻译  
 **权限**: 项目成员  
 **查询参数**:
+
 - `text`: 待翻译文本
 - `sourceLocale`: 源语言
 - `targetLocale`: 目标语言
 - `minMatch`: 最小匹配率（默认 75）
 
 **响应**:
+
 ```json
 {
   "code": 200,

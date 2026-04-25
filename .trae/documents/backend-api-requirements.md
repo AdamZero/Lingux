@@ -19,21 +19,21 @@
 
 ### 1.1 本次需求接口
 
-| 序号 | 接口 | 方法 | 优先级 | 用途 | 阻塞功能 |
-|------|------|------|--------|------|----------|
-| 1 | `/workspace/stats` | GET | P0 | 工作台统计数据 | DashboardPage 统计卡片 |
-| 2 | `/workspace/tasks` | GET | P0 | 工作台待办任务 | DashboardPage 我的待办 |
-| 3 | `/config/features` | GET | P1 | 功能开关配置 | ComingSoon 判断 |
+| 序号 | 接口               | 方法 | 优先级 | 用途           | 阻塞功能               |
+| ---- | ------------------ | ---- | ------ | -------------- | ---------------------- |
+| 1    | `/workspace/stats` | GET  | P0     | 工作台统计数据 | DashboardPage 统计卡片 |
+| 2    | `/workspace/tasks` | GET  | P0     | 工作台待办任务 | DashboardPage 我的待办 |
+| 3    | `/config/features` | GET  | P1     | 功能开关配置   | ComingSoon 判断        |
 
 ### 1.2 后续迭代接口（供参考）
 
-| 序号 | 接口 | 方法 | 优先级 | 用途 |
-|------|------|------|--------|------|
-| 4 | `/reviews` | GET | P1 | 审核任务列表 |
-| 5 | `/reviews/:id/approve` | POST | P1 | 审核通过 |
-| 6 | `/reviews/:id/reject` | POST | P1 | 审核退回 |
-| 7 | `/imports/preview` | POST | P1 | 导入预览 |
-| 8 | `/imports/:id/confirm` | POST | P1 | 确认导入 |
+| 序号 | 接口                   | 方法 | 优先级 | 用途         |
+| ---- | ---------------------- | ---- | ------ | ------------ |
+| 4    | `/reviews`             | GET  | P1     | 审核任务列表 |
+| 5    | `/reviews/:id/approve` | POST | P1     | 审核通过     |
+| 6    | `/reviews/:id/reject`  | POST | P1     | 审核退回     |
+| 7    | `/imports/preview`     | POST | P1     | 导入预览     |
+| 8    | `/imports/:id/confirm` | POST | P1     | 确认导入     |
 
 ---
 
@@ -48,36 +48,38 @@ GET /api/v1/workspace/stats
 ```
 
 **请求头**:
+
 ```
 Authorization: Bearer {token}
 ```
 
 **响应**:
+
 ```json
 {
   "code": 0,
   "data": {
-    "pending": 42,      // 待翻译数量（当前用户有权限且状态为 PENDING 的翻译）
-    "reviewing": 15,    // 审核中数量（当前用户提交的正在审核的翻译）
-    "approved": 128     // 已通过数量（当前用户本月审核通过的翻译）
+    "pending": 42, // 待翻译数量（当前用户有权限且状态为 PENDING 的翻译）
+    "reviewing": 15, // 审核中数量（当前用户提交的正在审核的翻译）
+    "approved": 128 // 已通过数量（当前用户本月审核通过的翻译）
   }
 }
 ```
 
 **统计规则说明**:
 
-| 字段 | 统计范围 | 权限要求 |
-|------|----------|----------|
-| `pending` | 当前项目下，状态为 PENDING 的翻译数量 | 用户有 EDIT 权限的命名空间 |
-| `reviewing` | 当前用户提交，状态为 REVIEWING 的翻译数量 | 用户自己提交的 |
-| `approved` | 当前用户提交，状态为 APPROVED 的翻译数量 | 本月数据 |
+| 字段        | 统计范围                                  | 权限要求                   |
+| ----------- | ----------------------------------------- | -------------------------- |
+| `pending`   | 当前项目下，状态为 PENDING 的翻译数量     | 用户有 EDIT 权限的命名空间 |
+| `reviewing` | 当前用户提交，状态为 REVIEWING 的翻译数量 | 用户自己提交的             |
+| `approved`  | 当前用户提交，状态为 APPROVED 的翻译数量  | 本月数据                   |
 
 **错误码**:
 
-| 错误码 | 说明 |
-|--------|------|
-| 401 | 未登录或 token 过期 |
-| 403 | 无项目访问权限 |
+| 错误码 | 说明                |
+| ------ | ------------------- |
+| 401    | 未登录或 token 过期 |
+| 403    | 无项目访问权限      |
 
 ---
 
@@ -90,19 +92,21 @@ GET /api/v1/workspace/tasks
 ```
 
 **请求头**:
+
 ```
 Authorization: Bearer {token}
 ```
 
 **查询参数**:
 
-| 参数 | 类型 | 必填 | 说明 | 默认值 |
-|------|------|------|------|--------|
-| `status` | string | 否 | 筛选状态：`PENDING` / `REVIEWING` | 无（全部） |
-| `limit` | number | 否 | 返回数量限制 | 10 |
-| `projectId` | string | 是 | 当前项目 ID | - |
+| 参数        | 类型   | 必填 | 说明                              | 默认值     |
+| ----------- | ------ | ---- | --------------------------------- | ---------- |
+| `status`    | string | 否   | 筛选状态：`PENDING` / `REVIEWING` | 无（全部） |
+| `limit`     | number | 否   | 返回数量限制                      | 10         |
+| `projectId` | string | 是   | 当前项目 ID                       | -          |
 
 **响应**:
+
 ```json
 {
   "code": 0,
@@ -110,24 +114,26 @@ Authorization: Bearer {token}
     "items": [
       {
         "id": "task_001",
-        "type": "TRANSLATION",      // 任务类型：TRANSLATION / REVIEW
+        "type": "TRANSLATION", // 任务类型：TRANSLATION / REVIEW
         "title": "翻译 checkout.button.submit",
         "description": "结算页提交按钮",
-        "priority": "HIGH",           // 优先级：HIGH / MEDIUM / LOW
-        "status": "PENDING",          // 状态：PENDING / REVIEWING
-        "dueDate": "2026-03-20",      // 截止日期（可选）
+        "priority": "HIGH", // 优先级：HIGH / MEDIUM / LOW
+        "status": "PENDING", // 状态：PENDING / REVIEWING
+        "dueDate": "2026-03-20", // 截止日期（可选）
         "key": {
           "id": "key_001",
           "name": "checkout.button.submit",
           "namespace": "common",
           "description": "结算页提交按钮"
         },
-        "sourceTranslation": {        // 原文（baseLocale）
+        "sourceTranslation": {
+          // 原文（baseLocale）
           "id": "trans_001",
           "content": "Submit",
           "locale": "en-US"
         },
-        "targetLocale": {             // 目标语言
+        "targetLocale": {
+          // 目标语言
           "code": "zh-CN",
           "name": "简体中文"
         },
@@ -142,20 +148,20 @@ Authorization: Bearer {token}
 
 **任务类型说明**:
 
-| 类型 | 说明 | 适用角色 |
-|------|------|----------|
-| `TRANSLATION` | 需要翻译的任务 | EDITOR |
-| `REVIEW` | 需要审核的任务 | REVIEWER, ADMIN |
+| 类型          | 说明           | 适用角色        |
+| ------------- | -------------- | --------------- |
+| `TRANSLATION` | 需要翻译的任务 | EDITOR          |
+| `REVIEW`      | 需要审核的任务 | REVIEWER, ADMIN |
 
 **排序规则**: 按优先级降序，再按更新时间降序
 
 **错误码**:
 
-| 错误码 | 说明 |
-|--------|------|
-| 400 | 参数错误 |
-| 401 | 未登录或 token 过期 |
-| 403 | 无项目访问权限 |
+| 错误码 | 说明                |
+| ------ | ------------------- |
+| 400    | 参数错误            |
+| 401    | 未登录或 token 过期 |
+| 403    | 无项目访问权限      |
 
 ---
 
@@ -170,44 +176,47 @@ GET /api/v1/config/features
 ```
 
 **请求头**:
+
 ```
 Authorization: Bearer {token}
 ```
 
 **响应**:
+
 ```json
 {
   "code": 0,
   "data": {
-    "review": true,       // 审核功能开关
-    "import": false,      // 导入功能开关
-    "invite": false,      // 邀请功能开关
-    "llm": false,         // LLM翻译功能开关（预留）
-    "tm": false           // 翻译记忆功能开关（预留）
+    "review": true, // 审核功能开关
+    "import": false, // 导入功能开关
+    "invite": false, // 邀请功能开关
+    "llm": false, // LLM翻译功能开关（预留）
+    "tm": false // 翻译记忆功能开关（预留）
   }
 }
 ```
 
 **开关说明**:
 
-| 开关 | 控制功能 | 默认状态 |
-|------|----------|----------|
-| `review` | 审核工作台菜单和页面 | false |
-| `import` | 导入按钮和功能入口 | false |
-| `invite` | 成员邀请功能 | false |
-| `llm` | LLM自动翻译 | false |
-| `tm` | 翻译记忆提示 | false |
+| 开关     | 控制功能             | 默认状态 |
+| -------- | -------------------- | -------- |
+| `review` | 审核工作台菜单和页面 | false    |
+| `import` | 导入按钮和功能入口   | false    |
+| `invite` | 成员邀请功能         | false    |
+| `llm`    | LLM自动翻译          | false    |
+| `tm`     | 翻译记忆提示         | false    |
 
 **建议实现方式**:
+
 - 数据库配置表存储开关状态
 - 支持按项目维度配置（可选）
 - 支持热更新，无需重启服务
 
 **错误码**:
 
-| 错误码 | 说明 |
-|--------|------|
-| 401 | 未登录或 token 过期 |
+| 错误码 | 说明                |
+| ------ | ------------------- |
+| 401    | 未登录或 token 过期 |
 
 ---
 
@@ -223,14 +232,15 @@ GET /api/v1/reviews
 
 **查询参数**:
 
-| 参数 | 类型 | 必填 | 说明 |
-|------|------|------|------|
-| `status` | string | 否 | `pending` / `completed` |
-| `projectId` | string | 是 | 项目 ID |
-| `page` | number | 否 | 页码，默认 1 |
-| `pageSize` | number | 否 | 每页数量，默认 20 |
+| 参数        | 类型   | 必填 | 说明                    |
+| ----------- | ------ | ---- | ----------------------- |
+| `status`    | string | 否   | `pending` / `completed` |
+| `projectId` | string | 是   | 项目 ID                 |
+| `page`      | number | 否   | 页码，默认 1            |
+| `pageSize`  | number | 否   | 每页数量，默认 20       |
 
 **响应**:
+
 ```json
 {
   "code": 0,
@@ -273,6 +283,7 @@ POST /api/v1/reviews/:id/approve
 ```
 
 **响应**:
+
 ```json
 {
   "code": 0,
@@ -295,6 +306,7 @@ POST /api/v1/reviews/:id/reject
 ```
 
 **请求体**:
+
 ```json
 {
   "reason": "占位符不匹配，原文有 {count} 但译文没有",
@@ -303,6 +315,7 @@ POST /api/v1/reviews/:id/reject
 ```
 
 **响应**:
+
 ```json
 {
   "code": 0,
@@ -327,22 +340,22 @@ POST /api/v1/reviews/:id/reject
 
 ```json
 {
-  "code": 0,           // 0 表示成功，非 0 表示错误
+  "code": 0, // 0 表示成功，非 0 表示错误
   "message": "success", // 错误时的提示信息
-  "data": {}           // 响应数据
+  "data": {} // 响应数据
 }
 ```
 
 ### B. 通用错误码
 
-| 错误码 | 说明 |
-|--------|------|
-| 0 | 成功 |
-| 400 | 请求参数错误 |
-| 401 | 未认证（token 缺失或过期） |
-| 403 | 无权限访问 |
-| 404 | 资源不存在 |
-| 500 | 服务器内部错误 |
+| 错误码 | 说明                       |
+| ------ | -------------------------- |
+| 0      | 成功                       |
+| 400    | 请求参数错误               |
+| 401    | 未认证（token 缺失或过期） |
+| 403    | 无权限访问                 |
+| 404    | 资源不存在                 |
+| 500    | 服务器内部错误             |
 
 ### C. 数据模型建议
 
@@ -351,13 +364,13 @@ POST /api/v1/reviews/:id/reject
 ```typescript
 interface Task {
   id: string;
-  type: 'TRANSLATION' | 'REVIEW';
-  userId: string;           // 任务分配给哪个用户
+  type: "TRANSLATION" | "REVIEW";
+  userId: string; // 任务分配给哪个用户
   projectId: string;
   keyId: string;
-  translationId?: string;   // 已有的翻译 ID（编辑场景）
-  status: 'PENDING' | 'IN_PROGRESS' | 'COMPLETED';
-  priority: 'HIGH' | 'MEDIUM' | 'LOW';
+  translationId?: string; // 已有的翻译 ID（编辑场景）
+  status: "PENDING" | "IN_PROGRESS" | "COMPLETED";
+  priority: "HIGH" | "MEDIUM" | "LOW";
   dueDate?: Date;
   createdAt: Date;
   updatedAt: Date;

@@ -13,8 +13,7 @@ export const useFeatures = () => {
   return useQuery<Features>({
     queryKey: ["config", "features"],
     queryFn: async () => {
-      const response = await apiClient.get("/config/features");
-      return response.data;
+      return await apiClient.get("/config/features");
     },
     staleTime: 5 * 60 * 1000, // 5分钟缓存
     placeholderData: {

@@ -3,11 +3,7 @@ import {
   App as AntdApp,
   Button,
   Card,
-  Descriptions,
   Drawer,
-  Form,
-  Input,
-  Modal,
   Select,
   Space,
   Table,
@@ -19,12 +15,8 @@ import { createTwoFilesPatch } from "diff";
 import { Diff, Hunk, parseDiff } from "react-diff-view";
 import "react-diff-view/style/index.css";
 import {
-  approveReleaseSession,
   getActiveReleaseSession,
   getReleaseSession,
-  publishReleaseSession,
-  rejectReleaseSession,
-  submitReleaseSession,
   previewRelease,
 } from "@/api/releases";
 import type {
@@ -34,11 +26,14 @@ import type {
   PreviewReleasePayload,
   ReleaseSession,
   ReleaseSessionLockedError,
-  ReleaseValidationError,
-  ValidationFailedError,
 } from "@/types/release";
 
 type LocaleOption = { code: string; name: string };
+
+interface NamespaceOption {
+  id: string;
+  name: string;
+}
 
 type Props = {
   open: boolean;
@@ -49,6 +44,9 @@ type Props = {
   currentReleaseId?: string | null;
   scope: PreviewReleasePayload["scope"];
   scopeLabel: string;
+  onEditKey?: (keyName: string) => void;
+  namespaces?: NamespaceOption[];
+  allowScopeChange?: boolean;
 };
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
@@ -74,51 +72,109 @@ const extractApiError = (error: unknown) => {
   return { status, data };
 };
 
-const reasonText: Record<ReleaseValidationError["reason"], string> = {
-  MISSING_TRANSLATION: "缺少翻译",
-  EMPTY_CONTENT: "内容为空",
-  PLACEHOLDER_MISMATCH: "占位符不一致",
-  ICU_INVALID: "花括号不平衡",
-};
-
 const PublishDrawer: React.FC<Props> = (props) => {
   const { message } = AntdApp.useApp();
-  const [form] = Form.useForm<{ localeCodes: string[] }>();
-
   const [preview, setPreview] = useState<PreviewReleaseResponse | null>(null);
   const isInitializingRef = useRef(false);
-  const autoPreviewTimerRef = useRef<number | null>(null);
-  const lastAutoPreviewKeyRef = useRef<string | null>(null);
-  const watchedLocaleCodes = Form.useWatch("localeCodes", form);
+
+  // Scope selection state (only for batch publish)
+  const [selectedNamespaceIds, setSelectedNamespaceIds] = useState<string[]>(
+    [],
+  );
+
+  // Initialize scope from props
+  useEffect(() => {
+    if (props.open) {
+      if (props.scope.type === "namespaces") {
+        setSelectedNamespaceIds(props.scope.namespaceIds);
+      } else {
+        setSelectedNamespaceIds([]);
+      }
+    }
+  }, [props.open, props.scope]);
 
   const allLocaleCodes = useMemo(
     () => props.locales.map((l) => l.code),
     [props.locales],
   );
-  const defaultLocaleCodes = useMemo(() => {
-    if (!props.baseLocale) {
-      return allLocaleCodes;
-    }
-    const set = new Set(allLocaleCodes);
-    set.add(props.baseLocale);
-    return Array.from(set);
-  }, [allLocaleCodes, props.baseLocale]);
 
-  const errorColumns: ColumnsType<ReleaseValidationError> = [
-    { title: "Locale", dataIndex: "localeCode", key: "localeCode", width: 110 },
+  // 合并同一个 key 的错误，按 key 分组，并根据当前 scope 过滤
+  const groupedErrors = useMemo(() => {
+    if (!preview) return [];
+
+    const groupMap = new Map<
+      string,
+      {
+        keyName: string;
+        namespaceName: string;
+        localeCodes: string[];
+      }
+    >();
+
+    // Get the list of allowed namespace IDs based on current scope
+    const allowedNamespaceIds = props.allowScopeChange
+      ? selectedNamespaceIds
+      : props.scope.type === "namespaces"
+        ? props.scope.namespaceIds
+        : null; // null means all namespaces (no filter)
+
+    preview.errors.forEach((error) => {
+      // Filter by namespace if in scoped mode
+      if (
+        allowedNamespaceIds !== null &&
+        !allowedNamespaceIds.includes(error.namespaceId)
+      ) {
+        return;
+      }
+
+      const key = `${error.namespaceId}:${error.keyId}`;
+      if (groupMap.has(key)) {
+        groupMap.get(key)!.localeCodes.push(error.localeCode);
+      } else {
+        groupMap.set(key, {
+          keyName: error.keyName,
+          namespaceName: error.namespaceName,
+          localeCodes: [error.localeCode],
+        });
+      }
+    });
+
+    return Array.from(groupMap.values());
+  }, [preview, props.allowScopeChange, props.scope, selectedNamespaceIds]);
+
+  const errorColumns: ColumnsType<{
+    keyName: string;
+    namespaceName: string;
+    localeCodes: string[];
+  }> = [
+    {
+      title: "Key",
+      dataIndex: "keyName",
+      key: "keyName",
+      width: 200,
+      render: (keyName: string) =>
+        props.onEditKey ? (
+          <Typography.Link
+            onClick={() => props.onEditKey?.(keyName)}
+            style={{ cursor: "pointer" }}
+          >
+            {keyName}
+          </Typography.Link>
+        ) : (
+          keyName
+        ),
+    },
     {
       title: "Namespace",
       dataIndex: "namespaceName",
       key: "namespaceName",
-      width: 140,
+      width: 120,
     },
-    { title: "Key", dataIndex: "keyName", key: "keyName", width: 220 },
     {
-      title: "Reason",
-      dataIndex: "reason",
-      key: "reason",
-      render: (value: ReleaseValidationError["reason"]) =>
-        reasonText[value] ?? value,
+      title: "缺失语言",
+      dataIndex: "localeCodes",
+      key: "localeCodes",
+      render: (localeCodes: string[]) => localeCodes.join(", "),
     },
   ];
 
@@ -145,22 +201,13 @@ const PublishDrawer: React.FC<Props> = (props) => {
       sessionId,
     )) as GetReleaseSessionResponse;
     setPreview(toPreviewFromSession(result.session));
-    if (
-      Array.isArray(result.session.localeCodes) &&
-      result.session.localeCodes.length
-    ) {
-      form.setFieldsValue({ localeCodes: result.session.localeCodes });
-    }
   };
 
   const previewMutation = useMutation({
     mutationFn: async (payload: PreviewReleasePayload) =>
       previewRelease(props.projectId, payload),
-    onSuccess: (data, variables) => {
+    onSuccess: (data) => {
       setPreview(data);
-      if (Array.isArray(variables.localeCodes)) {
-        form.setFieldsValue({ localeCodes: variables.localeCodes });
-      }
     },
     onError: (error: unknown) => {
       const { status, data } = extractApiError(error);
@@ -187,107 +234,6 @@ const PublishDrawer: React.FC<Props> = (props) => {
         return;
       }
       message.error("预览失败");
-    },
-  });
-
-  const submitMutation = useMutation({
-    mutationFn: async (sessionId: string) =>
-      submitReleaseSession(props.projectId, sessionId),
-    onSuccess: async () => {
-      if (!preview) {
-        return;
-      }
-      await loadSession(preview.sessionId);
-      message.success("已提交审核");
-    },
-    onError: (error: unknown) => {
-      const { status, data } = extractApiError(error);
-      if (
-        status === 422 &&
-        isRecord(data) &&
-        data.code === "VALIDATION_FAILED" &&
-        Array.isArray(data.errors)
-      ) {
-        const d = data as unknown as ValidationFailedError;
-        setPreview((prev) =>
-          prev
-            ? {
-                ...prev,
-                canPublish: false,
-                errors: d.errors,
-              }
-            : prev,
-        );
-        message.error("校验失败，请先修复翻译后再提交审核");
-        return;
-      }
-      message.error("提交失败");
-    },
-  });
-
-  const approveMutation = useMutation({
-    mutationFn: async (sessionId: string) =>
-      approveReleaseSession(props.projectId, sessionId),
-    onSuccess: async () => {
-      if (!preview) {
-        return;
-      }
-      await loadSession(preview.sessionId);
-      message.success("已审核通过");
-    },
-    onError: () => {
-      message.error("审核失败");
-    },
-  });
-
-  const rejectMutation = useMutation({
-    mutationFn: async (params: { sessionId: string; reason: string }) =>
-      rejectReleaseSession(props.projectId, params.sessionId, {
-        reason: params.reason,
-      }),
-    onSuccess: async () => {
-      if (!preview) {
-        return;
-      }
-      await loadSession(preview.sessionId);
-      message.success("已驳回");
-    },
-    onError: () => {
-      message.error("驳回失败");
-    },
-  });
-
-  const publishMutation = useMutation({
-    mutationFn: async (sessionId: string) =>
-      publishReleaseSession(props.projectId, sessionId),
-    onSuccess: (res) => {
-      message.success(`发布成功：${res.releaseId}`);
-      setPreview(null);
-      form.resetFields();
-      props.onClose();
-    },
-    onError: (error: unknown) => {
-      const { status, data } = extractApiError(error);
-      if (
-        status === 422 &&
-        isRecord(data) &&
-        data.code === "VALIDATION_FAILED" &&
-        Array.isArray(data.errors)
-      ) {
-        const d = data as unknown as ValidationFailedError;
-        setPreview((prev) =>
-          prev
-            ? {
-                ...prev,
-                canPublish: false,
-                errors: d.errors,
-              }
-            : prev,
-        );
-        message.error("校验失败，请先修复翻译后再发布");
-        return;
-      }
-      message.error("发布失败");
     },
   });
 
@@ -321,25 +267,33 @@ const PublishDrawer: React.FC<Props> = (props) => {
     return files[0] ?? null;
   }, [diffText]);
 
-  const submitPreview = async () => {
-    if (preview && preview.status !== "DRAFT") {
-      message.error("当前会话已提交或已审核，不能重新预览");
-      return;
-    }
-    const values = await form.validateFields();
-    const payload: PreviewReleasePayload = {
-      scope: props.scope,
-      localeCodes: values.localeCodes,
-    };
-    setPreview(null);
-    previewMutation.mutate(payload);
-  };
-
   const close = () => {
     setPreview(null);
-    form.resetFields();
+    setSelectedNamespaceIds([]);
     props.onClose();
   };
+
+  // Compute current scope based on selection
+  const currentScope = useMemo<PreviewReleasePayload["scope"]>(() => {
+    // In batch publish mode (allowScopeChange), always use namespaces scope
+    // In single publish mode, use the scope from props
+    if (props.allowScopeChange) {
+      return { type: "namespaces", namespaceIds: selectedNamespaceIds };
+    }
+    return props.scope;
+  }, [props.allowScopeChange, props.scope, selectedNamespaceIds]);
+
+  // Compute scope label for display
+  const currentScopeLabel = useMemo(() => {
+    if (selectedNamespaceIds.length === 0) {
+      return "未选择命名空间";
+    }
+    if (selectedNamespaceIds.length === 1 && props.namespaces) {
+      const ns = props.namespaces.find((n) => n.id === selectedNamespaceIds[0]);
+      return `命名空间: ${ns?.name ?? selectedNamespaceIds[0]}`;
+    }
+    return `命名空间: ${selectedNamespaceIds.length}个`;
+  }, [selectedNamespaceIds, props.namespaces]);
 
   useEffect(() => {
     if (!props.open) {
@@ -351,21 +305,14 @@ const PublishDrawer: React.FC<Props> = (props) => {
         const res = await getActiveReleaseSession(props.projectId);
         if (res.session) {
           setPreview(toPreviewFromSession(res.session));
-          if (
-            Array.isArray(res.session.localeCodes) &&
-            res.session.localeCodes.length
-          ) {
-            form.setFieldsValue({ localeCodes: res.session.localeCodes });
-          }
           isInitializingRef.current = false;
           return;
         }
 
-        form.setFieldsValue({ localeCodes: defaultLocaleCodes });
         isInitializingRef.current = false;
         previewMutation.mutate({
-          scope: props.scope,
-          localeCodes: defaultLocaleCodes,
+          scope: currentScope,
+          localeCodes: allLocaleCodes,
         });
       } catch {
         isInitializingRef.current = false;
@@ -373,60 +320,12 @@ const PublishDrawer: React.FC<Props> = (props) => {
       }
     })();
   }, [
-    defaultLocaleCodes,
-    form,
+    allLocaleCodes,
     previewMutation,
     props.open,
     props.projectId,
-    props.scope,
+    currentScope,
   ]);
-
-  useEffect(() => {
-    if (!props.open) {
-      return;
-    }
-    const localeCodes = watchedLocaleCodes as string[] | undefined;
-    const canAutoPreview =
-      !isInitializingRef.current && (!preview || preview.status === "DRAFT");
-    if (
-      !canAutoPreview ||
-      !Array.isArray(localeCodes) ||
-      localeCodes.length === 0
-    ) {
-      return;
-    }
-    if (previewMutation.isPending) {
-      return;
-    }
-
-    const normalized = Array.from(new Set(localeCodes)).sort();
-    const autoPreviewKey = JSON.stringify({
-      scope: props.scope,
-      localeCodes: normalized,
-    });
-    if (lastAutoPreviewKeyRef.current === autoPreviewKey) {
-      return;
-    }
-    lastAutoPreviewKeyRef.current = autoPreviewKey;
-
-    if (autoPreviewTimerRef.current) {
-      window.clearTimeout(autoPreviewTimerRef.current);
-    }
-
-    autoPreviewTimerRef.current = window.setTimeout(() => {
-      previewMutation.mutate({
-        scope: props.scope,
-        localeCodes: normalized,
-      });
-    }, 400);
-
-    return () => {
-      if (autoPreviewTimerRef.current) {
-        window.clearTimeout(autoPreviewTimerRef.current);
-        autoPreviewTimerRef.current = null;
-      }
-    };
-  }, [preview, previewMutation, props.open, props.scope, watchedLocaleCodes]);
 
   return (
     <Drawer
@@ -437,200 +336,124 @@ const PublishDrawer: React.FC<Props> = (props) => {
       destroyOnClose
       extra={
         <Space>
-          <Button onClick={close}>Close</Button>
+          <Button onClick={close}>关闭</Button>
+          <Button
+            type="primary"
+            loading={previewMutation.isPending}
+            disabled={!preview}
+            onClick={() => {
+              if (preview) {
+                message.success("草稿已创建");
+                close();
+              }
+            }}
+          >
+            确认创建
+          </Button>
         </Space>
       }
     >
-      <Space direction="vertical" style={{ width: "100%" }} size="large">
-        <Card>
-          <Descriptions size="small" column={1}>
-            <Descriptions.Item label="Scope">
-              {props.scopeLabel}
-            </Descriptions.Item>
-            <Descriptions.Item label="Current Release">
-              <Typography.Text code>
-                {props.currentReleaseId || "-"}
-              </Typography.Text>
-            </Descriptions.Item>
-            <Descriptions.Item label="Session">
-              <Space>
-                <Typography.Text code>
-                  {preview?.sessionId ?? "-"}
-                </Typography.Text>
-                <Typography.Text type="secondary">
-                  {preview?.status ?? "-"}
-                </Typography.Text>
-              </Space>
-            </Descriptions.Item>
-            <Descriptions.Item label="Base Release">
-              <Typography.Text code>
-                {preview?.baseReleaseId ?? "-"}
-              </Typography.Text>
-            </Descriptions.Item>
-            <Descriptions.Item label="Can Publish">
-              {preview ? (
-                <Typography.Text
-                  type={preview.canPublish ? "success" : "danger"}
-                >
-                  {preview.canPublish ? "YES" : "NO"}
-                </Typography.Text>
-              ) : (
-                <Typography.Text type="secondary">-</Typography.Text>
-              )}
-            </Descriptions.Item>
-          </Descriptions>
-        </Card>
-
-        <Card title="Preview" size="small">
-          <Form
-            form={form}
-            layout="vertical"
-            initialValues={{
-              localeCodes: defaultLocaleCodes,
-            }}
-          >
-            <Form.Item
-              name="localeCodes"
-              label="Locales"
-              rules={[{ required: true, message: "请选择至少一个 locale" }]}
-            >
+      <div
+        style={{
+          display: "flex",
+          flexDirection: "column",
+          height: "calc(100vh - 120px)",
+          gap: 16,
+        }}
+      >
+        {/* Scope Selection - Only show in batch publish mode */}
+        {props.allowScopeChange &&
+          props.namespaces &&
+          props.namespaces.length > 0 && (
+            <Card size="small" title="选择要发布的命名空间">
               <Select
                 mode="multiple"
-                showSearch
-                optionFilterProp="label"
-                disabled={!!preview && preview.status !== "DRAFT"}
-                options={props.locales.map((l) => ({
-                  value: l.code,
-                  label: `${l.name} (${l.code})`,
-                }))}
-              />
-            </Form.Item>
-          </Form>
-
-          <Space wrap>
-            <Button onClick={submitPreview} loading={previewMutation.isPending}>
-              Refresh Preview
-            </Button>
-            <Button
-              disabled={
-                !preview || preview.status !== "DRAFT" || !preview.canPublish
-              }
-              loading={submitMutation.isPending}
-              onClick={() => {
-                if (!preview) {
-                  return;
-                }
-                submitMutation.mutate(preview.sessionId);
-              }}
-            >
-              Submit
-            </Button>
-            <Button
-              disabled={!preview || preview.status !== "IN_REVIEW"}
-              loading={approveMutation.isPending}
-              onClick={() => {
-                if (!preview) {
-                  return;
-                }
-                approveMutation.mutate(preview.sessionId);
-              }}
-            >
-              Approve
-            </Button>
-            <Button
-              danger
-              disabled={!preview || preview.status !== "IN_REVIEW"}
-              loading={rejectMutation.isPending}
-              onClick={() => {
-                if (!preview) {
-                  return;
-                }
-                let reason = "";
-                Modal.confirm({
-                  title: "驳回原因",
-                  content: (
-                    <Input.TextArea
-                      autoSize={{ minRows: 3, maxRows: 8 }}
-                      onChange={(e) => {
-                        reason = e.target.value;
-                      }}
-                    />
-                  ),
-                  okText: "Reject",
-                  cancelText: "Cancel",
-                  onOk: async () => {
-                    if (!reason.trim()) {
-                      message.error("请输入原因");
-                      throw new Error("reason required");
-                    }
-                    await rejectMutation.mutateAsync({
-                      sessionId: preview.sessionId,
-                      reason: reason.trim(),
+                placeholder="请选择命名空间"
+                value={selectedNamespaceIds}
+                onChange={(newIds) => {
+                  // Check if "__ALL__" was selected
+                  if (newIds.includes("__ALL__")) {
+                    const allIds = props.namespaces!.map((n) => n.id);
+                    setSelectedNamespaceIds(allIds);
+                    previewMutation.mutate({
+                      scope: { type: "namespaces", namespaceIds: allIds },
+                      localeCodes: allLocaleCodes,
                     });
-                  },
-                });
-              }}
-            >
-              Reject
-            </Button>
-            <Button
-              type="primary"
-              disabled={
-                !preview || preview.status !== "APPROVED" || !preview.canPublish
-              }
-              loading={publishMutation.isPending}
-              onClick={() => {
-                if (!preview) {
-                  return;
-                }
-                publishMutation.mutate(preview.sessionId);
-              }}
-            >
-              Publish
-            </Button>
-          </Space>
-
-          {preview && preview.errors.length > 0 ? (
-            <Card
-              size="small"
-              style={{ marginTop: 16 }}
-              title={`Validation Errors (${preview.errors.length})`}
-            >
-              <Table
-                size="small"
-                rowKey={(r) =>
-                  `${r.localeCode}:${r.namespaceId}:${r.keyId}:${r.reason}`
-                }
-                columns={errorColumns}
-                dataSource={preview.errors}
-                pagination={{ pageSize: 8 }}
+                  } else {
+                    setSelectedNamespaceIds(newIds);
+                    // Auto-trigger preview when selection changes
+                    if (newIds.length > 0) {
+                      previewMutation.mutate({
+                        scope: { type: "namespaces", namespaceIds: newIds },
+                        localeCodes: allLocaleCodes,
+                      });
+                    } else {
+                      setPreview(null);
+                    }
+                  }
+                }}
+                options={[
+                  { label: "全选", value: "__ALL__" },
+                  ...props.namespaces.map((ns) => ({
+                    label: ns.name,
+                    value: ns.id,
+                  })),
+                ]}
+                style={{ width: "100%" }}
+                maxTagCount={3}
+                allowClear
               />
             </Card>
-          ) : null}
-
-          {parsedFile ? (
-            <Card
-              size="small"
-              style={{ marginTop: 16 }}
-              title="Diff (side-by-side)"
-            >
-              <Diff
-                viewType="split"
-                diffType={parsedFile.type}
-                hunks={parsedFile.hunks}
-              >
-                {(hunks) =>
-                  hunks.map((hunk) => <Hunk key={hunk.content} hunk={hunk} />)
-                }
-              </Diff>
-            </Card>
-          ) : (
-            <Typography.Text type="secondary">
-              {previewMutation.isPending ? "正在加载预览..." : "暂无预览"}
-            </Typography.Text>
           )}
-        </Card>
-      </Space>
+
+        {/* Scope Label Display - Only show in single namespace publish mode */}
+        {!props.allowScopeChange && (
+          <Card size="small">
+            <Typography.Text type="secondary">发布范围: </Typography.Text>
+            <Typography.Text strong>{currentScopeLabel}</Typography.Text>
+          </Card>
+        )}
+
+        {groupedErrors.length > 0 && !preview?.canPublish ? (
+          <Card
+            size="small"
+            title={`Validation Errors (${groupedErrors.length})`}
+            style={{ flex: 4, minHeight: 0, overflow: "hidden" }}
+            styles={{ body: { height: "calc(100% - 40px)", overflow: "auto" } }}
+          >
+            <Table
+              size="small"
+              rowKey={(r) => `${r.namespaceName}:${r.keyName}`}
+              columns={errorColumns}
+              dataSource={groupedErrors}
+              pagination={false}
+            />
+          </Card>
+        ) : null}
+
+        {parsedFile ? (
+          <Card
+            size="small"
+            title="Diff (side-by-side)"
+            style={{ flex: 6, minHeight: 0, overflow: "hidden" }}
+            styles={{ body: { height: "calc(100% - 40px)", overflow: "auto" } }}
+          >
+            <Diff
+              viewType="split"
+              diffType={parsedFile.type}
+              hunks={parsedFile.hunks}
+            >
+              {(hunks) =>
+                hunks.map((hunk) => <Hunk key={hunk.content} hunk={hunk} />)
+              }
+            </Diff>
+          </Card>
+        ) : (
+          <Typography.Text type="secondary">
+            {previewMutation.isPending ? "正在加载预览..." : "暂无预览"}
+          </Typography.Text>
+        )}
+      </div>
     </Drawer>
   );
 };
